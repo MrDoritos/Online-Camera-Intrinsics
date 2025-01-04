@@ -1,0 +1,99 @@
+body {
+  background: transparent; /* Make it white if you need */
+  color: black;
+  padding: 0;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  /*justify-content: center;
+  align-items: center;*/
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.container {
+	min-width:20%;
+	max-width:50%;
+	overflow:scroll;
+	padding:0;
+	margin:0;
+	width: fit-content;
+	max-height:100%;
+}
+
+.container div {
+	display:inline-grid;
+	/*! width: fit-content; */
+	height: 3em;
+	overflow: visible;
+	#min-width: 5em;
+  #font-size:1.2em;
+	#width:50%;
+	#margin-inline: 0.4em;
+	#display:;
+	#display:inline;
+	justify-content: center;
+	\#align-content: center;
+	#justify-self: center;
+	padding: 0;
+	margin:0;
+	width: 12em;
+}
+
+#distortion {
+	width: 95%;
+	border: 1px solid black;
+}
+
+#distortion:hover {
+	transform: scale(2.0);
+}
+
+#center {
+	max-width:50%;
+	min-width:20%;
+	height:fit-content;
+	min-height:100%;
+	
+	background-color: lightgray;
+}
+
+#button, #select, #checkbox {
+	justify-content: center;
+	display:flex;
+	margin: 0;
+	padding: 0;
+}
+
+#canvas {
+	border-top: 1px solid black;
+}
+
+#canvas p, #canvas {
+	text-align: center;
+	margin:0.25em 0 0.25em 0em;
+}
+
+#autocalc, #autodist {
+	margin-top: 0.9em;
+}
+
+button, select, #checkbox p {
+	width:auto;
+	max-width: 14.0em;
+	min-width: 8.0em;
+	margin: 0.25em 0 0.25em 0;
+}
+
+#inputs p, #inputs input, #outputs p, #outputs input {
+  margin:0em;
+  padding:0em;
+	height:1.4em;
+	overflow: visible;
+	#min-width:5em;
+	#max-width:100%;
+	#min-width: 10em;
+	#max-width: 10%;
+	#display:flex;
+  #width: 100%;
+	#justify-self: center;
+}

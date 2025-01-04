@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="inputs" class="container"></div>
+    <div id="center">
+		<div id="button"><button id="calculate" type="button" onclick="calculate_button()">Calculate</button></div>
+		<div id="button"><button id="swap" type="button" onclick="swap_button()">Swap</button></div>
+		<div id="button"><button id="clear" type="button" onclick="clear_button()">Clear</button></div>
+		<div id="button"><button id="reset" type="button" onclick="reset_button()">Reset Preset</button></div>
+		<div id="select"><select id="templates" oninput="on_preset(this)"></select></div>
+		<div id="checkbox"><input id="autocalc" type="checkbox" checked /><p>Automatic Calculation</p></div>
+		<div id="checkbox"><input id="autodist" type="checkbox" checked /><p>Automatic Distortion Viewer</p></div>
+		<div id="canvas"><a id="floatpop"><p>Distortion</p><canvas id="distortion"></canvas></a></div>
+    </div>
+    <div id="outputs" class="container"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
