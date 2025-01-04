@@ -1,28 +1,16 @@
-function quick_format(values) {
-	return {
-		text: values[1],
-		value: values[2],
-		step: values[3],
-		calc: values[4]
-	};
-}
+let outline_empty = {};
+let outline_fields = [];
+let outline_presets = [];
+let sensor_format_presets = [];
+const std_diag_35mm = 43.3; //43.267
 
-function outline_from_raw(raw_input) {
-	let outline = {};
-	raw_input.forEach(n => {
-		outline[n[0]] = { ... quick_format(n) };
-	});
-	//console.log("outline:", outline);
-	return outline;
-}
+/*
+Raspberry Pi camera documentation
+https://www.raspberrypi.com/documentation/accessories/camera.html
 
-function get_empty_outline(raw_input) {
-	let full_outline = outline_from_raw(raw_input);
-	for (const [key, value] of Object.entries(full_outline)) {
-		//full_outline[key].value = ;
-	}
-	return full_outline;
-}
+Sensor crop factor <==> Focal length multiplier
+
+*/
 
 function get_form(query) {
 	var inputs = document.querySelectorAll(query);
@@ -33,107 +21,28 @@ function get_form(query) {
 	return ret;
 }
 
+function get_empty_outline() {
+	let outline_copy = {};
+	for (const [key, value] of Object.entries(outline_empty)) {
+		outline_copy[key] = { ... value };
+	}
+	return outline_copy;
+}
+
+function camera_from_form(form_input) {
+	let input_camera = get_empty_outline();
+	for (const [key, value] of Object.entries(form_input)) {
+		input_camera[key].value = value;
+	}
+	return input_camera;
+}
+
 function get_form_input() {
 	return get_form('#inputs input');
 }
 
 function get_form_output() {
 	return get_form('#outputs input');
-}
-
-/*
-sensor-format 2.3/1"
-radial1 0.158
-radial2 -0.411
-radial3 0.347
-
-*/
-
-const raw_outline = [
-	["sensor-name", "Sensor part number", '', 0, -1],
-	["sensor-name-friendly", "Sensor name", '', 0, -1],
-	["FL", "35mm focal length", '', 0.1, 1],
-	["EFL", "Effective focal length", '', 0.1, 1],
-	["sensor-pix-x", "Sensor X pixel count", '', 100, 1],
-	["sensor-pix-y", "Sensor Y pixel count", '', 100, 1],
-	["sensor-pix-size", "Sensor pixel size (μm)", '', 0.1, 1],
-	["sensor-width", "Sensor width (mm)", '', 0.5, 1],
-	["sensor-height", "Sensor height (mm)", '', 0.5, 1],
-	["sensor-diagonal", "Sensor diagonal (mm)", '', 0.5, 1],
-	["sensor-area", "Sensor area (mm²)", '', 1.0, 1],
-	["sensor-format", "Sensor format", '', 0, -1],
-	["sensor-mp", "Sensor MP", '', 0.5, 1],
-	["sensor-aspect", "Sensor aspect ratio", '', 0.05, 1],
-	["sensor-crop-factor", "Sensor crop factor", '', 0.5, 1], //"Focal length multiplier"
-	["lens-hfov", "Lens horizontal FOV", '', 0.5, 1],
-	["lens-vfov", "Lens vertical FOV", '', 0.5, 1],
-	["lens-dfov", "Lens diagonal FOV", '', 0.5, 1],
-	["lens-dof", "Lens depth of field", '', 0.5, 1],
-	["lens-cof", "Lens circle of confusion", '', 0.5, 1],
-	["lens-image-circle", "Lens image circle dia.", '', 0.5, 1],
-	["subject-distance", "Subject distance (m)", '', 1, 1],
-	["distortion-type", "Radial distortion type", '', 0, -1],
-	["brown3-radial1", "Brown 3 radial 1", '', 0.05, 1],
-	["brown3-radial2", "Brown 3 radial 2", '', 0.05, 1],
-	["brown3-radial3", "Brown 3 radial 3", '', 0.05, 1],
-	["principle-pix-x", "Principle point X", 0, 1, 1],
-	["principle-pix-y", "Principle point Y", 0, 1, 1]
-];
-
-const outline_empty = get_empty_outline(raw_outline);
-
-function get_camera_quick(sn, snf, efl, fl, spx, spy, sps, sf, br1, br2, br3, smp, sd) {
-	let camera_outline = get_empty_outline(raw_outline);
-	camera_outline["EFL"].value = efl;
-	camera_outline["FL"].value = fl;
-	camera_outline["sensor-name"].value = sn;
-	camera_outline["sensor-name-friendly"].value = snf;
-	camera_outline["sensor-pix-x"].value = spx;
-	camera_outline["sensor-pix-y"].value = spy;
-	camera_outline["sensor-pix-size"].value = sps;
-	camera_outline["sensor-diagonal"].value = sd;
-	camera_outline["sensor-format"].value = sf;
-	camera_outline["sensor-mp"].value = smp;
-	camera_outline["brown3-radial1"].value = br1;
-	camera_outline["brown3-radial2"].value = br2;
-	camera_outline["brown3-radial3"].value = br3;
-	return camera_outline;
-}
-
-const default_preset = "IMX766";
-
-const sensor_format_presets = [
-	['1/10"', 1.6, 1.28, 0.96]
-	['1/1.56"',10.2,8.16, 6.12]
-];
-
-/*
-Raspberry Pi camera documentation
-https://www.raspberrypi.com/documentation/accessories/camera.html
-*/
-
-const outline_presets = [
-	get_camera_quick("None", "None", '', '', '', '', '', '', '', '', '', '', ''),
-	get_camera_quick("IMX766", "Samsung A54", 5.54, 24.5, 8160, 6120, 1.0, '1/1.56"', 0.158, -0.411, 0.347, 49.9392, ''),
-	get_camera_quick("OV5647", "Raspberry Pi v1", 3.6, '', 2592, '', 1.4, '1/4"', '', '', '', 5.0, ''),
-	get_camera_quick("IMX219", "Raspberry Pi v2", 3.04, '', 3280, '', 1.12, '1/4"', '', '', '', 8.0, 4.6),
-	get_camera_quick("IMX708", "Raspberry Pi v3", 4.74, '', 4608, '', 1.4, '1/2.43"', '', '', '', 11.9, 7.4),
-	get_camera_quick("IMX477", "Raspberry Pi High Quality", 4.0, '', 4056, '', 1.55, '1/2.3"', '', '', '', 12.3, 7.9),
-	get_camera_quick("IMX500", "Raspberry Pi AI", 4.74, '', 4056, '', 1.55, '1/2.3"', '', '', '', 12.3, 3.75),
-	get_camera_quick("QV2710", "Arducam", 2.8, '', 1920, 1080, 3.0, '1/2.7"', '', '', '', '', ''),
-	get_camera_quick("35mm", "Standard", 35.0, '', '3600', '2400', '10', '36x24', '')
-];
-
-//console.log("outline_from_raw", outline_from_raw(raw_outline), "raw_outline", raw_outline);
-//console.log("get_inputs()", get_inputs());
-
-function camera_from_form(form_input) {
-	let input_camera = outline_empty;
-	//console.log('form_input:', form_input);
-	for (const [key, value] of Object.entries(form_input)) {
-		input_camera[key].value = value;
-	}
-	return input_camera;
 }
 
 function get_inputs() {
@@ -146,16 +55,15 @@ function get_outputs() {
 
 function quick_format_html(outline, readonly) {
 	let innerHTML = "";
-	html_type = readonly ? "text" : "number";
-	extra_text = readonly ? "readonly" : "";
+	let extra_text = readonly ? "readonly" : "";
 
 	for (const [key, value] of Object.entries(outline)) {
+		let html_type = readonly || value.calc < 1 ? "text" : "number";
 		let html =
 `<div><p>${value.text}</p><input type="${html_type}" name="${key}" step="${value.step}" value="${value.value}" ${extra_text} oninput="on_change(this)" /></div>\n`;
-		//console.log("html", html);
 		innerHTML += html;
 	}
-	//console.log("innerHTML", innerHTML, "outline", outline);
+	
 	return innerHTML;
 }
 
@@ -209,8 +117,6 @@ function auto_pyt(cam, a, b) {
 	return Math.sqrt((a*a)+(b*b));
 }
 
-const std_diag_35mm = 43.3; //43.267
-
 function auto_cf(cam, a, b) {
 	return std_diag_35mm / a;
 }
@@ -254,14 +160,14 @@ const solve_requirements = [
 	['sensor-area', 'sensor-width', 'sensor-height', auto_mul, 1],
 	['sensor-diagonal', 'sensor-width', 'sensor-height', auto_pyt, 1],
 	['sensor-crop-factor', 'sensor-diagonal', 'sensor-diagonal', auto_cf, 1],
-	['EFL', 'FL', 'sensor-crop-factor', auto_div, 1],
-	['FL', 'EFL', 'sensor-crop-factor', auto_mul, 1],
-	['lens-dfov', 'EFL', 'sensor-diagonal', auto_xfov, 1],
-	['lens-hfov', 'EFL', 'sensor-width', auto_xfov, 1],
-	['lens-vfov', 'EFL', 'sensor-height', auto_xfov, 1],
-	['EFL', 'lens-dfov', 'sensor-diagonal', auto_xefl, 1],
-	['EFL', 'lens-hfov', 'sensor-width', auto_xefl, 1],
-	['EFL', 'lens-vfov', 'sensor-height', auto_xefl, 1],
+	['effective-focal-length', 'focal-length', 'sensor-crop-factor', auto_div, 1],
+	['focal-length', 'effective-focal-length', 'sensor-crop-factor', auto_mul, 1],
+	['lens-dfov', 'effective-focal-length', 'sensor-diagonal', auto_xfov, 1],
+	['lens-hfov', 'effective-focal-length', 'sensor-width', auto_xfov, 1],
+	['lens-vfov', 'effective-focal-length', 'sensor-height', auto_xfov, 1],
+	['effective-focal-length', 'lens-dfov', 'sensor-diagonal', auto_xefl, 1],
+	['effective-focal-length', 'lens-hfov', 'sensor-width', auto_xefl, 1],
+	['effective-focal-length', 'lens-vfov', 'sensor-height', auto_xefl, 1],
 ];
 
 function multipass_solver(cam) {
@@ -320,8 +226,8 @@ function render_distortion(camera) {
 	canvas.imageSmoothingEnabled = false;
 	
 	let aspect = Number(camera['sensor-aspect'].value);
-	let ppx = Number(camera['principle-pix-x'].value);
-	let ppy = Number(camera['principle-pix-y'].value);
+	let ppx = Number(camera['principal-pix-x'].value);
+	let ppy = Number(camera['principal-pix-y'].value);
 	let senw = Number(camera['sensor-pix-x'].value);
 	let senh = Number(camera['sensor-pix-y'].value);
 	
@@ -398,51 +304,10 @@ function render_distortion(camera) {
 			}
 		}
 	}
-	/*
-	for (let x = -x0; x < x0; x+=dx) {
-		for (let y = -y0; y < y0; y+=dy) {
-			//canvas.moveTo(x0+x,y0+y);
-			//canvas.lineTo(x0+x,y0+y);
-			let rx = Math.round(x0 + x + xoffset);
-			let ry = Math.round(y0 + y + yoffset);
-			
-			let offset = ((ry * width) + rx) * 4;
-			
-			let rpix = Math.sqrt((x * x) + (y * y));
-			let r = rpix / rmax;
-			
-			let model = ((Math.pow(r, 2) * k1) + (Math.pow(r, 4) * k2) + (Math.pow(r, 6) * k3));
-			
-			let undistort_x = rx + (x * model);
-			let undistort_y = ry + (y * model);
-
-			let rux = Math.round(undistort_x);
-			let ruy = Math.round(undistort_y);
-			
-			if (rux < 0 || rux >= width || ruy < 0 || ruy >= height)
-				continue;
-			
-			let undistort_offset = ((ruy * width) + rux) * 4;
-			
-			//data[offset] = 255;
-			//data[offset+1] = 0;
-			//data[offset+2] = 0;
-			//data[offset+3] = 255;
-			put_pixel(data, undistort_offset, red_color);
-		}
-	}
-	*/
 	
 	put_pixel(data, get_offset(_ppx, _ppy, width), green_color);
+
 	canvas.putImageData(image, 0, 0);
-	//Principle point
-	canvas.font = '20px Arial';
-	canvas.textAlign = 'center';
-	canvas.textBaseline = 'middle';
-	//canvas.fillText('x', _ppx, _ppy);
-	
-	//canvas.stroke();
-	
 }
 
 function is_autocalc() {
@@ -489,13 +354,14 @@ function on_preset(element) {
 
 function add_presets(outlines) {
 	let template_dropdown = document.querySelector('div #templates');
-	template_dropdown.innerHTML = "";
+	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
+	
 	outlines.forEach(n => {
 		template_dropdown.innerHTML +=
 `<option value="${n['sensor-name'].value}">${n['sensor-name'].value} (${n['sensor-name-friendly'].value})</option>`;
 	});
-	template_dropdown.value = default_preset;
-	on_preset(template_dropdown);
+	//template_dropdown.value = outlines[0]['sensor-name'].value;
+	//on_preset(template_dropdown);
 }
 
 function reset_button() {
@@ -503,7 +369,7 @@ function reset_button() {
 }
 
 function clear_button() {
-	let empty = get_empty_outline(raw_outline);
+	let empty = get_empty_outline();
 	set_inputs(empty);
 	calculate_all(empty);	
 }
@@ -514,6 +380,134 @@ function swap_button() {
 	calculate_all(to_swap);
 }
 
-//set_outputs(outline_empty);
-//set_inputs(outline_empty);
-add_presets(outline_presets);
+async function load_csv(url) {
+	let csv = [];
+	let r = await fetch(url)
+	let text = await r.text();
+	let lines = text.split('\n');
+	lines.forEach(n => {
+		let parts = n.split(',');
+		csv.push(parts);
+	});
+	console.log("csv:", csv);
+	return csv;
+}
+
+async function process_csv(csv) {
+	let slots = [
+		['outlines', {}],
+		['formats', []],
+		['presets', []]
+	];
+
+	let active = -1;
+	let field = '';
+	let fieldline = false;
+	let tfields = [];
+	let fields = [];
+
+	for (let i = 0; i < csv.length; i++) {
+		let n = csv[i];
+		fieldline = false;
+		if (n[0].length > 0) {
+			for (let j = 0; j < slots.length; j++) {
+				if (n[0] === slots[j][0]) {
+					active = j;
+					field = '';
+					fieldline = true;
+				}
+			}
+
+			if (active > -1) {
+				if (n[0] !== slots[active][0]) {
+					field = n[0];
+				}
+			}
+		}
+
+		if (active < 0)
+			continue;
+
+		let name = slots[active][0];
+		let slot = slots[active][1];
+
+		if (name === 'outlines') {
+			if (fieldline) {
+				fields = n.slice(1);
+				fields.forEach(n => {
+					slot[n] = {};
+				});
+			} else {
+				if (field.length > 0) {
+					for (let i = 0; i < fields.length; i++) {
+						slot[fields[i]][field] = n[i+1];
+					}
+				}
+			}
+			field = '';
+		}
+
+		if (name === 'formats') {
+			if (fieldline) {
+				tfields = n.slice(1);
+			} else {
+				let format = {};
+				if (n[1] === undefined || n[1].length < 1)
+					continue;
+				
+				for (let i = 0; i < tfields.length; i++) {
+					if (tfields[i].length > 0) {
+						format[tfields[i]] = n[i+1];
+					}
+				}
+				slot.push(format);
+			}
+		}
+
+		if (name === 'presets') {
+			if (fieldline) {
+
+			} else {
+				let preset = {};
+				let exit = false;
+				for (let i = 0; i < fields.length; i++) {
+					if (n[i+1] === undefined) {
+						exit = true;
+						break;
+					}
+					let _field = fields[i];
+					//preset[fields[i]] = n[i+1];
+					preset[_field] = { ... slots[0][1][_field] };
+					preset[_field].value = n[i+1];
+				}
+				if (!exit) {
+					slot.push(preset);
+				}
+			}
+		}
+	}
+
+	console.log("slots:", slots);
+	
+	outline_empty = slots[0][1];
+	outline_fields = fields;
+	sensor_format_presets = slots[1][1];
+	outline_presets = slots[2][1];
+
+	return;
+}
+
+async function on_load(element) {
+	document.querySelector('#center').insertAdjacentHTML('afterbegin', '<h1 id="loading">Loading...</h1>');
+	await process_csv(await load_csv('sensors.csv'));
+
+	//set_inputs(outline_empty);
+	//set_outputs(outline_empty);
+	add_presets(outline_presets);
+	//reset_button();
+	set_inputs(outline_presets[1]);
+	calculate_all(get_inputs());
+
+
+	document.querySelector('#loading').remove();
+}

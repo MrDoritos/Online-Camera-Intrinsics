@@ -1,0 +1,23 @@
+outlines,sensor-name,sensor-name-friendly,effective-focal-length,focal-length,sensor-pix-x,sensor-pix-y,sensor-pix-size,sensor-width,sensor-height,sensor-diagonal,sensor-area,sensor-format,sensor-mp,sensor-aspect,sensor-crop-factor,lens-hfov,lens-vfov,lens-dfov,lens-dof,lens-cof,lens-image-circle,subject-distance,distortion-type,brown3-radial1,brown3-radial2,brown3-radial3,principal-pix-x,principal-pix-y
+text,Sensor part number,Sensor name,Effective focal length,35mm focal length,Sensor X pixel count,Sensor Y pixel count,Sensor pixel size (μm),Sensor width (mm),Sensor height (mm),Sensor diagonal (mm),Sensor area (mm²),Sensor format,Sensor MP,Sensor aspect ratio,Sensor crop factor,Lens horizontal FOV,Lens vertical FOV,Lens diagonal FOV,Lens depth of field,Lens circle of confusion,Lens image circle dia.,Subject distance (m),Radial distortion type,Brown 3 radial 1,Brown 3 radial 2,Brown 3 radial 3,Principal point X,Principal point Y
+value,,,,,,,,,,,,,,,,,,,,,,,,,,,0,0
+step,,,0.1,0.1,100,100,0.1,0.5,0.5,0.5,1,,0.5,0.05,0.5,0.5,0.5,0.5,0.5,0.5,0.5,1,,0.05,0.05,0.05,1,1
+calc,,,1,1,1,1,1,1,1,1,1,,1,1,1,1,1,1,1,1,1,1,,1,1,1,1,1
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+formats,sensor-format,sensor-width,sensor-height,sensor-diagonal,,,,,,,,,,,,,,,,,,,,,,,,
+,1/10”,1.28,0.96,1.6,,,,,,,,,,,,,,,,,,,,,,,,
+,1/1.56”,8.16,6.12,10.2,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+presets,outlines*,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,None,None,,,,,,,,,,,,,,,,,,,,,,,,,,
+,IMX766,Samsung A54,5.54,24.5,8160,6120,1,,,,,1/1.56”,49.9392,,,,,,,,,,,0.158,-0.411,0.347,,
+,OV5647,Raspberry Pi v1,3.6,,2592,,1.4,,,,,1/4”,5,,,,,,,,,,,,,,,
+,IMX219,Raspberry Pi v2,3.04,,3280,,1.12,,,4.6,,1/4”,8,,,,,,,,,,,,,,,
+,IMX708,Raspberry Pi v3,4.74,,4608,,1.4,,,7.4,,1/2.43”,11.9,,,,,,,,,,,,,,,
+,IMX477,Raspberry Pi High Quality,4,,4056,,1.55,,,7.9,,1/2.3”,12.3,,,,,,,,,,,,,,,
+,IMX500,Raspberry Pi AI,4.74,,4056,,1.55,,,3.75,,1/2.3”,12.3,,,,,,,,,,,,,,,
+,QV2710,Arducam,2.8,,1920,1080,3,,,,,1/2.7”,,,,,,,,,,,,,,,,
+,135,Kodak 35mm,35,,3600,2400,10,,,,,36”x24”,,,,,,,,,,,,,,,,
