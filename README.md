@@ -12,9 +12,12 @@ Calculate and test different camera parameters to get a better understanding of 
 
 ### To Do
 
-- [] Import exif from loaded image
+- [ ] Import exif from loaded image
 - [X] Undistort an image and save it
-- [] Import/export custom presets
+- [ ] Import/export custom presets
+- [ ] Finish sensor format table
+- [ ] Add more distortion functions
+- [ ] Change page layout for mobile users
 
 ### Note
 
