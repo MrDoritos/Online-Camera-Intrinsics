@@ -318,6 +318,137 @@ function is_autodistort() {
 	return document.getElementById('autodist').checked;
 }
 
+let image_html = null;
+let image_form = null;
+let image_canvas = null;
+
+function display_image(camera) {
+	if (!image_canvas || !image_html)
+		return;
+
+	const element = document.getElementById('undistort_canvas');
+	image_html = document.getElementById('image_canvas');
+	image_canvas = image_html.getContext('2d');
+	element.setAttribute('class', '');
+	const ctx = element.getContext('2d');
+
+	ctx.imageSmoothingQuality = '';
+	ctx.imageSmoothingEnabled = false;
+	let aspect = Number(camera['sensor-aspect'].value);
+
+	let k1 = Number(camera['brown3-radial1'].value);
+	let k2 = Number(camera['brown3-radial2'].value);
+	let k3 = Number(camera['brown3-radial3'].value);
+	
+	if (!aspect)
+		aspect = 1;
+	
+	if (!k1)
+		k1 = 0;
+	if (!k2)
+		k2 = 0;
+	if (!k3)
+		k3 = 0;
+
+	let width = element.width = 300;
+	let height = element.height = Math.round(width / aspect);
+	let image_width = image_canvas.width = image_html.width;
+	let image_height = image_canvas.height = image_html.height;
+
+	//ctx.drawImage(image_data, 0, 0);
+
+	ctx.clearRect(0, 0, width, height);
+
+	const image = ctx.getImageData(0,0,width, height);
+	const data = image.data;
+
+	src_img = image_canvas.getImageData(0,0,image_width,image_height);
+	src_data = src_img.data;
+
+	//console.log(width, height, image_width, image_height, src_data.length);
+	//console.log(element, ctx);
+	//console.log(image_canvas, image_html, src_img, src_data);
+
+	let image_center_x = (width / (width - 1)) / 2;
+	let image_center_y = (height / (height - 1)) / 2;
+
+	for (let canvas_x = 0; canvas_x < width; canvas_x++) {
+		for (let canvas_y = 0; canvas_y < height; canvas_y++) {
+			let canvas_u_t = canvas_x / width;
+			let canvas_v_t = canvas_y / height;
+
+			let canvas_u = canvas_u_t - image_center_x;
+			let canvas_v = canvas_v_t - image_center_y;
+
+			let rmax = Math.sqrt((image_center_x * image_center_x) + (image_center_y * image_center_y));
+			let rpix = Math.sqrt((canvas_u * canvas_u) + (canvas_v * canvas_v));
+			let r = rpix / rmax;
+			let model = (Math.pow(r, 2) * k1) +
+						(Math.pow(r, 4) * k2) +
+						(Math.pow(r, 6) * k3);
+			let undistort_u = (canvas_u * -model) + canvas_u_t;
+			let undistort_v = (canvas_v * -model) + canvas_v_t;
+
+			let edge = (Math.abs(undistort_u-0.5) > 0.5 || Math.abs(undistort_v-0.5) > 0.5);
+
+			let image_offset = get_offset(undistort_u * image_width, undistort_v * image_height, image_width);
+			//let image_offset = get_offset(canvas_u_t * image_width, canvas_v_t * image_height, image_width);
+			
+			let image_sample = [0,0,0,255];
+
+			if (edge) {
+				image_sample = [0,0,0,0];
+			} else {
+				for (let i = 0; i < 3; i++) {
+					image_sample[i] = src_data[image_offset + i];
+				}
+			}
+
+			//console.log(undistort_u, undistort_v, image_offset, image_width, image_height, image_sample, src_data[image_offset]);
+
+			put_pixel(data, get_offset(canvas_x, canvas_y, width), image_sample);
+		}
+		//ctx.drawImage(_image_html, 0, 0);
+		ctx.putImageData(image, 0, 0);
+	}
+}
+
+function load_image_data(data) {
+	image_html = new Image();
+	image_html.onload = function(e) {
+		console.log(image_html);
+		image_element = document.getElementById('image_canvas');
+		image_element.width = image_html.width;
+		image_element.height = image_html.height;
+		image_canvas = image_element.getContext('2d');
+		image_canvas.createImageData(image_html.width, image_html.height);
+		image_canvas.drawImage(image_html, 0, 0);
+		display_image(get_outputs());
+	};
+	image_html.crossOrigin = "anonymous";
+	image_html.src = data;
+}
+
+function load_image() {
+	var file = document.querySelector('input[id="undistort_image"]');
+
+	if (file.files && file.files[0]) {
+		image_form = file.files[0];
+		
+		var reader = new FileReader();
+
+		reader.onload = function(e) {
+			load_image_data(e.target.result);
+		};
+
+		reader.readAsDataURL(image_form);
+	}
+}
+
+function save_button() {
+	
+}
+
 function on_change(element) {
 	//console.log("on_change:", element);
 
@@ -326,15 +457,22 @@ function on_change(element) {
 	if (is_autocalc()) {
 		calculate_intrinsics(camera);
 	}
+
+	camera = get_outputs();
 	
 	if (is_autodistort()) {
 		render_distortion(camera);
+		display_image(camera)
 	}
 }
 
 function calculate_all(camera) {
 	calculate_intrinsics(camera);
+
+	camera = get_outputs();
+
 	render_distortion(camera);
+	display_image(camera);
 }
 
 function calculate_button() {
@@ -507,6 +645,7 @@ async function on_load(element) {
 	//reset_button();
 	set_inputs(outline_presets[1]);
 	calculate_all(get_inputs());
+	load_image();
 
 
 	document.querySelector('#loading').remove();

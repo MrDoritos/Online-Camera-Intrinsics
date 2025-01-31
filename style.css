@@ -30,12 +30,12 @@ body {
 	width: 12em;
 }
 
-#distortion {
+#floatpop>canvas {
 	width: 95%;
 	border: 1px solid black;
 }
 
-#distortion:hover {
+#floatpop>canvas:hover {
 	transform: scale(2.0);
 }
 
@@ -71,18 +71,34 @@ body {
 	font-size:1.2vmax;
 }
 
-#button, #select, #checkbox {
+#button, #select, #checkbox, #recenter {
 	justify-content: center;
 	display:flex;
 	margin: 0;
 	padding: 0;
 }
 
-#canvas {
+
+#file {
+	justify-content: center;
+	text-align: center;
+	margin: 0;
+	padding: 0;
+}
+
+#undistort_image {
+	margin: 0.25em 0 0.25em 0;
+}
+
+#horizontal_border, .horizontal_border {
 	border-top: 1px solid black;
 }
 
-#canvas p, #canvas {
+.temp_hidden {
+	display: none;
+}
+
+#canvas p, #canvas, #file p {
 	text-align: center;
 	margin:0.25em 0 0.25em 0em;
 }

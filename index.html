@@ -8,6 +8,7 @@
     <meta name="description" content="Camera Intrinsics Calculator">
     <title>Camera Intrinsics Calculator</title>
     <link rel="stylesheet" href="style.css">
+    <canvas id="image_canvas" style="display:none"></canvas>
   </head>
   <body onload="on_load(this)">
     <div id="inputs" class="container"></div>
@@ -20,7 +21,11 @@
 		<div id="select"><select id="templates" oninput="on_preset(this)"></select></div>
 		<div id="checkbox"><input id="autocalc" type="checkbox" checked /><p>Automatic Calculation</p></div>
 		<div id="checkbox"><input id="autodist" type="checkbox" checked /><p>Automatic Distortion Viewer</p></div>
-		<div id="canvas"><a id="floatpop"><p>Distortion</p><canvas id="distortion"></canvas></a></div>
+		<div id="canvas" class="horizontal_border"><a id="floatpop"><p>Distortion</p><canvas id="distortion"></canvas></a></div>
+    <div id="recenter"><div id="file"><p id="undistort_image">Choose image to undistort</p><input name="undistort_image" id="undistort_image" type="file" accept="image/*, *" oninput="load_image()" /></div></div>
+		<div id="canvas"><a id="floatpop"><canvas id="undistort_canvas" class="temp_hidden"></canvas></a></div>
+    <div id="button"><button id="undistort_save" type="button" onclick="save_button()">Save image</button></div>
+    <div class="horizontal_border"></div>
     </div>
     <div id="outputs" class="container"></div>
     <p id="footer">Public domain project by iansweb.org <a href="https://github.com/MrDoritos/Online-Camera-Intrinsics">GitHub</a></p>
