@@ -401,100 +401,155 @@ function is_autodistort() {
 	return document.getElementById('autodist').checked;
 }
 
-let image_html = null;
-let image_form = null;
-let image_canvas = null;
+function get_image_file() {
+	return document.querySelector('input[id="undistort_image"]');
+}
 
 function is_image_loaded() {
-	return (image_canvas && image_html);
+	let img_file = get_image_file();
+	return (img_file && img_file.files && img_file.files.length);
+}
+
+function get_image(width = 300, aspect = 1) {
+	if (!is_image_loaded())
+		return 0;
+
+	let element_undistort_preview = document.getElementById('undistort_canvas');
+	let element_image_save = document.getElementById('save_canvas');
+	let element_image_source = document.getElementById('image_canvas');
+	let canvas_undistort_preview = element_undistort_preview.getContext('2d');
+	let canvas_image_save = element_image_save.getContext('2d');
+	let canvas_image_source = element_image_source.getContext('2d');
+
+	let width_undistort_preview = element_undistort_preview.width = width;
+	let height_undistort_preview = element_undistort_preview.height = Math.round(width / aspect);
+	let width_image_source = canvas_image_source.width = element_image_source.width;
+	let height_image_source = canvas_image_source.height = element_image_source.height;
+
+	let imagedata_undistort_preview = 
+		canvas_undistort_preview.getImageData(0,0,width_undistort_preview,height_undistort_preview);
+	let imagedata_image_source = 
+		canvas_image_source.getImageData(0,0,width_image_source,height_image_source);
+
+	return {
+		element_undistort_preview, element_image_save, element_image_source,
+		canvas_undistort_preview, canvas_image_save, canvas_image_source,
+		width_undistort_preview, height_undistort_preview,
+		width_image_source, height_image_source,
+		imagedata_undistort_preview, imagedata_image_source
+	};
 }
 
 function display_image(camera) {
-	if (!image_canvas || !image_html)
+	if (!is_image_loaded())
 		return;
 
-	const element = document.getElementById('undistort_canvas');
-	image_html = document.getElementById('image_canvas');
-	image_canvas = image_html.getContext('2d');
-	element.setAttribute('class', '');
-	const ctx = element.getContext('2d');
+	let parameters = get_distort_parameters(camera, -1);
+	let image = get_image(300, parameters.aspect);
+	let ctx = image.canvas_undistort_preview;
+	let ctxW = image.width_undistort_preview, ctxH = image.height_undistort_preview;
+	let imgW = image.width_image_source, imgH = image.height_image_source;
+
+	image.element_undistort_preview.setAttribute('class', '');
 
 	ctx.imageSmoothingQuality = '';
 	ctx.imageSmoothingEnabled = false;
 	
-	let parameters = get_distort_parameters(camera, -1);
+	ctx.clearRect(0, 0, ctxW, ctxH);
 
-	let width = element.width = 300;
-	let height = element.height = Math.round(width / parameters.aspect);
-	let image_width = image_canvas.width = image_html.width;
-	let image_height = image_canvas.height = image_html.height;
-
-	ctx.clearRect(0, 0, width, height);
-
-	const image = ctx.getImageData(0,0,width, height);
-	const data = image.data;
-
-	src_img = image_canvas.getImageData(0,0,image_width,image_height);
-	src_data = src_img.data;
-
-	for (let canvas_x = 0; canvas_x < width; canvas_x++) {
-		for (let canvas_y = 0; canvas_y < height; canvas_y++) {
-			let uv = distort_pixel(parameters, canvas_x, canvas_y, width, height);
+	for (let canvas_x = 0; canvas_x < ctxW; canvas_x++) {
+		for (let canvas_y = 0; canvas_y < ctxH; canvas_y++) {
+			let uv = distort_pixel(parameters, canvas_x, canvas_y, ctxW, ctxH);
 
 			emplace_pixel_bound(
-				data,
+				image.imagedata_undistort_preview.data,
 				sample_pixel_bound(
-					src_data, 
-					uv.u * image_width,
-					uv.v * image_height,
-					image_width,
-					image_height
+					image.imagedata_image_source.data, 
+					uv.u * imgW,
+					uv.v * imgH,
+					imgW,
+					imgH
 				),
 				canvas_x,
 				canvas_y,
-				width,
-				height
+				ctxW,
+				ctxH
 			);
 		}
 		
-		ctx.putImageData(image, 0, 0);
+		ctx.putImageData(image.imagedata_undistort_preview, 0, 0);
 	}
 }
 
 function load_image_data(data) {
-	image_html = new Image();
-	image_html.onload = function(e) {
-		console.log(image_html);
-		image_element = document.getElementById('image_canvas');
-		image_element.width = image_html.width;
-		image_element.height = image_html.height;
-		image_canvas = image_element.getContext('2d');
-		image_canvas.createImageData(image_html.width, image_html.height);
-		image_canvas.drawImage(image_html, 0, 0);
+	let image = new Image();
+	image.onload = function() {
+		let in_doc = get_image(300, 1);
+		let width = image.width, height = image.height;
+		in_doc.element_image_source.width = width;
+		in_doc.element_image_source.height = height;
+		in_doc.canvas_image_source.drawImage(image, 0, 0);
 		display_image(get_outputs());
 	};
-	image_html.crossOrigin = "anonymous";
-	image_html.src = data;
+	image.crossOrigin = "anonymous";
+	image.src = data;
 }
 
 function load_image() {
-	var file = document.querySelector('input[id="undistort_image"]');
+	let file = get_image_file();
 
-	if (file.files && file.files[0]) {
-		image_form = file.files[0];
-		
-		var reader = new FileReader();
+	if (!is_image_loaded())
+		return;
 
-		reader.onload = function(e) {
-			load_image_data(e.target.result);
-		};
+	let image_form = file.files[0];
 
-		reader.readAsDataURL(image_form);
-	}
+	let reader = new FileReader();
+	reader.onload = function(e) {
+		load_image_data(e.target.result);
+	};
+
+	reader.readAsDataURL(image_form);
 }
 
 function save_button() {
+	let image = get_image(300, 1);
+
+	if (!image)
+		return;
+
+	let params = get_distort_parameters(get_outputs(), -1);
 	
+	if (!params)
+		return;
+
+	image.element_image_save.width = image.width_image_source;
+	image.element_image_save.height = image.height_image_source;
+	let undistort_out = image.canvas_image_save.createImageData(image.width_image_source, image.height_image_source);
+
+	for (let x = 0; x < undistort_out.width; x++) {
+		for (let y = 0; y < undistort_out.height; y++) {
+			let uv = distort_pixel(params, x, y, undistort_out.width, undistort_out.height);
+			emplace_pixel_bound(undistort_out.data, 
+				sample_pixel_bound(
+					image.imagedata_image_source.data,
+					uv.u * image.width_image_source,
+					uv.v * image.height_image_source,
+					image.width_image_source,
+					image.height_image_source
+				),
+				x,
+				y,
+				undistort_out.width,
+				undistort_out.height
+			);
+		}
+	}
+
+	image.canvas_image_save.putImageData(undistort_out, 0, 0);
+
+	window.open(image.element_image_save.toDataURL("image/png"));
+
+	display_image(get_outputs());
 }
 
 function on_change(element) {
@@ -575,7 +630,7 @@ async function load_csv(url) {
 		let parts = n.split(',');
 		csv.push(parts);
 	});
-	console.log("csv:", csv);
+	//console.log("csv:", csv);
 	return csv;
 }
 
@@ -673,7 +728,7 @@ async function process_csv(csv) {
 		}
 	}
 
-	console.log("slots:", slots);
+	//console.log("slots:", slots);
 	
 	outline_empty = slots[0][1];
 	outline_fields = fields;
