@@ -219,6 +219,89 @@ let red_color = [255,0,0,255];
 let blue_color = [0,0,255,255];
 let green_color = [0,255,0,255];
 
+function get_distort_parameters(camera, direction) {
+	let params = {k1:0.0,k2:0.0,k3:0.0,aspect:1.0,direction:direction};
+
+	if (!camera)
+		return params;
+
+	let aspect = Number(camera['sensor-aspect'].value);
+
+	let k1 = Number(camera['brown3-radial1'].value);
+	let k2 = Number(camera['brown3-radial2'].value);
+	let k3 = Number(camera['brown3-radial3'].value);
+
+	if (aspect)
+		params.aspect = aspect;
+	if (k1)
+		params.k1 = k1;
+	if (k2)
+		params.k2 = k2;
+	if (k3)
+		params.k3 = k3;
+
+	return params;
+}
+
+function in_bound(x, y, width, height) {
+	return (x < width && y < height && x >= 0 && y >= 0);
+}
+
+function emplace_pixel(data, pixel, x, y, width, height) {
+	let offset = get_offset(x, y, width);
+	for (let i = 0; i < 4; i++)
+		data[offset + i] = pixel[i];
+}
+
+function emplace_pixel_bound(data, pixel, x, y, width, height) {
+	if (!in_bound(x,y,width,height))
+		return;
+	emplace_pixel(data, pixel, x, y, width, height);
+}
+
+function sample_pixel(data, x, y, width, height) {
+	let pixel = [0,0,0,255];
+	let offset = get_offset(x, y, width);
+	for (let i = 0; i < 4; i++)
+		pixel[i] = data[offset + i];
+	return pixel;
+}
+
+function sample_pixel_bound(data, x, y, width, height) {
+	if (!in_bound(x,y,width,height))
+		return [0,0,0,0];
+	return sample_pixel(data, x, y, width, height);
+}
+
+function distort_pixel(parameters, x, y, width, height) {
+	let center_x = 1 / 2;
+	let center_y = 1 / 2;
+
+	let rel_u = x / width;
+	let rel_v = y / height;
+
+	let u = rel_u - center_x;
+	let v = rel_v - center_y;
+
+	let max_radius = ((center_x * center_x) + (center_y * center_y));
+	let pix_radius = ((u * u) + (v * v));
+	let radius = pix_radius / max_radius;
+	let model = ((Math.pow(radius, 2) * parameters.k1) +
+				 (Math.pow(radius, 4) * parameters.k2) +
+				 (Math.pow(radius, 6) * parameters.k3)) * parameters.direction;
+
+	let undistort_u = (u * model);
+	let undistort_v = (v * model);
+
+	let undistort_rel_u = undistort_u + rel_u;
+	let undistort_rel_v = undistort_v + rel_v;
+
+	let edge = radius >= 1.0;
+	edge = (Math.abs(undistort_rel_u - 0.5) > 0.5 || Math.abs(undistort_rel_v - 0.5) > 0.5);
+
+	return {u:undistort_rel_u, v:undistort_rel_v, edge:edge};
+}
+
 function render_distortion(camera) {
 	let element = document.getElementById('distortion');
 	let canvas = element.getContext('2d');
@@ -322,6 +405,10 @@ let image_html = null;
 let image_form = null;
 let image_canvas = null;
 
+function is_image_loaded() {
+	return (image_canvas && image_html);
+}
+
 function display_image(camera) {
 	if (!image_canvas || !image_html)
 		return;
@@ -334,28 +421,13 @@ function display_image(camera) {
 
 	ctx.imageSmoothingQuality = '';
 	ctx.imageSmoothingEnabled = false;
-	let aspect = Number(camera['sensor-aspect'].value);
-
-	let k1 = Number(camera['brown3-radial1'].value);
-	let k2 = Number(camera['brown3-radial2'].value);
-	let k3 = Number(camera['brown3-radial3'].value);
 	
-	if (!aspect)
-		aspect = 1;
-	
-	if (!k1)
-		k1 = 0;
-	if (!k2)
-		k2 = 0;
-	if (!k3)
-		k3 = 0;
+	let parameters = get_distort_parameters(camera, -1);
 
 	let width = element.width = 300;
-	let height = element.height = Math.round(width / aspect);
+	let height = element.height = Math.round(width / parameters.aspect);
 	let image_width = image_canvas.width = image_html.width;
 	let image_height = image_canvas.height = image_html.height;
-
-	//ctx.drawImage(image_data, 0, 0);
 
 	ctx.clearRect(0, 0, width, height);
 
@@ -365,50 +437,26 @@ function display_image(camera) {
 	src_img = image_canvas.getImageData(0,0,image_width,image_height);
 	src_data = src_img.data;
 
-	//console.log(width, height, image_width, image_height, src_data.length);
-	//console.log(element, ctx);
-	//console.log(image_canvas, image_html, src_img, src_data);
-
-	let image_center_x = (width / (width - 1)) / 2;
-	let image_center_y = (height / (height - 1)) / 2;
-
 	for (let canvas_x = 0; canvas_x < width; canvas_x++) {
 		for (let canvas_y = 0; canvas_y < height; canvas_y++) {
-			let canvas_u_t = canvas_x / width;
-			let canvas_v_t = canvas_y / height;
+			let uv = distort_pixel(parameters, canvas_x, canvas_y, width, height);
 
-			let canvas_u = canvas_u_t - image_center_x;
-			let canvas_v = canvas_v_t - image_center_y;
-
-			let rmax = Math.sqrt((image_center_x * image_center_x) + (image_center_y * image_center_y));
-			let rpix = Math.sqrt((canvas_u * canvas_u) + (canvas_v * canvas_v));
-			let r = rpix / rmax;
-			let model = (Math.pow(r, 2) * k1) +
-						(Math.pow(r, 4) * k2) +
-						(Math.pow(r, 6) * k3);
-			let undistort_u = (canvas_u * -model) + canvas_u_t;
-			let undistort_v = (canvas_v * -model) + canvas_v_t;
-
-			let edge = (Math.abs(undistort_u-0.5) > 0.5 || Math.abs(undistort_v-0.5) > 0.5);
-
-			let image_offset = get_offset(undistort_u * image_width, undistort_v * image_height, image_width);
-			//let image_offset = get_offset(canvas_u_t * image_width, canvas_v_t * image_height, image_width);
-			
-			let image_sample = [0,0,0,255];
-
-			if (edge) {
-				image_sample = [0,0,0,0];
-			} else {
-				for (let i = 0; i < 3; i++) {
-					image_sample[i] = src_data[image_offset + i];
-				}
-			}
-
-			//console.log(undistort_u, undistort_v, image_offset, image_width, image_height, image_sample, src_data[image_offset]);
-
-			put_pixel(data, get_offset(canvas_x, canvas_y, width), image_sample);
+			emplace_pixel_bound(
+				data,
+				sample_pixel_bound(
+					src_data, 
+					uv.u * image_width,
+					uv.v * image_height,
+					image_width,
+					image_height
+				),
+				canvas_x,
+				canvas_y,
+				width,
+				height
+			);
 		}
-		//ctx.drawImage(_image_html, 0, 0);
+		
 		ctx.putImageData(image, 0, 0);
 	}
 }
