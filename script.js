@@ -220,25 +220,30 @@ let blue_color = [0,0,255,255];
 let green_color = [0,255,0,255];
 
 function get_distort_parameters(camera, direction) {
-	let params = {k1:0.0,k2:0.0,k3:0.0,aspect:1.0,direction:direction};
+	let params = {k1:0.0,k2:0.0,k3:0.0,aspect:1.0,ppx:0,ppy:0,senw:1,senh:1,direction:direction};
 
-	if (!camera)
-		return params;
+	if (!camera) return params;
 
 	let aspect = Number(camera['sensor-aspect'].value);
 
 	let k1 = Number(camera['brown3-radial1'].value);
 	let k2 = Number(camera['brown3-radial2'].value);
 	let k3 = Number(camera['brown3-radial3'].value);
+	
+	let ppx = Number(camera['principal-pix-x'].value);
+	let ppy = Number(camera['principal-pix-y'].value);
 
-	if (aspect)
-		params.aspect = aspect;
-	if (k1)
-		params.k1 = k1;
-	if (k2)
-		params.k2 = k2;
-	if (k3)
-		params.k3 = k3;
+	let senw = Number(camera['sensor-pix-x'].value);
+	let senh = Number(camera['sensor-pix-y'].value);
+
+	if (aspect) params.aspect = aspect;
+	if (k1)	params.k1 = k1;
+	if (k2)	params.k2 = k2;
+	if (k3)	params.k3 = k3;
+	if (senw) params.senw = senw;
+	if (senh) params.senh = senh;
+	if (ppx) params.ppx = ppx / senw;
+	if (ppy) params.ppy = ppy / senh;
 
 	return params;
 }
@@ -274,8 +279,8 @@ function sample_pixel_bound(data, x, y, width, height) {
 }
 
 function distort_pixel(parameters, x, y, width, height) {
-	let center_x = 1 / 2;
-	let center_y = 1 / 2;
+	let center_x = 1 / 2 + parameters.ppx;
+	let center_y = 1 / 2 + parameters.ppy;
 
 	let rel_u = x / width;
 	let rel_v = y / height;
@@ -297,7 +302,7 @@ function distort_pixel(parameters, x, y, width, height) {
 	let undistort_rel_v = undistort_v + rel_v;
 
 	let edge = radius >= 1.0;
-	edge = (Math.abs(undistort_rel_u - 0.5) > 0.5 || Math.abs(undistort_rel_v - 0.5) > 0.5);
+	//edge = (Math.abs(undistort_rel_u - 0.5) > 0.5 || Math.abs(undistort_rel_v - 0.5) > 0.5);
 
 	return {u:undistort_rel_u, v:undistort_rel_v, edge:edge};
 }
@@ -308,89 +313,40 @@ function render_distortion(camera) {
 	canvas.imageSmoothingQuality = '';
 	canvas.imageSmoothingEnabled = false;
 	
-	let aspect = Number(camera['sensor-aspect'].value);
-	let ppx = Number(camera['principal-pix-x'].value);
-	let ppy = Number(camera['principal-pix-y'].value);
-	let senw = Number(camera['sensor-pix-x'].value);
-	let senh = Number(camera['sensor-pix-y'].value);
-	
-	let k1 = Number(camera['brown3-radial1'].value);
-	let k2 = Number(camera['brown3-radial2'].value);
-	let k3 = Number(camera['brown3-radial3'].value);
-	
-	if (!aspect)
-		aspect = 1;
-	
-	let width = element.width = 150;
-	let height = element.height = Math.round(width / aspect);
+	let params = get_distort_parameters(camera, 1);
+
+	let width = element.width = 300;
+	let height = element.height = Math.round(width / params.aspect);
 	
 	canvas.clearRect(0,0,width,height);
 	
-	let image = canvas.getImageData(0,0,width, height);
-	let data = image.data;
+	let imageData = canvas.createImageData(width, height);
+	let data = imageData.data;
 	
-	let x0 = width * 0.5;
-	let y0 = height * 0.5;
-	
-	let scale = 1.0;
 	let divisions = 25;
-	let div_x = divisions;
-	let div_y = divisions * aspect;
 	
-	let dx = width / divisions;
-	let dy = height / divisions * aspect;
+	let dx = (width - 1) / divisions;
+	let dy = dx / params.aspect;
 	
-	let xoffset = dx * 0.5;
-	let yoffset = dy * 0.5;
-	
-	let _sw = senw / width;
-	let _sh = senh / height;
-	let _ppx = ((senw / 2) + ppx) / _sw;
-	let _ppy = ((senh / 2) + ppy) / _sh;
-	
-	let rmax = Math.sqrt((x0 * x0) + (y0 * y0));
-	
-	for (let _dx = 0; _dx < div_x; _dx++) {
-		for (let _dy = 0; _dy < div_y; _dy++) {
-			for (let _x = 0, _y = 0; _x < dx && _y < dy; _x++, _y++) {
-				let _xo = Math.round(_dx * dx - (dx*0.5));
-				let _yo = Math.round(_dy * dy - (dy*0.5));
-				let x = _xo + _x;
-				let y = _yo + _y;
-				let rx = x;
-				let ry = y;
-				let cx = rx - x0 - (_ppx - x0);
-				let cy = ry - y0 - (_ppy - y0);
-						
-				let rpix = Math.sqrt((cx * cx) + (cy * cy)); //sample dist from center
-				let r = rpix / rmax;
-				let model = ((Math.pow(r, 2) * k1) + (Math.pow(r, 4) * k2) + (Math.pow(r, 6) * k3));
-				
-				let undistort_x = rx + (cx * model);
-				let undistort_y = ry + (cy * model);
-				let undistort_x0 = _xo + (cx * model);
-				let undistort_y0 = _yo + (cy * model);
-
-				let rux = Math.round(undistort_x);
-				let ruy = Math.round(undistort_y);
-				let rux0 = Math.round(undistort_x0);
-				let ruy0 = Math.round(undistort_y0);
-				
-				
-				if (rux < 0 || rux >= width || ruy < 0 || ruy >= height)
-					continue;
-				
-				//put_pixel(data, get_offset(x, _yo, width), blue_color);
-				//put_pixel(data, get_offset(_xo, y, width), blue_color);
-				put_pixel(data, get_offset(rux, ruy0, width), red_color);
-				put_pixel(data, get_offset(rux0, ruy, width), red_color);
-			}
+	for (let _dx = 0; _dx < width; _dx+=dx) {
+		for (let _y = 0; _y < height; _y++) {
+			let uv = distort_pixel(params, _dx, _y, width, height);
+			if (!uv.edge)
+				emplace_pixel_bound(data, red_color, uv.u * width, uv.v * height, width, height);
 		}
 	}
-	
-	put_pixel(data, get_offset(_ppx, _ppy, width), green_color);
 
-	canvas.putImageData(image, 0, 0);
+	for (let _dy = 0; _dy < height; _dy+=dy) {
+		for (let _x = 0; _x < width; _x++) {
+			let uv = distort_pixel(params, _x, _dy, width, height);
+			if (!uv.edge)
+				emplace_pixel_bound(data, red_color, uv.u * width, uv.v * height, width, height);
+		}
+	}
+
+	emplace_pixel_bound(data, green_color, width * 0.5 + params.ppx * width, height * 0.5 + params.ppy * width, width, height);
+
+	canvas.putImageData(imageData, 0, 0);
 }
 
 function is_autocalc() {

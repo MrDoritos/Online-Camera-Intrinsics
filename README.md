@@ -1,6 +1,6 @@
 ## Online Camera Intrinsics Calculator
 
-### Hosted at https://iansweb.org/
+### View live site at https://iansweb.org/
 
 Calculate and test different camera parameters to get a better understanding of some of the values. Will extrapolate as best it can with any given parameters. Has some presets.
 
@@ -12,9 +12,9 @@ Calculate and test different camera parameters to get a better understanding of 
 
 ### To Do
 
-- Load image and import exif
-- Undistort an image
-- Import/export custom presets
+- [] Import exif from loaded image
+- [X] Undistort an image and save it
+- [] Import/export custom presets
 
 ### Note
 
