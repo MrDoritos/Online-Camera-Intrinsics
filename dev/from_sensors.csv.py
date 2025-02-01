@@ -19,18 +19,27 @@ def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sens
     print("template:", json.dumps(template_json))
 
     sensors_csv = csv.reader(sensors_csv_file)
-    outline = next(sensors_csv)
-    friendly = next(sensors_csv)
-
-    print(outline)
+    outline_csv = next(sensors_csv)
+    friendly_csv = next(sensors_csv)
 
     header_csv = csv.writer(sys.stdout)
     #if not dry_run:
     if True:
         header_csv = csv.writer(sensor_header_file)
 
-    header_csv.writerow(outline[1:])
-    header_csv.writerow(friendly[1:])
+    outline = []
+    friendly = []
+
+    for i in range(1, len(outline_csv)):
+        if outline_csv[i] and len(outline_csv[i]):
+            outline.append(outline_csv[i])
+            friendly.append(friendly_csv[i])
+
+    header_csv.writerow(outline)
+    header_csv.writerow(friendly)
+
+    print('outline:', outline)
+    print('friendly:', friendly)
 
     is_preset = False
 
@@ -55,11 +64,12 @@ def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sens
             dict: dict
         }
 
-        for i in range(1, len(outline)):
-            #print(outline[i], row[i])
+        for x in template_json:
+            i = outline_csv.index(x)
             data = row[i]
-            key = outline[i]
+            key = x
             template_data = template_json[key]
+            print(outline_csv[i], row[i], template_data, type(template_data))
             if not data or len(data) < 1 or data is 0:
                 sensor_json[key] = template_data
             else:

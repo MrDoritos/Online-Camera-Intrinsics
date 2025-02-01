@@ -42,7 +42,7 @@ def create_data(sensors_csv_all_fp, sensor_template_fp, sensors_header_fp, senso
                     with open(n_file) as sensor_json_fp:
                         sensor_json = json.load(sensor_json_fp)
 
-                        values = [sensor_json[x] for x in sensor_json]
+                        values = [sensor_json[x] for x in header]
                         for i in range(len(values)):
                             if values[i] == 0:
                                 values[i] = ''
