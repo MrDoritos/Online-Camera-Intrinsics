@@ -1,7 +1,13 @@
 let outline_empty = {};
 let outline_fields = [];
 let outline_presets = [];
+let sensor_cache = [];
+let current_sensor = {};
 let sensor_format_presets = [];
+let sensors_all = [];
+const red_color = [255,0,0,255];
+const blue_color = [0,0,255,255];
+const green_color = [0,255,0,255];
 const std_diag_35mm = 43.3; //43.267
 
 /*
@@ -214,10 +220,6 @@ function put_pixel(imagedata,offset,data) {
 function get_offset(x, y, w) {
 	return Math.round(Math.round(y) * w + x) * 4;
 }
-
-let red_color = [255,0,0,255];
-let blue_color = [0,0,255,255];
-let green_color = [0,255,0,255];
 
 function get_distort_parameters(camera, direction) {
 	let params = {k1:0.0,k2:0.0,k3:0.0,aspect:1.0,ppx:0,ppy:0,senw:1,senh:1,direction:direction};
@@ -538,27 +540,42 @@ function calculate_button() {
 	calculate_all(get_inputs());
 }
 
-function on_preset(element) {
-	let current_preset_name = element.value;	
-	outline_presets.forEach(n => {
-		if (n['sensor-name'].value === current_preset_name) {
-			set_inputs(n);
-			on_change(element);
-			return;
-		}
+async function on_preset(element) {
+	let preset_name = element.value;	
+
+	let cached = sensor_cache.find(n => n[0] === preset_name);
+
+	let camera = undefined;
+
+	if (cached)
+		camera = await load_preset(preset_name);
+	else
+		camera = await load_preset_from_all(preset_name);
+
+	if (camera) {
+		set_inputs(camera);
+		on_change(element);
+	}
+}
+
+function add_presets_kvs(kvs) {
+	let template_dropdown = document.querySelector('div #templates');
+	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
+	
+	kvs.forEach(kv => {
+		template_dropdown.innerHTML +=
+			`<option value="${kv[0]}">${kv[0]} (${kv[1]})</option>`;
 	});
 }
 
 function add_presets(outlines) {
-	let template_dropdown = document.querySelector('div #templates');
-	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
-	
+	let kvs = [];
+
 	outlines.forEach(n => {
-		template_dropdown.innerHTML +=
-`<option value="${n['sensor-name'].value}">${n['sensor-name'].value} (${n['sensor-name-friendly'].value})</option>`;
+		kvs.push([n['sensor-name'].value,n['sensor-name-friendly'].value]);
 	});
-	//template_dropdown.value = outlines[0]['sensor-name'].value;
-	//on_preset(template_dropdown);
+
+	add_presets_kvs(kvs);
 }
 
 function reset_button() {
@@ -581,9 +598,9 @@ async function load_csv(url) {
 	let csv = [];
 	let r = await fetch(url)
 	let text = await r.text();
-	let lines = text.split('\n');
+	let lines = text.trim().split('\n');
 	lines.forEach(n => {
-		let parts = n.split(',');
+		let parts = n.trim().split(',');
 		csv.push(parts);
 	});
 	//console.log("csv:", csv);
@@ -694,18 +711,108 @@ async function process_csv(csv) {
 	return;
 }
 
-async function on_load(element) {
-	document.querySelector('#center').insertAdjacentHTML('afterbegin', '<h1 id="loading">Loading...</h1>');
-	await process_csv(await load_csv('sensors.csv'));
+async function load_cache(csv) {
+	let kv = csv[0];
+	sensor_cache = [];
 
-	//set_inputs(outline_empty);
-	//set_outputs(outline_empty);
-	add_presets(outline_presets);
-	//reset_button();
-	set_inputs(outline_presets[1]);
+	//sensor_cache = csv;
+
+	for (let i = 1; i < csv.length; i++) {
+		let preset = {};
+		preset[kv[0]] = csv[i][0];
+		preset[kv[1]] = csv[i][1];
+		outline_presets.push(preset);
+		sensor_cache.push([csv[i][0], csv[i][1]]);
+	}
+}
+
+async function load_all(csv) {
+	let columns = outline_fields.length;
+	let rows = csv.length;
+	sensors_all = [];
+
+	for (let i_row = 5; i_row < rows; i_row++) {
+		let preset = get_empty_outline();
+
+		for (let i_column = 0; i_column < columns; i_column++) {
+			let key = outline_fields[i_column];
+			let value = csv[i_row][i_column];
+
+			preset[key].value = value;
+		}
+
+		sensors_all.push(preset);
+	}
+
+	return sensors_all;
+}
+
+async function load_header(csv) {
+	outline_empty = {};
+
+	outline_fields = [];
+	let field_line = csv[0];
+	for (let i = 0; i < field_line.length; i++) {
+		outline_fields.push(field_line[i]);
+		outline_empty[field_line[i]] = {};
+	}
+
+	let titles = ['outline', 'text', 'value', 'step', 'calc'];
+
+	//console.log(csv);
+	for (let i = 1; i < csv.length; i++) {
+		let row = csv[i];
+		//console.log(row);
+		for (let v = 0; v < outline_fields.length; v++) {
+			console.log(i,v,row[v],titles[i],outline_fields[v]);
+			outline_empty[outline_fields[v]][titles[i]] = row[v];
+		}
+	}
+}
+
+function camera_from_json(json) {
+	let input_camera = get_empty_outline();
+
+	if (!json)
+		return input_camera;
+
+	for (const [key, value] of Object.entries(json))
+		if (json[key] && json[key] != 0)
+			input_camera[key].value = value;
+
+	return input_camera;
+}
+
+async function load_preset(sensor_name) {
+	let response = await fetch('sensors/' + sensor_name + '/' + sensor_name + '.json');
+	return camera_from_json(await response.json());
+}
+
+async function load_preset_from_all(sensor_name) {
+	let csv = await load_csv('sensors/sensors_all.csv');
+	let all = await load_all(csv);
+
+	let all_index = all.find(n => n['sensor-name'] === sensor_name);
+
+	if (!all_index)
+		return;
+
+	return camera_from_form(all_index);
+}
+
+async function on_load(element) {
+	document.querySelector('#loading').textContent = "Loading...";
+
+	await load_header(await load_csv('sensors/sensors_header.csv'))
+	await load_cache(await load_csv('sensors/sensors_cache.csv'))
+
+	add_presets_kvs(sensor_cache);
+	let input = await load_preset(sensor_cache[0][0]);
+
+	set_inputs(input);
+
 	calculate_all(get_inputs());
 	load_image();
-
 
 	document.querySelector('#loading').remove();
 }
