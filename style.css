@@ -120,3 +120,63 @@ button, select, #checkbox p {
 	height:1.4em;
 	overflow: visible;
 }
+
+#csv table tr:hover {
+	background-color: rgba(150,0,0,0.3);
+}
+
+#csv table tr :nth-child(even) {
+	background-color: rgba(180,180,180,0.4);
+}
+
+#csv table :nth-child(even) {
+	background-color: rgba(200,200,200,0.4);
+}
+
+#csv table tr:nth-child(1) {
+	background-color: rgba(150,150,150,1.0);
+}
+
+#csv table td:nth-child(1) {
+	background-color: rgba(150,150,150,1.0);
+}
+
+#csv table tr, #csv table tr td, #csv table tr th {
+	margin: 0;
+	padding: 0;
+	align-items: center;
+	height: 2.7vh;
+	max-width: 10em;
+	overflow-x: visible;
+}
+
+#csv table tr td:hover {
+	padding:0;
+	height:1.9vh;
+}
+
+#csv p:hover {
+	background-color: brown;
+	border: 0.1em solid black;
+	z-index: 11;
+	overflow-x: visible;
+	height: 2.2vh;
+	min-width: max-content;
+}
+
+#csv p {
+	padding: 0.2em;
+	margin: 0;
+	font-size: 2vh;
+	text-align: center;
+	white-space: nowrap;
+	overflow-x: clip;
+}
+
+#control {
+	max-width: 20vw;
+}
+
+#csv {
+	padding-bottom: 3em;
+}
