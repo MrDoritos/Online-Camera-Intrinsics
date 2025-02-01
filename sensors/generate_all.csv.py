@@ -6,7 +6,7 @@ import sys
 import csv
 from typing import cast
 
-dry_run = True
+dry_run = False
 sensors_directory_filepath = 'sensors/'
 sensors_csv_all_filename = 'sensors_all.csv'
 sensor_template_filename = 'sensors_template.json'
