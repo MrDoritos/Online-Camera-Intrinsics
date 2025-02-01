@@ -1,11 +1,9 @@
-let outline_empty = {};
-let outline_fields = [];
-let outline_presets = [];
+// #region Internal state and constants
+
 let sensors_header = [];
 let sensors_cache = [];
 let sensors_fields = [];
 let sensor_empty = {};
-let current_sensor = {};
 let sensor_format_presets = [];
 let sensors_all = [];
 const red_color = [255,0,0,255];
@@ -13,13 +11,7 @@ const blue_color = [0,0,255,255];
 const green_color = [0,255,0,255];
 const std_diag_35mm = 43.3; //43.267
 
-/*
-Raspberry Pi camera documentation
-https://www.raspberrypi.com/documentation/accessories/camera.html
-
-Sensor crop factor <==> Focal length multiplier
-
-*/
+// #endregion
 
 // #region Data generation
 
