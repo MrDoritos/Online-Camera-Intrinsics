@@ -18,13 +18,20 @@ Sensor crop factor <==> Focal length multiplier
 
 */
 
-function get_form(query) {
-	var inputs = document.querySelectorAll(query);
-	let ret = {};
-	inputs.forEach(n => {
-		ret[n.name] = n.value;
-	});
-	return ret;
+// #region Data generation
+
+function quick_format_html(outline, readonly) {
+	let innerHTML = "";
+	let extra_text = readonly ? "readonly" : "";
+
+	for (const [key, value] of Object.entries(outline)) {
+		let html_type = readonly || value.calc < 1 ? "text" : "number";
+		let html =
+`<div><p>${value.text}</p><input type="${html_type}" name="${key}" step="${value.step}" value="${value.value}" ${extra_text} oninput="on_change(this)" /></div>\n`;
+		innerHTML += html;
+	}
+	
+	return innerHTML;
 }
 
 function get_empty_outline() {
@@ -43,6 +50,32 @@ function camera_from_form(form_input) {
 	return input_camera;
 }
 
+function camera_from_json(json) {
+	let input_camera = get_empty_outline();
+
+	if (!json)
+		return input_camera;
+
+	for (const [key, value] of Object.entries(json))
+		if (json[key] && json[key] != 0)
+			input_camera[key].value = value;
+
+	return input_camera;
+}
+
+// #endregion
+
+// #region Query internal state
+
+function get_form(query) {
+	var inputs = document.querySelectorAll(query);
+	let ret = {};
+	inputs.forEach(n => {
+		ret[n.name] = n.value;
+	});
+	return ret;
+}
+
 function get_form_input() {
 	return get_form('#inputs input');
 }
@@ -59,18 +92,36 @@ function get_outputs() {
 	return camera_from_form(get_form_output());
 }
 
-function quick_format_html(outline, readonly) {
-	let innerHTML = "";
-	let extra_text = readonly ? "readonly" : "";
+function is_autocalc() {
+	return document.getElementById('autocalc').checked;
+}
 
-	for (const [key, value] of Object.entries(outline)) {
-		let html_type = readonly || value.calc < 1 ? "text" : "number";
-		let html =
-`<div><p>${value.text}</p><input type="${html_type}" name="${key}" step="${value.step}" value="${value.value}" ${extra_text} oninput="on_change(this)" /></div>\n`;
-		innerHTML += html;
-	}
+function is_autodistort() {
+	return document.getElementById('autodist').checked;
+}
+
+// #endregion
+
+// #region Modify internal state
+
+function add_presets_kvs(kvs) {
+	let template_dropdown = document.querySelector('div #templates');
+	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
 	
-	return innerHTML;
+	kvs.forEach(kv => {
+		template_dropdown.innerHTML +=
+			`<option value="${kv[0]}">${kv[0]} (${kv[1]})</option>`;
+	});
+}
+
+function add_presets(outlines) {
+	let kvs = [];
+
+	outlines.forEach(n => {
+		kvs.push([n['sensor-name'].value,n['sensor-name-friendly'].value]);
+	});
+
+	add_presets_kvs(kvs);
 }
 
 function set_inputs(camera) {
@@ -83,133 +134,9 @@ function set_outputs(camera) {
 	outputs_div.innerHTML = quick_format_html(camera, true);
 }
 
-function get_missing(camera, template) {
-	let missing_entries = [];
-	for (const [key, value] of Object.entries(camera)) {
-		if (value.value === "" && value.calc !== -1) {
-			missing_entries.push(key);
-		}
-	}
-	return missing_entries;
-}
+// #endregion
 
-function get_valid(camera, template) {
-	let valid_entries = [];
-	for (const [key, value] of Object.entries(camera)) {
-		if (value.value !== "" && value.calc !== -1) {
-			valid_entries.push(key);
-		}
-	}
-	return valid_entries;
-}
-
-function valid_field(camera, field) {
-	for (const [key, value] of Object.entries(camera)) {
-		if (field === key && value.value !== "")
-			return true;
-	}
-	return false;
-}
-
-function auto_div(cam, a, b) {
-	return a / b;
-}
-
-function auto_mul(cam, a, b) {
-	return a * b;
-}
-
-function auto_pyt(cam, a, b) {
-	return Math.sqrt((a*a)+(b*b));
-}
-
-function auto_cf(cam, a, b) {
-	return std_diag_35mm / a;
-}
-
-function auto_xfov(cam, a, b) {
-	return (2.0 * 180.0 * Math.atan(b / (2 * a))) / 3.14159;
-}
-
-function auto_xefl(cam, a, b) {
-	let arad = (a * 3.14159) / 360;
-	return b / 2 / Math.tan(arad);
-}
-
-function get_pixcnt(mp) {
-	return mp * 1000000;
-}
-
-function auto_pix(cam, a, b) {
-	let pixcnt = get_pixcnt(a);
-	return pixcnt / b;
-}
-
-function auto_pixasp(cam, a, b) {
-	let pixcnt = get_pixcnt(a);
-	return Math.sqrt(pixcnt / b);
-}
-
-const solve_requirements = [
-	['sensor-aspect', 'sensor-height', 'sensor-width', auto_div, 1],
-	['sensor-aspect', 'sensor-pix-x', 'sensor-pix-y', auto_div, 1],
-	['sensor-mp', 'sensor-pix-x', 'sensor-pix-y', auto_mul, 0.000001],
-	['sensor-pix-x', 'sensor-width', 'sensor-pix-size', auto_div, 1000],
-	['sensor-pix-y', 'sensor-height', 'sensor-pix-size', auto_div, 1000],
-	['sensor-pix-x', 'sensor-mp', 'sensor-pix-y', auto_pix, 1],
-	['sensor-pix-y', 'sensor-mp', 'sensor-pix-x', auto_pix, 1],
-	['sensor-pix-y', 'sensor-mp', 'sensor-aspect', auto_pixasp, 1],
-	['sensor-width', 'sensor-pix-x', 'sensor-pix-size', auto_mul, 0.001],
-	['sensor-height', 'sensor-pix-y', 'sensor-pix-size', auto_mul, 0.001],
-	['sensor-width', 'sensor-height', 'sensor-aspect', auto_mul, 1],
-	['sensor-height', 'sensor-width', 'sensor-aspect', auto_div, 1],
-	['sensor-area', 'sensor-width', 'sensor-height', auto_mul, 1],
-	['sensor-diagonal', 'sensor-width', 'sensor-height', auto_pyt, 1],
-	['sensor-crop-factor', 'sensor-diagonal', 'sensor-diagonal', auto_cf, 1],
-	['effective-focal-length', 'focal-length', 'sensor-crop-factor', auto_div, 1],
-	['focal-length', 'effective-focal-length', 'sensor-crop-factor', auto_mul, 1],
-	['lens-dfov', 'effective-focal-length', 'sensor-diagonal', auto_xfov, 1],
-	['lens-hfov', 'effective-focal-length', 'sensor-width', auto_xfov, 1],
-	['lens-vfov', 'effective-focal-length', 'sensor-height', auto_xfov, 1],
-	['effective-focal-length', 'lens-dfov', 'sensor-diagonal', auto_xefl, 1],
-	['effective-focal-length', 'lens-hfov', 'sensor-width', auto_xefl, 1],
-	['effective-focal-length', 'lens-vfov', 'sensor-height', auto_xefl, 1],
-];
-
-function multipass_solver(cam) {
-	invalid = get_missing(cam, outline_empty);
-	valid = get_valid(cam, outline_empty);
-
-	//console.log("(Pass)\ninvalid:", invalid, "valid:", valid);
-
-	invalid.forEach(n => {
-		solve_requirements.forEach(s => {
-			if (s[0] == n) {
-				if (valid.includes(s[1]) && valid.includes(s[2])) {
-					//console.log('n:', n, 's:', s);
-					let a = cam[s[1]].value;
-					let b = cam[s[2]].value;
-					cam[n].value = s[3](cam, a, b) * s[4];
-				}
-			}		
-		});
-	});
-
-	return invalid.length;
-}
-
-function calculate_intrinsics(camera) {
-	let prev_len = multipass_solver(camera);	
-
-	for (let i = prev_len; i > -1; i--) {
-		let nlen = multipass_solver(camera);
-		if (nlen == prev_len)
-			break;
-		prev_len = nlen;
-	}
-
-	set_outputs(camera);
-}
+// #region Canvas, distortion rendering, image files
 
 function put_pixel(imagedata,offset,data) {
 	for (let i = 0; i < 4; i++) {
@@ -349,14 +276,6 @@ function render_distortion(camera) {
 	emplace_pixel_bound(data, green_color, width * 0.5 + params.ppx * width, height * 0.5 + params.ppy * width, width, height);
 
 	canvas.putImageData(imageData, 0, 0);
-}
-
-function is_autocalc() {
-	return document.getElementById('autocalc').checked;
-}
-
-function is_autodistort() {
-	return document.getElementById('autodist').checked;
 }
 
 function get_image_file() {
@@ -510,21 +429,136 @@ function save_button() {
 	display_image(get_outputs());
 }
 
-function on_change(element) {
-	//console.log("on_change:", element);
+// #endregion
 
-	let camera = get_inputs();
+// #region Calculations
 
-	if (is_autocalc()) {
-		calculate_intrinsics(camera);
+function get_missing(camera, template) {
+	let missing_entries = [];
+	for (const [key, value] of Object.entries(camera)) {
+		if (value.value === "" && value.calc !== -1) {
+			missing_entries.push(key);
+		}
+	}
+	return missing_entries;
+}
+
+function get_valid(camera, template) {
+	let valid_entries = [];
+	for (const [key, value] of Object.entries(camera)) {
+		if (value.value !== "" && value.calc !== -1) {
+			valid_entries.push(key);
+		}
+	}
+	return valid_entries;
+}
+
+function valid_field(camera, field) {
+	for (const [key, value] of Object.entries(camera)) {
+		if (field === key && value.value !== "")
+			return true;
+	}
+	return false;
+}
+
+function auto_div(cam, a, b) {
+	return a / b;
+}
+
+function auto_mul(cam, a, b) {
+	return a * b;
+}
+
+function auto_pyt(cam, a, b) {
+	return Math.sqrt((a*a)+(b*b));
+}
+
+function auto_cf(cam, a, b) {
+	return std_diag_35mm / a;
+}
+
+function auto_xfov(cam, a, b) {
+	return (2.0 * 180.0 * Math.atan(b / (2 * a))) / 3.14159;
+}
+
+function auto_xefl(cam, a, b) {
+	let arad = (a * 3.14159) / 360;
+	return b / 2 / Math.tan(arad);
+}
+
+function get_pixcnt(mp) {
+	return mp * 1000000;
+}
+
+function auto_pix(cam, a, b) {
+	let pixcnt = get_pixcnt(a);
+	return pixcnt / b;
+}
+
+function auto_pixasp(cam, a, b) {
+	let pixcnt = get_pixcnt(a);
+	return Math.sqrt(pixcnt / b);
+}
+
+const solve_requirements = [
+	['sensor-aspect', 'sensor-height', 'sensor-width', auto_div, 1],
+	['sensor-aspect', 'sensor-pix-x', 'sensor-pix-y', auto_div, 1],
+	['sensor-mp', 'sensor-pix-x', 'sensor-pix-y', auto_mul, 0.000001],
+	['sensor-pix-x', 'sensor-width', 'sensor-pix-size', auto_div, 1000],
+	['sensor-pix-y', 'sensor-height', 'sensor-pix-size', auto_div, 1000],
+	['sensor-pix-x', 'sensor-mp', 'sensor-pix-y', auto_pix, 1],
+	['sensor-pix-y', 'sensor-mp', 'sensor-pix-x', auto_pix, 1],
+	['sensor-pix-y', 'sensor-mp', 'sensor-aspect', auto_pixasp, 1],
+	['sensor-width', 'sensor-pix-x', 'sensor-pix-size', auto_mul, 0.001],
+	['sensor-height', 'sensor-pix-y', 'sensor-pix-size', auto_mul, 0.001],
+	['sensor-width', 'sensor-height', 'sensor-aspect', auto_mul, 1],
+	['sensor-height', 'sensor-width', 'sensor-aspect', auto_div, 1],
+	['sensor-area', 'sensor-width', 'sensor-height', auto_mul, 1],
+	['sensor-diagonal', 'sensor-width', 'sensor-height', auto_pyt, 1],
+	['sensor-crop-factor', 'sensor-diagonal', 'sensor-diagonal', auto_cf, 1],
+	['effective-focal-length', 'focal-length', 'sensor-crop-factor', auto_div, 1],
+	['focal-length', 'effective-focal-length', 'sensor-crop-factor', auto_mul, 1],
+	['lens-dfov', 'effective-focal-length', 'sensor-diagonal', auto_xfov, 1],
+	['lens-hfov', 'effective-focal-length', 'sensor-width', auto_xfov, 1],
+	['lens-vfov', 'effective-focal-length', 'sensor-height', auto_xfov, 1],
+	['effective-focal-length', 'lens-dfov', 'sensor-diagonal', auto_xefl, 1],
+	['effective-focal-length', 'lens-hfov', 'sensor-width', auto_xefl, 1],
+	['effective-focal-length', 'lens-vfov', 'sensor-height', auto_xefl, 1],
+];
+
+function multipass_solver(cam) {
+	invalid = get_missing(cam, outline_empty);
+	valid = get_valid(cam, outline_empty);
+
+	//console.log("(Pass)\ninvalid:", invalid, "valid:", valid);
+
+	invalid.forEach(n => {
+		solve_requirements.forEach(s => {
+			if (s[0] == n) {
+				if (valid.includes(s[1]) && valid.includes(s[2])) {
+					//console.log('n:', n, 's:', s);
+					let a = cam[s[1]].value;
+					let b = cam[s[2]].value;
+					cam[n].value = s[3](cam, a, b) * s[4];
+				}
+			}		
+		});
+	});
+
+	return invalid.length;
+}
+
+function calculate_intrinsics(camera) {
+	let prev_len = multipass_solver(camera);	
+
+	for (let i = prev_len; i > -1; i--) {
+		let nlen = multipass_solver(camera);
+		if (nlen == prev_len)
+			break;
+		prev_len = nlen;
 	}
 
-	camera = get_outputs();
-	
-	if (is_autodistort()) {
-		render_distortion(camera);
-		display_image(camera)
-	}
+	set_outputs(camera);
 }
 
 function calculate_all(camera) {
@@ -540,59 +574,9 @@ function calculate_button() {
 	calculate_all(get_inputs());
 }
 
-async function on_preset(element) {
-	let preset_name = element.value;	
+// #endregion
 
-	let cached = sensor_cache.find(n => n[0] === preset_name);
-
-	let camera = undefined;
-
-	if (cached)
-		camera = await load_preset(preset_name);
-	else
-		camera = await load_preset_from_all(preset_name);
-
-	if (camera) {
-		set_inputs(camera);
-		on_change(element);
-	}
-}
-
-function add_presets_kvs(kvs) {
-	let template_dropdown = document.querySelector('div #templates');
-	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
-	
-	kvs.forEach(kv => {
-		template_dropdown.innerHTML +=
-			`<option value="${kv[0]}">${kv[0]} (${kv[1]})</option>`;
-	});
-}
-
-function add_presets(outlines) {
-	let kvs = [];
-
-	outlines.forEach(n => {
-		kvs.push([n['sensor-name'].value,n['sensor-name-friendly'].value]);
-	});
-
-	add_presets_kvs(kvs);
-}
-
-function reset_button() {
-	on_preset(document.getElementById('templates'));
-}
-
-function clear_button() {
-	let empty = get_empty_outline();
-	set_inputs(empty);
-	calculate_all(empty);	
-}
-
-function swap_button() {
-	let to_swap = get_outputs();
-	set_inputs(to_swap);
-	calculate_all(to_swap);
-}
+// #region Loaders
 
 async function load_csv(url) {
 	let csv = [];
@@ -607,7 +591,7 @@ async function load_csv(url) {
 	return csv;
 }
 
-async function process_csv(csv) {
+async function load_old_sensors(csv) {
 	let slots = [
 		['outlines', {}],
 		['formats', []],
@@ -770,19 +754,6 @@ async function load_header(csv) {
 	}
 }
 
-function camera_from_json(json) {
-	let input_camera = get_empty_outline();
-
-	if (!json)
-		return input_camera;
-
-	for (const [key, value] of Object.entries(json))
-		if (json[key] && json[key] != 0)
-			input_camera[key].value = value;
-
-	return input_camera;
-}
-
 async function load_preset(sensor_name) {
 	let response = await fetch('sensors/' + sensor_name + '/' + sensor_name + '.json');
 	return camera_from_json(await response.json());
@@ -798,6 +769,65 @@ async function load_preset_from_all(sensor_name) {
 		return;
 
 	return camera_from_form(all_index);
+}
+
+// #endregion
+
+// #region Explicit user inputs
+
+function reset_button() {
+	on_preset(document.getElementById('templates'));
+}
+
+function clear_button() {
+	let empty = get_empty_outline();
+	set_inputs(empty);
+	calculate_all(empty);	
+}
+
+function swap_button() {
+	let to_swap = get_outputs();
+	set_inputs(to_swap);
+	calculate_all(to_swap);
+}
+
+// #endregion
+
+// #region Interface events
+
+function on_change(element) {
+	//console.log("on_change:", element);
+
+	let camera = get_inputs();
+
+	if (is_autocalc()) {
+		calculate_intrinsics(camera);
+	}
+
+	camera = get_outputs();
+	
+	if (is_autodistort()) {
+		render_distortion(camera);
+		display_image(camera)
+	}
+}
+
+async function on_preset(element) {
+	let preset_name = element.value;	
+
+	let cached = sensor_cache.find(n => n[0] === preset_name);
+
+	let camera = undefined;
+
+	if (cached)
+		camera = await load_preset(preset_name);
+	else
+		camera = await load_preset_from_all(preset_name);
+
+	if (camera) {
+		set_inputs(camera);
+		on_change(element);
+	}
 }
 
 async function on_load(element) {
@@ -816,3 +846,5 @@ async function on_load(element) {
 
 	document.querySelector('#loading').remove();
 }
+
+// #endregion
