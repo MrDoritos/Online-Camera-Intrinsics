@@ -19,8 +19,12 @@ def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sens
     print("template:", json.dumps(template_json))
 
     sensors_csv = csv.reader(sensors_csv_file)
+
     outline_csv = next(sensors_csv)
     friendly_csv = next(sensors_csv)
+    values_csv = next(sensors_csv)
+    step_csv = next(sensors_csv)
+    calc_csv = next(sensors_csv)
 
     header_csv = csv.writer(sys.stdout)
     #if not dry_run:
@@ -29,14 +33,23 @@ def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sens
 
     outline = []
     friendly = []
+    values = []
+    steps = []
+    calcs = []
 
     for i in range(1, len(outline_csv)):
         if outline_csv[i] and len(outline_csv[i]):
             outline.append(outline_csv[i])
             friendly.append(friendly_csv[i])
+            values.append(values_csv[i])
+            steps.append(step_csv[i])
+            calcs.append(calc_csv[i])
 
     header_csv.writerow(outline)
     header_csv.writerow(friendly)
+    header_csv.writerow(values)
+    header_csv.writerow(steps)
+    header_csv.writerow(calcs)
 
     print('outline:', outline)
     print('friendly:', friendly)
