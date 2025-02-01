@@ -1,7 +1,10 @@
 let outline_empty = {};
 let outline_fields = [];
 let outline_presets = [];
-let sensor_cache = [];
+let sensors_header = [];
+let sensors_cache = [];
+let sensors_fields = [];
+let sensor_empty = {};
 let current_sensor = {};
 let sensor_format_presets = [];
 let sensors_all = [];
@@ -36,7 +39,7 @@ function quick_format_html(outline, readonly) {
 
 function get_empty_outline() {
 	let outline_copy = {};
-	for (const [key, value] of Object.entries(outline_empty)) {
+	for (const [key, value] of Object.entries(sensor_empty)) {
 		outline_copy[key] = { ... value };
 	}
 	return outline_copy;
@@ -104,7 +107,7 @@ function is_autodistort() {
 
 // #region Modify internal state
 
-function add_presets_kvs(kvs) {
+function set_presets_kvs(kvs) {
 	let template_dropdown = document.querySelector('div #templates');
 	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
 	
@@ -114,14 +117,37 @@ function add_presets_kvs(kvs) {
 	});
 }
 
-function add_presets(outlines) {
+function set_presets(sensors) {
 	let kvs = [];
 
-	outlines.forEach(n => {
+	sensors.forEach(n => {
 		kvs.push([n['sensor-name'].value,n['sensor-name-friendly'].value]);
 	});
 
-	add_presets_kvs(kvs);
+	set_presets_kvs(kvs);
+}
+
+async function set_preset(sensor_name) {
+	let cached = sensors_cache.find(n => n[0] === sensor_name);
+
+	let camera = undefined;
+
+	if (cached)
+		camera = await load_preset(sensor_name);
+	else
+		camera = await load_preset_from_all(sensor_name);
+
+	set_camera(camera);
+}
+
+function set_camera(camera) {
+	if (!camera)
+		return;
+
+	set_inputs(camera);
+	set_outputs(calculate_all(camera));
+
+	return camera;
 }
 
 function set_inputs(camera) {
@@ -461,6 +487,8 @@ function valid_field(camera, field) {
 	return false;
 }
 
+// #region Equations
+
 function auto_div(cam, a, b) {
 	return a / b;
 }
@@ -500,6 +528,8 @@ function auto_pixasp(cam, a, b) {
 	return Math.sqrt(pixcnt / b);
 }
 
+// #endregion
+
 const solve_requirements = [
 	['sensor-aspect', 'sensor-height', 'sensor-width', auto_div, 1],
 	['sensor-aspect', 'sensor-pix-x', 'sensor-pix-y', auto_div, 1],
@@ -527,8 +557,8 @@ const solve_requirements = [
 ];
 
 function multipass_solver(cam) {
-	invalid = get_missing(cam, outline_empty);
-	valid = get_valid(cam, outline_empty);
+	let invalid = get_missing(cam, outline_empty);
+	let valid = get_valid(cam, outline_empty);
 
 	//console.log("(Pass)\ninvalid:", invalid, "valid:", valid);
 
@@ -558,20 +588,26 @@ function calculate_intrinsics(camera) {
 		prev_len = nlen;
 	}
 
-	set_outputs(camera);
+	return camera;
 }
 
 function calculate_all(camera) {
-	calculate_intrinsics(camera);
-
-	camera = get_outputs();
+	camera = calculate_intrinsics(camera);
 
 	render_distortion(camera);
 	display_image(camera);
+
+	return camera;
 }
 
-function calculate_button() {
-	calculate_all(get_inputs());
+function calculate_partial(camera) {
+	if (is_autocalc())
+		camera = calculate_intrinsics(camera);
+
+	if (is_autodistort()) {
+		render_distortion(camera);
+		display_image(camera);
+	}
 }
 
 // #endregion
@@ -686,34 +722,26 @@ async function load_old_sensors(csv) {
 	}
 
 	//console.log("slots:", slots);
-	
-	outline_empty = slots[0][1];
-	outline_fields = fields;
-	sensor_format_presets = slots[1][1];
-	outline_presets = slots[2][1];
-
-	return;
+	return {empty: slots[0][1], 
+			fields: fields, 
+			formats: slots[1][1],
+			presets: slots[2][1]};
 }
 
 async function load_cache(csv) {
-	let kv = csv[0];
-	sensor_cache = [];
-
-	//sensor_cache = csv;
+	let _cache = [];
 
 	for (let i = 1; i < csv.length; i++) {
-		let preset = {};
-		preset[kv[0]] = csv[i][0];
-		preset[kv[1]] = csv[i][1];
-		outline_presets.push(preset);
-		sensor_cache.push([csv[i][0], csv[i][1]]);
+		_cache.push([csv[i][0], csv[i][1]]);
 	}
+
+	return {cache:_cache};
 }
 
 async function load_all(csv) {
 	let columns = outline_fields.length;
 	let rows = csv.length;
-	sensors_all = [];
+	let _all = [];
 
 	for (let i_row = 5; i_row < rows; i_row++) {
 		let preset = get_empty_outline();
@@ -725,37 +753,43 @@ async function load_all(csv) {
 			preset[key].value = value;
 		}
 
-		sensors_all.push(preset);
+		_all.push(preset);
 	}
 
-	return sensors_all;
+	return {all:_all};
 }
 
 async function load_header(csv) {
-	outline_empty = {};
+	let _empty = {};
+	let _fields = [];
 
-	outline_fields = [];
 	let field_line = csv[0];
-	for (let i = 0; i < field_line.length; i++) {
-		outline_fields.push(field_line[i]);
-		outline_empty[field_line[i]] = {};
-	}
+	const titles = ['outline', 'text', 'value', 'step', 'calc'];
 
-	let titles = ['outline', 'text', 'value', 'step', 'calc'];
+	for (let i = 0; i < field_line.length; i++) {
+		_fields.push(field_line[i]);
+		_empty[field_line[i]] = {};
+	}
 
 	//console.log(csv);
 	for (let i = 1; i < csv.length; i++) {
 		let row = csv[i];
 		//console.log(row);
-		for (let v = 0; v < outline_fields.length; v++) {
-			console.log(i,v,row[v],titles[i],outline_fields[v]);
-			outline_empty[outline_fields[v]][titles[i]] = row[v];
+		for (let v = 0; v < _fields.length; v++) {
+			//console.log(i,v,row[v],titles[i],_fields[v]);
+			_empty[_fields[v]][titles[i]] = row[v];
 		}
 	}
+
+	return {empty:_empty, fields:_fields};
 }
 
 async function load_preset(sensor_name) {
 	let response = await fetch('sensors/' + sensor_name + '/' + sensor_name + '.json');
+
+	if (!response)
+		return;
+
 	return camera_from_json(await response.json());
 }
 
@@ -780,15 +814,15 @@ function reset_button() {
 }
 
 function clear_button() {
-	let empty = get_empty_outline();
-	set_inputs(empty);
-	calculate_all(empty);	
+	set_camera(get_empty_outline());
 }
 
 function swap_button() {
-	let to_swap = get_outputs();
-	set_inputs(to_swap);
-	calculate_all(to_swap);
+	set_camera(get_outputs());
+}
+
+function calculate_button() {
+	calculate_all(get_inputs());
 }
 
 // #endregion
@@ -796,55 +830,35 @@ function swap_button() {
 // #region Interface events
 
 function on_change(element) {
-	//console.log("on_change:", element);
-
-	let camera = get_inputs();
-
-	if (is_autocalc()) {
-		calculate_intrinsics(camera);
-	}
-
-	camera = get_outputs();
-	
-	if (is_autodistort()) {
-		render_distortion(camera);
-		display_image(camera)
-	}
+	calculate_partial(get_inputs());
 }
 
 async function on_preset(element) {
-	let preset_name = element.value;	
-
-	let cached = sensor_cache.find(n => n[0] === preset_name);
-
-	let camera = undefined;
-
-	if (cached)
-		camera = await load_preset(preset_name);
-	else
-		camera = await load_preset_from_all(preset_name);
-
-	if (camera) {
-		set_inputs(camera);
-		on_change(element);
-	}
+	set_preset(element.value);
 }
 
 async function on_load(element) {
-	document.querySelector('#loading').textContent = "Loading...";
+	let loadingElement = document.querySelector('#loading');
+	loadingElement.textContent = "Loading...";
 
-	await load_header(await load_csv('sensors/sensors_header.csv'))
-	await load_cache(await load_csv('sensors/sensors_cache.csv'))
+	let header = await load_header(await load_csv('sensors/sensors_header.csv'))
+	let cache = await load_cache(await load_csv('sensors/sensors_cache.csv'))
 
-	add_presets_kvs(sensor_cache);
-	let input = await load_preset(sensor_cache[0][0]);
+	sensors_cache = cache.cache;
+	sensors_fields = header.fields;
+	sensor_empty = header.empty;
 
-	set_inputs(input);
+	set_presets_kvs(sensors_cache);
 
-	calculate_all(get_inputs());
+	let input = await load_preset(sensors_cache[0][0]);
+
+	console.log(input, sensors_cache);
+
+	set_camera(input);
+
 	load_image();
 
-	document.querySelector('#loading').remove();
+	loadingElement.remove();
 }
 
 // #endregion
