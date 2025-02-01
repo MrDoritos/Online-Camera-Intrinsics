@@ -6,7 +6,7 @@ import sys
 import csv
 from typing import cast
 
-dry_run = True
+dry_run = False
 sensor_dir = 'sensors/'
 sensor_table = 'sensors.csv'
 sensor_header = 'sensors_header.csv'

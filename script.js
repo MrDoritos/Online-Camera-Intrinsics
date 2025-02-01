@@ -451,7 +451,7 @@ function save_button() {
 
 // #region Calculations
 
-function get_missing(camera, template) {
+function get_missing(camera) {
 	let missing_entries = [];
 	for (const [key, value] of Object.entries(camera)) {
 		if (value.value === "" && value.calc !== -1) {
@@ -461,7 +461,7 @@ function get_missing(camera, template) {
 	return missing_entries;
 }
 
-function get_valid(camera, template) {
+function get_valid(camera) {
 	let valid_entries = [];
 	for (const [key, value] of Object.entries(camera)) {
 		if (value.value !== "" && value.calc !== -1) {
@@ -549,8 +549,8 @@ const solve_requirements = [
 ];
 
 function multipass_solver(cam) {
-	let invalid = get_missing(cam, outline_empty);
-	let valid = get_valid(cam, outline_empty);
+	let invalid = get_missing(cam);
+	let valid = get_valid(cam);
 
 	//console.log("(Pass)\ninvalid:", invalid, "valid:", valid);
 
@@ -842,11 +842,7 @@ async function on_load(element) {
 
 	set_presets_kvs(sensors_cache);
 
-	let input = await load_preset(sensors_cache[0][0]);
-
-	console.log(input, sensors_cache);
-
-	set_camera(input);
+	set_preset('IMX766');
 
 	load_image();
 
