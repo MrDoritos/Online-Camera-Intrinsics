@@ -6,13 +6,14 @@ import sys
 import csv
 from typing import cast
 
-dry_run = False
+dry_run = True
 sensor_dir = 'sensors/'
 sensor_table = 'sensors.csv'
 sensor_header = 'sensors_header.csv'
 sensor_template = 'sensors_template.json'
+sensor_format = 'sensors_format.csv'
 
-def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sensors_directory):
+def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sensor_format_file, sensors_directory):
     print("directory:", sensors_directory)
 
     template_json = json.load(sensor_template_file)
@@ -27,15 +28,20 @@ def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sens
     calc_csv = next(sensors_csv)
 
     header_csv = csv.writer(sys.stdout)
+    formats_csv = csv.writer(sys.stdout)
     #if not dry_run:
     if True:
         header_csv = csv.writer(sensor_header_file)
+        formats_csv = csv.writer(sensor_format_file)
 
     outline = []
     friendly = []
     values = []
     steps = []
     calcs = []
+
+    format_outline = []
+    format_csv = []
 
     for i in range(1, len(outline_csv)):
         if outline_csv[i] and len(outline_csv[i]):
@@ -55,6 +61,22 @@ def create_data(sensors_csv_file, sensor_template_file, sensor_header_file, sens
     print('friendly:', friendly)
 
     is_preset = False
+
+    for row in sensors_csv:
+        if row[0] == 'formats':
+            is_preset = True
+            format_outline = [x for x in row[1:] if len(x) > 0]
+            formats_csv.writerow(format_outline)
+            format_csv = row
+            continue
+        if row[0] == 'presets':
+            is_preset = False
+            break
+
+        if not is_preset or len(row[1]) < 1:
+            continue
+
+        formats_csv.writerow([row[format_csv.index(x)] for x in format_outline])
 
     for row in sensors_csv:
         if row[0] == 'presets':
@@ -121,5 +143,6 @@ if not os.path.exists(sensor_dir):
 
 with open(sensor_dir + sensor_template) as template_file:
     with open(sensor_dir + sensor_header, mode='w') as header_file:
-        with open(sensor_table) as sensor_file:
-            create_data(sensor_file, template_file, header_file, sensor_dir)
+        with open(sensor_dir + sensor_format, mode='w') as format_file:
+            with open(sensor_table) as sensor_file:
+                create_data(sensor_file, template_file, header_file, format_file, sensor_dir)

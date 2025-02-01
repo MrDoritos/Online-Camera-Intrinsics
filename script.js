@@ -4,7 +4,8 @@ let sensors_header = [];
 let sensors_cache = [];
 let sensors_fields = [];
 let sensor_empty = {};
-let sensor_format_presets = [];
+let sensor_formats = [];
+let sensor_formats_header = [];
 let sensors_all = [];
 const red_color = [255,0,0,255];
 const blue_color = [0,0,255,255];
@@ -523,7 +524,7 @@ function auto_pixasp(cam, a, b) {
 // #endregion
 
 const solve_requirements = [
-	['sensor-aspect', 'sensor-height', 'sensor-width', auto_div, 1],
+	['sensor-aspect', 'sensor-width', 'sensor-height', auto_div, 1],
 	['sensor-aspect', 'sensor-pix-x', 'sensor-pix-y', auto_div, 1],
 	['sensor-mp', 'sensor-pix-x', 'sensor-pix-y', auto_mul, 0.000001],
 	['sensor-pix-x', 'sensor-width', 'sensor-pix-size', auto_div, 1000],
@@ -570,6 +571,58 @@ function multipass_solver(cam) {
 	return invalid.length;
 }
 
+function get_format_fraction(diagonal) {
+	let number = diagonal * 1.5 / 25.4;
+
+	if (number > 1.0)
+		return String(Math.round(number*100.0)/100.0) + '&quot;';
+
+	let frac = 1.0 / number;
+	let v_frac = Math.round(frac * 100.0)/100.0;
+	let s_frac = String(v_frac);
+
+	return '1/' + s_frac + '&quot;';
+}
+
+function nearest_format(camera) {
+	let diag_str = camera['sensor-diagonal'].value;
+
+	if (!diag_str)
+		return camera;
+
+	let diag = Number(diag_str)
+
+	let format_diag_index = sensor_formats_header.indexOf('sensor-diagonal');
+	let format_name_index = sensor_formats_header.indexOf('sensor-format');
+	let format_name_index_2 = sensor_formats_header.indexOf('format-name');
+
+	let least_index = -1;
+	let least_distance = Number.MAX_VALUE;
+
+	for (let i = 0; i < sensor_formats.length; i++) {
+		let cand_diag = Number(sensor_formats[i][format_diag_index]);
+		let diff = diag - cand_diag;
+		if (Math.abs(diff) < least_distance) {
+			least_distance = diff;
+			least_index = i;
+		}
+	}
+
+	let format = sensor_formats[least_index];
+
+	let format_name = format[format_name_index];
+	let format_name_2 = format[format_name_index_2];
+
+	format_name = format_name + ' (' + get_format_fraction(diag) + ')';
+
+	if (format_name_2 && format_name_2.length > 0)
+		format_name = format_name + ' (' + format_name_2 + ')';
+
+	camera['sensor-format'].value = format_name;
+
+	return camera;
+}
+
 function calculate_intrinsics(camera) {
 	let prev_len = multipass_solver(camera);	
 
@@ -579,6 +632,8 @@ function calculate_intrinsics(camera) {
 			break;
 		prev_len = nlen;
 	}
+
+	camera = nearest_format(camera);
 
 	return camera;
 }
@@ -797,6 +852,19 @@ async function load_preset_from_all(sensor_name) {
 	return camera_from_form(all_index);
 }
 
+async function load_formats(csv) {
+	let _formats = [];
+	let _formats_outline = [];
+
+	_formats_outline = csv[0];
+
+	for (let i = 1; i < csv.length; i++) {
+		_formats.push(csv[i]);
+	}
+
+	return {outline:_formats_outline, formats:_formats};
+}
+
 // #endregion
 
 // #region Explicit user inputs
@@ -833,12 +901,15 @@ async function on_load(element) {
 	let loadingElement = document.querySelector('#loading');
 	loadingElement.textContent = "Loading...";
 
-	let header = await load_header(await load_csv('sensors/sensors_header.csv'))
-	let cache = await load_cache(await load_csv('sensors/sensors_cache.csv'))
+	let header = await load_header(await load_csv('sensors/sensors_header.csv'));
+	let cache = await load_cache(await load_csv('sensors/sensors_cache.csv'));
+	let formats = await load_formats(await load_csv('sensors/sensors_format.csv'));
 
 	sensors_cache = cache.cache;
 	sensors_fields = header.fields;
 	sensor_empty = header.empty;
+	sensor_formats = formats.formats;
+	sensor_formats_header = formats.outline;
 
 	set_presets_kvs(sensors_cache);
 
