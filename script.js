@@ -882,7 +882,7 @@ function swap_button() {
 }
 
 function calculate_button() {
-	calculate_all(get_inputs());
+	set_outputs(calculate_all(get_inputs()));
 }
 
 // #endregion
