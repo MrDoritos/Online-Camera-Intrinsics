@@ -12,24 +12,36 @@
     <canvas id="save_canvas" style="display:none"></canvas>
   </head>
   <body onload="on_load(this)">
-    <div id="inputs" class="container"></div>
-    <div id="center">
-    <h1 id="title">Camera Intrinsics Calculator</h1>
-    <h2 id="loading">Javascript is required</h1>
-		<div id="button"><button id="calculate" type="button" onclick="calculate_button()">Calculate</button></div>
-		<div id="button"><button id="swap" type="button" onclick="swap_button()">Swap</button></div>
-		<div id="button"><button id="clear" type="button" onclick="clear_button()">Clear</button></div>
-		<div id="button"><button id="reset" type="button" onclick="reset_button()">Reset Preset</button></div>
-		<div id="select"><select id="templates" oninput="on_preset(this)"></select></div>
-		<div id="checkbox"><input id="autocalc" type="checkbox" checked /><p>Automatic Calculation</p></div>
-		<div id="checkbox"><input id="autodist" type="checkbox" checked /><p>Automatic Distortion Viewer</p></div>
-		<div id="canvas" class="horizontal_border"><a id="floatpop"><p>Distortion</p><canvas id="distortion"></canvas></a></div>
-    <div id="recenter"><div id="file"><p id="undistort_image">Choose image to undistort</p><input name="undistort_image" id="undistort_image" type="file" accept="image/*, *" oninput="load_image()" /></div></div>
-		<div id="canvas"><a id="floatpop"><p>Preview</p></p><canvas id="undistort_canvas" class="temp_hidden"></canvas></a></div>
-    <div id="button"><button id="undistort_save" type="button" onclick="save_button()">Save image</button></div>
-    <div class="horizontal_border"></div>
+    <div class="header">
+      <div id="pageinfo">
+        <h1 id="title">Camera Intrinsics Calculator</h1>
+        <h2 id="loading">Javascript is required</h1>
+      </div>
+      <div id="buttons">
+        <div id="button"><button id="calculate" type="button" onclick="calculate_button()">Calculate</button></div>
+        <div id="button"><button id="swap" type="button" onclick="swap_button()">Swap</button></div>
+        <div id="button"><button id="clear" type="button" onclick="clear_button()">Clear</button></div>
+        <div id="button"><button id="reset" type="button" onclick="reset_button()">Reset Preset</button></div>
+        <div id="select"><select id="templates" oninput="on_preset(this)"></select></div>
+      </div>
+      <div id="checks">
+        <div id="checkbox"><input id="autocalc" type="checkbox" checked /><p>Automatic Calculation</p></div>
+        <div id="checkbox"><input id="autodist" type="checkbox" checked /><p>Automatic Distortion Viewer</p></div>
+      </div>
+      <div id="images">
+        <div id="canvas_undistort">
+          <div id="canvas"><a id="floatpop"><p>Distortion</p><canvas id="distortion"></canvas></a></div>
+        </div>
+        <div id="image_undistort">
+          <div id="canvas"><a id="floatpop"><p>Preview</p></p><canvas id="undistort_canvas" class="temp_hidden"></canvas></a></div>
+          <div id="recenter"><div><p id="undistort_image">Choose image to undistort</p></div><div id="file"><input name="undistort_image" id="undistort_image" type="file" accept="image/*, *" oninput="load_image()" /><button id="undistort_save" type="button" onclick="save_button()">Save image</button></div></div>
+        </div>
+      </div>
     </div>
-    <div id="outputs" class="container"></div>
+    <div id="main">
+      <div id="inputs" class="container"></div>
+      <div id="outputs" class="container"></div>
+    </div>
     <p id="footer">Public domain project by iansweb.org <a href="https://github.com/MrDoritos/Online-Camera-Intrinsics">GitHub</a></p>
     <script src="script.js"></script>
   </body>
