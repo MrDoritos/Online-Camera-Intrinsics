@@ -184,7 +184,10 @@ function get_distort_parameters(camera, direction) {
 	let senw = Number(camera['sensor-pix-x'].value);
 	let senh = Number(camera['sensor-pix-y'].value);
 
-	if (aspect) params.aspect = aspect;
+	if (aspect) {
+		if (Math.abs(Math.log10(aspect)) < 1.5) // verify aspect ratio is 1:100 or less
+		 	params.aspect = aspect;
+	}
 	if (k1)	params.k1 = k1;
 	if (k2)	params.k2 = k2;
 	if (k3)	params.k3 = k3;
@@ -655,6 +658,8 @@ function calculate_partial(camera) {
 		render_distortion(camera);
 		display_image(camera);
 	}
+
+	return camera;
 }
 
 // #endregion
@@ -890,7 +895,7 @@ function calculate_button() {
 // #region Interface events
 
 function on_change(element) {
-	calculate_partial(get_inputs());
+	set_outputs(calculate_partial(get_inputs()));
 }
 
 async function on_preset(element) {
