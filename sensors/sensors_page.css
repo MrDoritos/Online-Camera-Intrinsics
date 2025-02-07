@@ -1,0 +1,66 @@
+
+#sensor_properties b {
+    margin-right: 1.0em;
+}
+
+#sensor_properties span {
+    float: right;
+}
+
+#sensor_properties_container {
+    border: 0.1em solid blue;
+    min-width: fit-content;
+    max-width: 100vw;
+    height: fit-content;
+}
+
+#sensor_properties {
+    margin: 0.2em;
+}
+
+#sensor_properties > div {
+    margin-bottom: 0.2em;
+    background-color: #eeeeee;
+}
+
+#sensor_page_content {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+#sensor_page_content > div {
+    margin: 0.2em 0 0 0.2em;
+}
+
+#sensor_images {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+#sensor_images > div {
+    margin: 0 0.2em 0 0;
+}
+
+#sensor_images img {
+    width: 500px;
+    max-width: 95vw;
+    border: 0.1em solid black;
+}
+
+#control > div {
+    margin: 0 0 0 0.2em;
+}
+
+#sensor_title b {
+    font-size: 3em;
+}
+
+#control {
+    margin-bottom: 0.2em;
+    padding-bottom: 0.2em;
+    min-width: 100%;
+    background-color: #dddddd;
+    border-bottom: 0.1em solid black;
+}
