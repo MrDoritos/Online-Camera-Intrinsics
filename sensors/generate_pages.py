@@ -80,10 +80,6 @@ def create_data(sensors_header_fp, sensors_directory, sensors_page_fp):
                     with open(sensor_html_filepath, mode='w') as sensor_html_fp:
                         sensor_html_fp.write(page_tmp)
 
-                    print(page_tmp)
-
-                    return
-
 if not os.path.exists(sensors_directory_filepath):
     print('no sensor directory or bad directory:', sensors_directory_filepath)
     sys.exit(-1)
