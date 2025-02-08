@@ -130,6 +130,14 @@ async function set_preset(sensor_name) {
 	else
 		camera = await load_preset_from_all(sensor_name);
 
+	let link_path = '#';
+	
+	if (camera['sensor-name'] && camera['sensor-name'].value)
+		link_path = '/sensors/' + camera['sensor-name'].value + '/';
+
+	let link_element = document.getElementById("sensor_page_link");
+	link_element.setAttribute('href', link_path);
+
 	set_camera(camera);
 }
 
