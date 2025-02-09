@@ -5,6 +5,7 @@ import os
 import sys
 import csv
 import html
+import time
 from typing import cast
 
 dry_run = False
@@ -13,15 +14,25 @@ debug_mode = True
 extra_verbosity = False
 
 directory_filepath = 'sensors/'
+site_filepath = '.'
+
 all_csv_filename = 'sensors_all.csv'
 template_filename = 'sensors_template.json'
 header_filename = 'sensors_header.csv'
 cache_filename = 'sensors_cache.csv'
 format_filename = 'sensors_format.csv'
 page_filename = 'sensors_page.html'
-sensor_path = 'sensors.csv'
+
+sitemap_filename = 'sitemap.xml'
+sensor_filename = 'sensors.csv'
+CNAME_filename = 'CNAME'
+
+sensor_path = os.path.join(site_filepath, sensor_filename)
+CNAME_path = os.path.join(site_filepath, CNAME_filename)
+sitemap_path = os.path.join(site_filepath, sitemap_filename)
 
 image_filetypes = ['bmp', 'png', 'webp', 'jpg', 'jpeg', 'gif']
+sitemap_ignore = [sitemap_path, CNAME_path, './dev', './.gitignore', './.git', './README.md', '*.py']
 
 #from_sensors.csv.py
 
@@ -292,6 +303,67 @@ def generate_pages(header_fp, page_fp):
                     if limit_generation:
                         return
 
+def generate_sitemap(sitemap_fp):
+    print('generate', sitemap_filename, 'using site root')
+
+    site_realpath = os.path.realpath(site_filepath)
+
+    wildcards = [x for x in sitemap_ignore if '*' in x]
+    realpaths = [os.path.realpath(os.path.join(site_realpath, x)) for x in sitemap_ignore if x not in wildcards]
+
+    cname = 'localhost'
+
+    with open(CNAME_path, 'r') as CNAME_fp:
+        cname = CNAME_fp.read().strip()
+
+    proto = 'https://'
+
+    if debug_mode:
+        print('wildcards:', wildcards)
+        print('excluded paths:', realpaths)
+
+    sitemap_fp.write(f'<?xml version="1.0" encoding="UTF-8"?>\n')
+    sitemap_fp.write(f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
+
+    for path, _, files in os.walk(site_realpath):
+        for file in files:
+            filepath_real = os.path.realpath(os.path.join(path, file))
+            filepath_rel = os.path.relpath(os.path.join(path, file))
+
+            sitemap_entry_path = '/' + filepath_rel.lstrip('/')
+
+            if sum(1 for x in wildcards if x.replace('*', '') in filepath_real):
+                continue
+
+            if filepath_real in realpaths or sum(1 for x in realpaths if x in filepath_real) > 0:
+                continue
+
+            if debug_mode:
+                print('sitemap path:', filepath_rel)
+                print('filesystem path:', filepath_real)
+
+            last_modified = time.gmtime(os.stat(filepath_real).st_mtime)
+
+            change_frequency = 'monthly'
+
+            priority = 0.5 # default value
+
+            sitemap_entry = \
+f'''    <url>
+        <loc>{proto}{cname}{sitemap_entry_path}</loc>
+        <lastmod>{time.strftime('%Y-%m-%d', last_modified)}</lastmod>
+        <changefreq>{change_frequency}</changefreq>
+        <priority>{priority}</priority>
+    </url>\n'''
+            sitemap_fp.write(sitemap_entry)
+
+            if limit_generation:
+                break
+        if limit_generation:
+            break
+    
+    sitemap_fp.write('</urlset>')
+
 def run_sensors():
     template_path = directory_filepath + template_filename
     header_path = directory_filepath + header_filename
@@ -323,9 +395,14 @@ def run_pages():
         with open(page_path, 'r') as page_fp:
             generate_pages(header_fp, page_fp)
 
+def run_sitemap():
+    with open(sitemap_path, 'w') as sitemap_fp:
+        generate_sitemap(sitemap_fp)
+
 def compile_site():
     run_sensors()
     run_allcsv()
     run_pages()
+    run_sitemap()
 
 compile_site()
