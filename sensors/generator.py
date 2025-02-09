@@ -6,12 +6,21 @@ import sys
 import csv
 import html
 import time
+import argparse
 from typing import cast
+
+parser = argparse.ArgumentParser(
+    prog="generator.py",
+    description="Create site files",
+    epilog="https://iansweb.org/",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+)
 
 dry_run = False
 limit_generation = False
 debug_mode = True
 extra_verbosity = False
+build = False
 
 directory_filepath = 'sensors/'
 site_filepath = '.'
@@ -26,20 +35,74 @@ page_filename = 'sensors_page.html'
 sitemap_filename = 'sitemap.xml'
 sensor_filename = 'sensors.csv'
 robots_filename = 'robots.txt'
-CNAME_filename = 'CNAME'
+cname_filename = 'CNAME'
+
+image_filetypes = ['bmp', 'png', 'webp', 'jpg', 'jpeg', 'gif']
+sitemap_ignore = [sitemap_filename, cname_filename, './dev', './.gitignore', './.git', './README.md', '*.py']
+
+sensors_target = 'sensors'
+all_csv_target = 'all_csv'
+pages_target = 'pages'
+sitemap_target = 'sitemap'
+robots_target = 'robots'
+
+generator_targets = [sensors_target, all_csv_target, pages_target, sitemap_target, robots_target]
+generator_skips = []
+
+protocol = 'https://'
+cname = 'localhost'
+
+parser.add_argument('--site-path', default=site_filepath, dest='site_filepath', help='Site root directory')
+parser.add_argument('--data-path', default=directory_filepath, dest='data_filepath', help='Data path relative to site root')
+parser.add_argument('-v', '--verbose', default=debug_mode, action='store_true', dest='debug_mode', help='Debug mode')
+parser.add_argument('--extra-verbose', default=extra_verbosity, action='store_true', dest='extra_verbosity', help='Extra verbosity')
+parser.add_argument('-n', '--dry-run', default=dry_run, action='store_true', dest='dry_run', help="Don't make any changes on disk")
+parser.add_argument('--target', default=generator_targets, action='extend', nargs='+', choices=generator_targets, dest='generator_targets', help='Override list of targets in pipeline')
+parser.add_argument('--skip', default=generator_skips, action='extend', nargs='+', choices=generator_targets, dest='generator_skips', help='Skip a pipeline target')
+parser.add_argument('--image-types', default=image_filetypes, action='extend', nargs='+', dest='image_filetypes', help='Set image extensions')
+parser.add_argument('--sitemap-ignore', default=sitemap_ignore, action='extend', nargs='+', dest='sitemap_ignore', help='Set paths to be ignored by crawlers')
+parser.add_argument('--cname-path', default=cname_filename, dest='cname_filename', help='Set cname with a file')
+parser.add_argument('--cname', dest='cname', help='Ignores cname-path to set cname directly')
+parser.add_argument('--protocol', default=protocol, dest='protocol', help='Set protocol')
+parser.add_argument('--robots', default=robots_filename, dest='robots_filename', help='Set robots filename')
+
+args = parser.parse_args()
+
+site_filepath = args.site_filepath
+directory_filepath = args.data_filepath
+debug_mode = args.debug_mode
+extra_verbosity = args.extra_verbosity
+dry_run = args.dry_run
+generator_targets = args.generator_targets
+generator_skips = args.generator_skips
+image_filetypes = args.image_filetypes
+sitemap_ignore = args.sitemap_ignore
+cname_filename = args.cname_filename
+cname_arg = args.cname
+protocol = args.protocol
+robots_filename = args.robots_filename
+
+directory_path = os.path.join(site_filepath, directory_filepath)
+
+all_csv_path = os.path.join(directory_path, all_csv_filename)
+template_path = os.path.join(directory_path, template_filename)
+header_path = os.path.join(directory_path, header_filename)
+cache_path = os.path.join(directory_path, cache_filename)
+format_path = os.path.join(directory_path, format_filename)
+page_path = os.path.join(directory_path, page_filename)
 
 sensor_path = os.path.join(site_filepath, sensor_filename)
-CNAME_path = os.path.join(site_filepath, CNAME_filename)
+cname_path = os.path.join(site_filepath, cname_filename)
 sitemap_path = os.path.join(site_filepath, sitemap_filename)
 robots_path = os.path.join(site_filepath, robots_filename)
 
-image_filetypes = ['bmp', 'png', 'webp', 'jpg', 'jpeg', 'gif']
-sitemap_ignore = [sitemap_path, CNAME_path, './dev', './.gitignore', './.git', './README.md', '*.py']
+generator_targets = [x for x in generator_targets if x not in generator_skips]
 
-protocol = 'https://'
-cname = open(CNAME_path, 'r').read().strip()
-
-#from_sensors.csv.py
+def fmt_dry(msg):
+    if dry_run:
+        return msg + ' (dry):'
+    else:
+        return msg + ':'
 
 def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
     print('dissolving', sensor_path)
@@ -163,20 +226,13 @@ def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
 
         if not os.path.exists(sensor_directory):
             if debug_mode:
-                dry_msg = 'create directory:'
-                if dry_run:
-                    dry_msg = 'create directory (dry):'
-                print(dry_msg, sensor_directory)
+                print(fmt_dry('create directory'), sensor_directory)
 
             if not dry_run:
-                os.makedirs(sensor_directory, exist_ok=True)
-                
+                os.makedirs(sensor_directory, exist_ok=True) 
 
         if debug_mode:
-            dry_msg = 'generating:'
-            if dry_run:
-                dry_msg = 'generating (dry):'
-            print(dry_msg, sensor_json_file)
+            print(fmt_dry('generating'), sensor_json_file)
 
         if not dry_run:
             with open(sensor_json_file, mode='w') as sensor_file:
@@ -184,8 +240,6 @@ def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
 
         if limit_generation:
             return
-
-#generate_all.csv.py
 
 def generate_allcsv(all_csv_fp, template_fp, header_fp, cache_fp):
     print('compile', all_csv_filename, 'from sensor directories')
@@ -232,8 +286,6 @@ def generate_allcsv(all_csv_fp, template_fp, header_fp, cache_fp):
 
                     if limit_generation:
                         return
-
-#generate_pages.py
 
 def generate_pages(header_fp, page_fp):
     print('generate pages using the API header file', header_filename)
@@ -296,10 +348,7 @@ def generate_pages(header_fp, page_fp):
                     page_tmp = page_tmp.replace('$sensor_images', sensor_images)
 
                     if debug_mode:
-                        dry_msg = 'writing:'
-                        if dry_run:
-                            dry_msg = 'writing (dry):'
-                        print(dry_msg, sensor_html_filepath)
+                        print(fmt_dry('writing'), sensor_html_filepath)
 
                     if not dry_run:
                         with open(sensor_html_filepath, mode='w') as sensor_html_fp:
@@ -374,10 +423,6 @@ Allow: /
 Sitemap: {protocol}{cname}{sitemap_sitepath}''')
 
 def run_sensors():
-    template_path = directory_filepath + template_filename
-    header_path = directory_filepath + header_filename
-    format_path = directory_filepath + format_filename
-
     with open(template_path, mode='r') as template_fp:
         with open(header_path, mode='w') as header_fp:
             with open(format_path, mode='w') as format_fp:
@@ -385,11 +430,6 @@ def run_sensors():
                     generate_sensors(sensor_fp, template_fp, header_fp, format_fp)
 
 def run_allcsv():
-    template_path = directory_filepath + template_filename
-    header_path = directory_filepath + header_filename
-    cache_path = directory_filepath + cache_filename
-    all_csv_path = directory_filepath + all_csv_filename
-
     with open(template_path, 'r') as template_fp:
         with open(header_path, 'r') as header_fp:
             with open(cache_path, 'w') as cache_fp:
@@ -397,9 +437,6 @@ def run_allcsv():
                     generate_allcsv(all_csv_fp, template_fp, header_fp, cache_fp)
 
 def run_pages():
-    header_path = directory_filepath + header_filename
-    page_path = directory_filepath + page_filename
-
     with open(header_path, 'r') as header_fp:
         with open(page_path, 'r') as page_fp:
             generate_pages(header_fp, page_fp)
@@ -419,5 +456,38 @@ def compile_site():
     run_sitemap()
     run_robots()
 
-#compile_site()
-run_robots()
+def init():
+    global cname
+
+    if debug_mode:
+        print(args)
+
+    if not os.path.exists(site_filepath):
+        print(f'can\'t continue without valid site root (given "{site_filepath}")')
+        sys.exit(-1)
+
+    if not os.path.exists(directory_path):
+        if debug_mode:
+            print(fmt_dry('create directory'), directory_path)
+
+        if not dry_run:
+            os.makedirs(directory_path, exist_ok=True)
+
+    if cname_arg:
+        cname = cname_arg
+    else:
+        if os.path.exists(cname_path):
+            cname = open(cname_path, 'r').read().strip()
+        else:
+            print(f'cname_path is expected if cname is not defined (given "{cname_path}")')
+
+    if debug_mode:
+        print('using cname:', cname)
+
+    if sensors_target in generator_targets:
+        if not os.path.exists(sensor_path):
+            print(f'sensor_path is expected for target "{sensors_target}" (given "{sensor_path}")')
+            sys.exit(-1)
+
+init()
+compile_site()
