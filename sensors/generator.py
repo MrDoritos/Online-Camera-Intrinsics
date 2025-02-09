@@ -25,14 +25,19 @@ page_filename = 'sensors_page.html'
 
 sitemap_filename = 'sitemap.xml'
 sensor_filename = 'sensors.csv'
+robots_filename = 'robots.txt'
 CNAME_filename = 'CNAME'
 
 sensor_path = os.path.join(site_filepath, sensor_filename)
 CNAME_path = os.path.join(site_filepath, CNAME_filename)
 sitemap_path = os.path.join(site_filepath, sitemap_filename)
+robots_path = os.path.join(site_filepath, robots_filename)
 
 image_filetypes = ['bmp', 'png', 'webp', 'jpg', 'jpeg', 'gif']
 sitemap_ignore = [sitemap_path, CNAME_path, './dev', './.gitignore', './.git', './README.md', '*.py']
+
+protocol = 'https://'
+cname = open(CNAME_path, 'r').read().strip()
 
 #from_sensors.csv.py
 
@@ -311,13 +316,6 @@ def generate_sitemap(sitemap_fp):
     wildcards = [x for x in sitemap_ignore if '*' in x]
     realpaths = [os.path.realpath(os.path.join(site_realpath, x)) for x in sitemap_ignore if x not in wildcards]
 
-    cname = 'localhost'
-
-    with open(CNAME_path, 'r') as CNAME_fp:
-        cname = CNAME_fp.read().strip()
-
-    proto = 'https://'
-
     if debug_mode:
         print('wildcards:', wildcards)
         print('excluded paths:', realpaths)
@@ -350,7 +348,7 @@ def generate_sitemap(sitemap_fp):
 
             sitemap_entry = \
 f'''    <url>
-        <loc>{proto}{cname}{sitemap_entry_path}</loc>
+        <loc>{protocol}{cname}{sitemap_entry_path}</loc>
         <lastmod>{time.strftime('%Y-%m-%d', last_modified)}</lastmod>
         <changefreq>{change_frequency}</changefreq>
         <priority>{priority}</priority>
@@ -363,6 +361,17 @@ f'''    <url>
             break
     
     sitemap_fp.write('</urlset>')
+
+def generate_robots(robots_fp):
+    print('generate',robots_filename)
+
+    sitemap_sitepath = '/' + sitemap_filename.lstrip('/')
+
+    robots_fp.write( \
+f'''User-agent: *
+Allow: /
+
+Sitemap: {protocol}{cname}{sitemap_sitepath}''')
 
 def run_sensors():
     template_path = directory_filepath + template_filename
@@ -399,10 +408,16 @@ def run_sitemap():
     with open(sitemap_path, 'w') as sitemap_fp:
         generate_sitemap(sitemap_fp)
 
+def run_robots():
+    with open(robots_path, 'w') as robots_fp:
+        generate_robots(robots_fp)
+
 def compile_site():
     run_sensors()
     run_allcsv()
     run_pages()
     run_sitemap()
+    run_robots()
 
-compile_site()
+#compile_site()
+run_robots()
