@@ -20,7 +20,6 @@ dry_run = False
 limit_generation = False
 debug_mode = True
 extra_verbosity = False
-build = False
 
 directory_filepath = 'sensors/'
 site_filepath = '.'
@@ -96,13 +95,21 @@ cname_path = os.path.join(site_filepath, cname_filename)
 sitemap_path = os.path.join(site_filepath, sitemap_filename)
 robots_path = os.path.join(site_filepath, robots_filename)
 
-generator_targets = [x for x in generator_targets if x not in generator_skips]
-
 def fmt_dry(msg):
     if dry_run:
         return msg + ' (dry):'
     else:
         return msg + ':'
+
+def check_or_terminate(file, name, target='', code=-1):
+    if not os.path.exists(file):
+        print(f'{name} is expected', end='')
+
+        if target and len(target):
+            print(f' for target "{target}"', end='')
+
+        print(f' (given "{file}")')
+        sys.exit(code)
 
 def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
     print('dissolving', sensor_path)
@@ -423,6 +430,9 @@ Allow: /
 Sitemap: {protocol}{cname}{sitemap_sitepath}''')
 
 def run_sensors():
+    check_or_terminate(sensor_path, 'sensor_path', sensors_target)
+    check_or_terminate(template_path, 'template_path', sensors_target)
+
     with open(template_path, mode='r') as template_fp:
         with open(header_path, mode='w') as header_fp:
             with open(format_path, mode='w') as format_fp:
@@ -430,6 +440,9 @@ def run_sensors():
                     generate_sensors(sensor_fp, template_fp, header_fp, format_fp)
 
 def run_allcsv():
+    check_or_terminate(template_path, 'template_path', all_csv_target)
+    check_or_terminate(header_path, 'header_path', all_csv_target)
+
     with open(template_path, 'r') as template_fp:
         with open(header_path, 'r') as header_fp:
             with open(cache_path, 'w') as cache_fp:
@@ -437,6 +450,9 @@ def run_allcsv():
                     generate_allcsv(all_csv_fp, template_fp, header_fp, cache_fp)
 
 def run_pages():
+    check_or_terminate(header_path, 'header_path', pages_target)
+    check_or_terminate(page_path, 'page_path', pages_target)
+
     with open(header_path, 'r') as header_fp:
         with open(page_path, 'r') as page_fp:
             generate_pages(header_fp, page_fp)
@@ -449,12 +465,23 @@ def run_robots():
     with open(robots_path, 'w') as robots_fp:
         generate_robots(robots_fp)
 
+generator_target_items = [
+    [sensors_target, run_sensors],
+    [all_csv_target, run_allcsv],
+    [pages_target, run_pages],
+    [sitemap_target, run_sitemap],
+    [robots_target, run_robots]
+]
+
 def compile_site():
-    run_sensors()
-    run_allcsv()
-    run_pages()
-    run_sitemap()
-    run_robots()
+    for x in generator_target_items:
+        target_name = x[0]
+
+        if target_name in generator_targets and target_name not in generator_skips:
+            x[1]()
+        else:
+            if debug_mode:
+                print('skip target:', x[0])
 
 def init():
     global cname
@@ -483,11 +510,6 @@ def init():
 
     if debug_mode:
         print('using cname:', cname)
-
-    if sensors_target in generator_targets:
-        if not os.path.exists(sensor_path):
-            print(f'sensor_path is expected for target "{sensors_target}" (given "{sensor_path}")')
-            sys.exit(-1)
 
 init()
 compile_site()
