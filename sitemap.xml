@@ -14,7 +14,7 @@
     </url>
     <url>
         <loc>https://iansweb.org/robots.txt</loc>
-        <lastmod>2025-02-09</lastmod>
+        <lastmod>2025-02-12</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
@@ -391,6 +391,24 @@
         <priority>0.5</priority>
     </url>
     <url>
+        <loc>https://iansweb.org/sensors/IMX519/20250212_155729.jpg</loc>
+        <lastmod>2025-02-12</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
+        <loc>https://iansweb.org/sensors/IMX519/imx519-78-16mp-af-camera-4.jpg</loc>
+        <lastmod>2025-02-12</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
+        <loc>https://iansweb.org/sensors/IMX519/IMX519-78-16MP-AF-Camera-details-size.jpg</loc>
+        <lastmod>2025-02-12</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
         <loc>https://iansweb.org/sensors/IMX519/IMX519.json</loc>
         <lastmod>2025-02-12</lastmod>
         <changefreq>monthly</changefreq>
@@ -398,6 +416,12 @@
     </url>
     <url>
         <loc>https://iansweb.org/sensors/IMX519/index.html</loc>
+        <lastmod>2025-02-12</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+    <url>
+        <loc>https://iansweb.org/sensors/IMX519/s-l1200.jpg</loc>
         <lastmod>2025-02-12</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
