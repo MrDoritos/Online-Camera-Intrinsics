@@ -1,12 +1,22 @@
 sensor-name,sensor-name-friendly
+IMX582,Samsung S20
 135,Kodak 35mm
 AR1820,Arducam 18MP
 Exmor_RS_CMOS_50MP,Sony Alpha 1
+IMX208,Sony
+IMX214,Sony
 IMX219,Raspberry Pi v2
 IMX230,Arducam 21MP
+IMX258,Sony
+IMX274,Sony
+IMX283,Sony
+IMX290,Sony
+IMX296,Sony
 IMX298,Arducam 16MP
+IMX319,Sony
 IMX327,Sony
 IMX334,Sony
+IMX335,Sony
 IMX355,Sony
 IMX412,Sony
 IMX415,Sony
@@ -15,7 +25,6 @@ IMX477,Raspberry Pi High Quality
 IMX500,Raspberry Pi AI
 IMX519,Arducam 16MP
 IMX577,Sony
-IMX582,Samsung S20
 IMX586,Samsung S20
 IMX686,582/586 successor
 IMX708,Raspberry Pi v3
