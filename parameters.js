@@ -165,6 +165,11 @@ function distance_v(v1, v2) {
     return Math.sqrt(distance_nosqrt_v(v1, v2));
 }
 
+function distance_v2(v1, v2) {
+    let diff = sub_v2(v2, v1);
+    return Math.sqrt(sum_v3(mul_v(diff, diff)));
+}
+
 function length_v2(v) {
     return distance_v(v, vec2(0,0));
 }
@@ -183,6 +188,13 @@ function greater_v3(v) {
         greater = v.y;
     if (v.z > greater)
         greater = v.z;
+    return greater;
+}
+
+function greater_v2(v) {
+    let greater = v.x;
+    if (v.y > greater)
+        greater = v.y;
     return greater;
 }
 
@@ -259,13 +271,13 @@ class Arrows {
         '-x': 'red',
         'y': 'lime',
         '-y': 'lime',
-        'z': 'blue',
-        '-z': 'blue'
+        'z': 'dodgerblue',
+        '-z': 'dodgerblue'
     };
     arrow_tolerance = 1;
 
     get_tolerance(size) {
-        return this.arrow_tolerance / Math.sqrt((size.x * size.y));
+        return this.arrow_tolerance / Math.sqrt((size.x * size.y * 3));
         //return normalize_v3(vec3(size.x, size.y, this.arrow_tolerance)).z;
         //return this.arrow_tolerance;
     }
@@ -359,31 +371,48 @@ class Arrows {
             let v1 = vec2(p.x, p.y);
             let v2 = vec2(p.z, p.w);
 
+            let diff = sub_v2(v1, v2);
+            let norm = normalize_v2(diff);
+            let div = mul_v2_f(norm, 10 * this.arrow_tolerance);
+            let cen = add_v2(mul_v2_f(norm, this.arrow_tolerance), v2);
+
             ctx.strokeStyle = this.axis_types[arrow.axis];
+            //ctx.lineCap = "round";
+
+            ctx.lineWidth = this.arrow_tolerance * 0.5;
+
+            ctx.beginPath();
+            let len = greater_v2(size);
+            //let half = size.y * .5;
+            //let x = v1.x - (((v1.y-half) / norm.y) * norm.x);
+            let a = add_v2(mul_v2_f(norm, len), v2);
+            let b = add_v2(mul_v2_f(norm, -len), v2);
+            //let a = add_v2(mul_v2_f(norm, len), vec2(x, half));
+            //let b = add_v2(mul_v2_f(norm, -len), vec2(x, half));
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+
             ctx.lineWidth = this.arrow_tolerance * 1;
-            ctx.lineCap = "round";
 
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p.z, p.w);
+            ctx.lineTo(cen.x, cen.y);
 
             ctx.stroke();
 
             ctx.beginPath();
 
-            let diff = sub_v2(v1, v2);
-            diff = mul_v2_f(normalize_v2(diff), 10);
-
             let rads = Math.PI / 8;
 
-            let tr1 = rotate_v2(diff, -rads);
-            let tr2 = rotate_v2(diff, rads);
+            let tr1 = rotate_v2(div, -rads);
+            let tr2 = rotate_v2(div, rads);
 
             let tip1 = add_v2(tr1, v2);
             let tip2 = add_v2(tr2, v2);
 
             ctx.moveTo(tip1.x, tip1.y);
-            ctx.lineTo(p.z, p.w);
+            ctx.lineTo(cen.x, cen.y);
             ctx.lineTo(tip2.x, tip2.y);
 
             ctx.stroke();
@@ -474,6 +503,7 @@ class Parameters {
             this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), 'x'));
         }
 
+        this.update_arrow_select();
         this.draw();
     }
 
@@ -508,7 +538,7 @@ class Parameters {
                     image: image
                 };
 
-                _this.update_info();
+                _this.draw();
             }
 
             image.crossOrigin = "anonymous";
@@ -522,6 +552,21 @@ class Parameters {
     }
 
     range_opacity_input(event) {
+        this.update_opacity();
+    }
+
+    range_ui_scale_input(event) {
+        this.update_ui_scale();
+        this.draw();
+    }
+
+    update_ui_scale() {
+        let e = this.e_range_ui_scale();
+        console.log(e.value);
+        this.arrows.arrow_tolerance = 0.75 + ((e.value*0.05-0.5));
+    }
+
+    update_opacity() {
         let e = this.e_range_opacity();
         this.e_image_opacity().style.setProperty('opacity', `${e.value}%`);
     }
@@ -552,7 +597,6 @@ class Parameters {
 
     draw() {
         this.arrows.draw(this.e_arrows_canvas());
-        this.update_arrow_select();
         this.update_info();
     }
 
@@ -568,6 +612,9 @@ class Parameters {
         }
 
         this.axis_count_input();
+        this.update_opacity();
+        this.update_ui_scale();
+        this.update_arrow_select();
 
         this.draw();
     }
@@ -608,6 +655,10 @@ class Parameters {
         return document.getElementById('range_opacity');
     }
 
+    e_range_ui_scale() {
+        return document.getElementById('range_ui_scale');
+    }
+
     e_image_opacity() {
         return document.getElementById('image_opacity');
     }
@@ -630,3 +681,4 @@ arrows_canvas.addEventListener('change', function(event){prm.draw();});
 prm.e_axis_count().addEventListener('input', function(event){prm.axis_count_input(event);});
 prm.e_image_load().addEventListener('input', function(event){prm.image_load_input(event);});
 prm.e_range_opacity().addEventListener('input', function(event){prm.range_opacity_input(event);});
+prm.e_range_ui_scale().addEventListener('input', function(event){prm.range_ui_scale_input(event);});

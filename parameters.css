@@ -58,8 +58,13 @@ body {
     width:inherit;
 }
 
+#parameter_info {
+    background-color: silver;
+}
+
 #parameter_info p {
     font-family: monospace;
+    font-size: 1.3em;
 }
 
 #axis_types #item {
@@ -70,4 +75,9 @@ body {
 
 #axis_types div {
     margin-left: 4%;
+}
+
+#range_opacity, #range_ui_scale {
+    width: 95%;
+    margin-left: 2.5%;
 }
