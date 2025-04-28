@@ -393,6 +393,7 @@ class Arrows {
 class Parameters {
     held = false;
     selected_vector = undefined;
+    current_image = undefined;
     arrows = new Arrows;
     axis_types = {
         'x': 'red',
@@ -456,11 +457,51 @@ class Parameters {
     }
 
     image_load_input(event) {
+        let e = this.e_image_load();
 
+        if (!e || !e.files || !e.files.length)
+            return;
+
+        let form = e.files[0];
+
+        let reader = new FileReader();
+        let e_image = this.e_image_canvas();
+        let _this = this;
+
+        reader.onload = function(e) {
+            e_image.onload = function() {
+                _this.current_image = {
+                    width: e_image.width,
+                    height: e_image.height,
+                };
+
+                _this.update_info();
+            }
+
+            e_image.crossOrigin = "anonymous";
+            e_image.src = e.target.result;
+        }
+
+        reader.readAsDataURL(form);
+    }
+
+    range_opacity_input(event) {
+        let e = this.e_range_opacity();
+        this.e_image_opacity().style.setProperty('opacity', `${e.value}%`);
+    }
+
+    update_info() {
+        let e = this.e_parameter_info();
+        let c = this.current_image;
+
+        e.innerHTML = '<p style="text-align: center">Info</p>';
+        e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
+        e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
     }
 
     draw() {
         this.arrows.draw(this.e_arrows_canvas());
+        this.update_info();
     }
 
     init() {
@@ -483,6 +524,18 @@ class Parameters {
         this.draw();
     }
 
+    e_parameter_images() {
+        return document.getElementById('parameter_images');
+    }
+
+    e_parameter_info() {
+        return document.getElementById('parameter_info');
+    }
+
+    e_image_canvas() {
+        return document.getElementById('image_canvas');
+    }
+
     e_arrows_canvas() {
         return document.getElementById('arrows_canvas');
     }
@@ -497,6 +550,14 @@ class Parameters {
 
     e_image_load() {
         return document.getElementById('image_load');
+    }
+
+    e_range_opacity() {
+        return document.getElementById('range_opacity');
+    }
+
+    e_image_opacity() {
+        return document.getElementById('image_opacity');
     }
 }
 
@@ -516,3 +577,4 @@ arrows_canvas.addEventListener('change', function(event){prm.draw();});
 
 prm.e_axis_count().addEventListener('input', function(event){prm.axis_count_input(event);});
 prm.e_image_load().addEventListener('input', function(event){prm.image_load_input(event);});
+prm.e_range_opacity().addEventListener('input', function(event){prm.range_opacity_input(event);});

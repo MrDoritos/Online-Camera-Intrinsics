@@ -9,22 +9,54 @@ body {
 }
 
 #parameter_images {
+    background-color:cadetblue;
     position: relative;
     height:inherit;
     width: 80%;
 }
 
-#parameter_images > canvas {
+#parameter_images canvas {
     width:100%;
     height: 100%;
 }
 
+#image_holder {
+    display: flex;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
 #image_canvas {
-    position: relative;
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    margin: auto;
 }
 
 #arrows_canvas {
     position: absolute;
     top:0;
     left:0;
+}
+
+#image_opacity {
+    position: absolute;
+    top:0;
+    left:0;
+    background-color: rgb(90, 90, 90);
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+}
+
+#parameter_opts p { 
+    margin: 0;
+    padding: 0;
+    width:inherit;
+}
+
+#parameter_info p {
+    font-family: monospace;
 }

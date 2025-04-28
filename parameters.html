@@ -5,16 +5,20 @@
     </head>
     <body id="parameter_body">
         <div id="parameter_images">
-            <canvas id="image_canvas">
-
-            </canvas>
-            <canvas id="arrows_canvas">
-
-            </canvas>
+            <div id="image_holder">
+                <img id="image_canvas"></img>
+            </div>
+            <div id="image_opacity"></div>
+            <canvas id="arrows_canvas"></canvas>
         </div>
         <div id="parameter_opts">
+            <p>Load Image</p>
             <input name="image_load" id="image_load" type="file" accept="image/*, *" />
+            <p>Dim Image</p>
+            <input name="range_opacity" id="range_opacity" type="range" min="0" max="100" />
+            <p>Number of Vanishing Points</p>
             <select id="axis_count"></select>
+            <div id="parameter_info"></div>
         </div>
     </body>
     <script src="parameters.js"></script>
