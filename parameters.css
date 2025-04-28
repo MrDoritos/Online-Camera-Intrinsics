@@ -1,0 +1,30 @@
+body {
+    overflow-x: none;
+    overflow-y: hidden;
+	min-height: 100vh;
+    margin:0;
+    padding:0;
+    background-color: lightgray;
+    display: flex;
+}
+
+#parameter_images {
+    position: relative;
+    height:inherit;
+    width: 80%;
+}
+
+#parameter_images > canvas {
+    width:100%;
+    height: 100%;
+}
+
+#image_canvas {
+    position: relative;
+}
+
+#arrows_canvas {
+    position: absolute;
+    top:0;
+    left:0;
+}
