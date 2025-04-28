@@ -254,12 +254,15 @@ function emplace_pixel(data, pixel, x, y, width, height) {
 
 class Arrows {
     arrows = [];
-    axis_colors = {
+    axis_types = {
         'x': 'red',
-        'y': 'green',
-        'z': 'blue'
+        '-x': 'red',
+        'y': 'lime',
+        '-y': 'lime',
+        'z': 'blue',
+        '-z': 'blue'
     };
-    arrow_tolerance = .75;
+    arrow_tolerance = 1;
 
     get_tolerance(size) {
         return this.arrow_tolerance / Math.sqrt((size.x * size.y));
@@ -310,6 +313,18 @@ class Arrows {
             return {arrow:closest, vector:closest_vec, distance:closest_val};
     }
 
+    find_free_placement(tolerance) {
+        let start = vec2(-0.5, 0.5);
+        let end = vec2(0.5, -0.5);
+
+        for (let x = start.x; x < end.x; x += tolerance) {
+            for (let y = start.y; y >= end.y; y -= tolerance) {
+                if (!this.find_arrow_by_mousepos_first(vec2(x, y), tolerance))
+                    return vec2(x,y);
+            }
+        }
+    }
+
     get_canvas_pos(arrow, size) {
         let s = screen_v(arrow.start, size);
         let e = screen_v(arrow.end, size);
@@ -344,8 +359,8 @@ class Arrows {
             let v1 = vec2(p.x, p.y);
             let v2 = vec2(p.z, p.w);
 
-            ctx.strokeStyle = this.axis_colors[arrow.axis];
-            ctx.lineWidth = this.arrow_tolerance;
+            ctx.strokeStyle = this.axis_types[arrow.axis];
+            ctx.lineWidth = this.arrow_tolerance * 1;
             ctx.lineCap = "round";
 
             ctx.beginPath();
@@ -395,14 +410,6 @@ class Parameters {
     selected_vector = undefined;
     current_image = undefined;
     arrows = new Arrows;
-    axis_types = {
-        'x': 'red',
-        '-x': 'red',
-        'y': 'green',
-        '-y': 'green',
-        'z': 'blue',
-        '-z': 'blue'
-    };
 
     Parameters() {
 
@@ -453,7 +460,31 @@ class Parameters {
     }
 
     axis_count_input(event) {
+        let e = this.e_axis_count();
 
+        let c = e.value * 2;
+        let l = this.arrows.arrows.length;
+
+        for (let i = c; i < l; i++)
+            this.arrows.arrows.pop();
+
+        for (let i = 0; i < c-l; i++) {
+            let p = this.arrows.find_free_placement(0.05);
+
+            this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), 'x'));
+        }
+
+        this.draw();
+    }
+
+    axis_type_input(event) {
+        for (let i = 0; i < this.arrows.arrows.length; i++) {
+            let arrow = this.arrows.arrows[i];
+            if (i == event.getAttribute("name"))
+                arrow.axis = event.value;
+        }
+
+        this.draw();
     }
 
     image_load_input(event) {
@@ -469,16 +500,21 @@ class Parameters {
         let _this = this;
 
         reader.onload = function(e) {
-            e_image.onload = function() {
+            let image = new Image();
+            image.onload = function() {
                 _this.current_image = {
-                    width: e_image.width,
-                    height: e_image.height,
+                    width: image.width,
+                    height: image.height,
+                    image: image
                 };
 
                 _this.update_info();
             }
 
+            image.crossOrigin = "anonymous";
             e_image.crossOrigin = "anonymous";
+
+            image.src = e.target.result;
             e_image.src = e.target.result;
         }
 
@@ -499,27 +535,39 @@ class Parameters {
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
     }
 
+    update_arrow_select() {
+        let e = this.e_axis_types();
+        
+        e.innerHTML = `<p style="text-align:center">Axis</p>`;
+        for (let i = 0; i < this.arrows.arrows.length; i++) {
+            let arrow = this.arrows.arrows[i];
+            let str = `<div><p id="item">${i+1}</p><select name="${i}" id="axis_select" oninput="prm.axis_type_input(this)">`;
+            for (const [axis, color] of Object.entries(this.arrows.axis_types)) {
+                str += `<option ${arrow.axis == axis ? 'selected' : ''} value="${axis}">${axis}</option>`;
+            }
+            str += '</select></div>';
+            e.innerHTML += str;
+        }
+    }
+
     draw() {
         this.arrows.draw(this.e_arrows_canvas());
+        this.update_arrow_select();
         this.update_info();
     }
 
     init() {
-        this.arrows.arrows = [
-            get_arrow(vec2(0,0),vec2(0.5,0),'x'),
-            get_arrow(vec2(0,0.1),vec2(0.5,0.1),'y')
-        ];
+        //this.arrows.arrows = [
+        //    get_arrow(vec2(0,0),vec2(0.5,0),'x'),
+        //    get_arrow(vec2(0,0.1),vec2(0.5,0.1),'y')
+        //];
 
-        for (const [axis, color] of Object.entries(this.axis_types)) {
-            this.e_axis_count().innerHTML +=
-                `<option style="background-color: ${color}" value="${axis}">${axis}</option>`;
-        };
-
-        this.e_axis_count().innerHTML = `<option disabled>Vanishing Point Count</option>`
         for (let i = 1; i < 4; i++) {
             this.e_axis_count().innerHTML +=
-                `<option value="${i}">${i}</option>`
+                `<option ${i == 1 ? 'selected' : ''} value="${i}">${i}</option>`
         }
+
+        this.axis_count_input();
 
         this.draw();
     }
@@ -546,6 +594,10 @@ class Parameters {
 
     e_axis_count() {
         return document.getElementById('axis_count');
+    }
+
+    e_axis_types() {
+        return document.getElementById('axis_types');
     }
 
     e_image_load() {
