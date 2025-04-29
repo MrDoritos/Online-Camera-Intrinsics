@@ -243,6 +243,14 @@ function rotation_m2(radians) {
     ];
 }
 
+function determinant_m2(m) {
+    return (m[0].x * m[1].y) - (m[1].x * m[0].y);
+}
+
+function inverse_m2(m) {
+
+}
+
 function rotate_v2(vector, radians) {
     let m = rotation_m2(radians);
     //return op_m2_v2(m, vector, op_mul);
@@ -266,6 +274,7 @@ function emplace_pixel(data, pixel, x, y, width, height) {
 
 class Arrows {
     arrows = [];
+    intersections = [];
     axis_types = {
         'x': 'red',
         '-x': 'red',
@@ -337,6 +346,67 @@ class Arrows {
         }
     }
 
+    get_arrow_magnitude(arrow) {
+        return normalize_v2(sub_v2(arrow.end, arrow.start));
+    }
+
+    iden_v2(v) {
+        return [
+            {x:v.x, y:1},
+            {x:v.y, y:1}
+        ];
+    }
+
+    find_intersection(a1, a2) {
+        let mag1 = this.get_arrow_magnitude(a1);
+        let mag2 = this.get_arrow_magnitude(a2);
+
+        let v1 = a1.start;
+        let v2 = a1.end;
+        let v3 = a2.start;
+        let v4 = a2.end;
+
+        let m1 = matrix2(v1, v2);
+        let m2 = matrix2(v3, v4);
+
+        let mx1 = this.iden_v2(vec2(v1.x, v2.x));
+        let mx2 = this.iden_v2(vec2(v3.x, v4.x));
+
+        let my1 = this.iden_v2(vec2(v1.y, v2.y));
+        let my2 = this.iden_v2(vec2(v3.y, v4.y));
+
+        let pxn1 = determinant_m2(m1);
+        let pxn2 = determinant_m2(mx1);
+        let pxn3 = determinant_m2(m2);
+        let pxn4 = determinant_m2(mx2);
+
+        let pxd1 = determinant_m2(mx1);
+        let pxd2 = determinant_m2(my1);
+        let pxd3 = determinant_m2(mx2);
+        let pxd4 = determinant_m2(my2);
+
+        let pyn1 = determinant_m2(m1);
+        let pyn2 = determinant_m2(my1);
+        let pyn3 = determinant_m2(m2);
+        let pyn4 = determinant_m2(my2);
+
+        let pyd1 = determinant_m2(mx1);
+        let pyd2 = determinant_m2(my1);
+        let pyd3 = determinant_m2(mx2);
+        let pyd4 = determinant_m2(my2);
+
+        let pxn = determinant_m2([vec2(pxn1, pxn2), vec2(pxn3, pxn4)]);
+        let pxd = determinant_m2([vec2(pxd1, pxd2), vec2(pxd3, pxd4)]);
+
+        let pyn = determinant_m2([vec2(pyn1, pyn2), vec2(pyn3, pyn4)]);
+        let pyd = determinant_m2([vec2(pyd1, pyd2), vec2(pyd3, pyd4)]);
+
+        let px = pxn / pxd;
+        let py = pyn / pyd;
+
+        return vec2(px, py);
+    }
+
     get_canvas_pos(arrow, size) {
         let s = screen_v(arrow.start, size);
         let e = screen_v(arrow.end, size);
@@ -349,6 +419,8 @@ class Arrows {
     }
 
     draw(canvas) {
+        this.solve();
+
         let rect = canvas.getBoundingClientRect();
 
         let ctx = canvas.getContext('2d');
@@ -431,6 +503,21 @@ class Arrows {
 
             ctx.stroke();
         });
+
+        this.intersections.forEach(intersect => {
+            ctx.beginPath();
+            let p = screen_v(intersect, size);
+            ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    solve() {
+        this.intersections = [];
+
+        for (let i = 0; i < this.arrows.length; i+=2) {
+            this.intersections.push(this.find_intersection(this.arrows[i], this.arrows[i + 1]));
+        }
     }
 }
 
@@ -485,7 +572,8 @@ class Parameters {
         let pos = this.get_mouse_rel(event);
 
         copy_v(vector.vector, pos);
-        this.arrows.draw(this.e_arrows_canvas());
+        //this.arrows.draw(this.e_arrows_canvas());
+        this.draw();
     }
 
     axis_count_input(event) {
@@ -562,7 +650,6 @@ class Parameters {
 
     update_ui_scale() {
         let e = this.e_range_ui_scale();
-        console.log(e.value);
         this.arrows.arrow_tolerance = 0.75 + ((e.value*0.05-0.5));
     }
 
@@ -578,6 +665,11 @@ class Parameters {
         e.innerHTML = '<p style="text-align: center">Info</p>';
         e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
+        
+        for (let i = 0; i < this.arrows.intersections.length; i++) {
+            let intersect = this.arrows.intersections[i];
+            e.innerHTML += `<p>${i + 1} intersect: ${intersect.x.toFixed(3)},${intersect.y.toFixed(3)}</p>`;
+        }
     }
 
     update_arrow_select() {
