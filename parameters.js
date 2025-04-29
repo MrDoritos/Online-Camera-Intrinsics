@@ -432,6 +432,9 @@ class Arrows {
         let h = canvas.height;
         let size = vec2(w, h);
         let radius = this.arrow_tolerance * 2;
+
+        let axis_dis_pos = vec2(0,0);
+        let axis_dis_scr = screen_v(axis_dis_pos, size);
         
         //let arrow = new Arrow(new vec2(0.0, 0.0), new vec2(0.0, 0.5));
         //emplace_pixel(imgdata, {r:128, g:128, b:0}, 0.25, 0.75, w, h);
@@ -453,6 +456,8 @@ class Arrows {
 
             ctx.lineWidth = this.arrow_tolerance * 0.5;
 
+            //#region To vanishing point
+
             ctx.beginPath();
             let len = greater_v2(size);
             //let half = size.y * .5;
@@ -465,13 +470,21 @@ class Arrows {
             ctx.lineTo(b.x, b.y);
             ctx.stroke();
 
+            //#endregion
+
             ctx.lineWidth = this.arrow_tolerance * 1;
+
+            //#region Line
 
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(cen.x, cen.y);
 
             ctx.stroke();
+
+            //#endregion
+
+            //#region Arrow tip
 
             ctx.beginPath();
 
@@ -489,7 +502,11 @@ class Arrows {
 
             ctx.stroke();
 
+            //#endregion
+
             ctx.strokeStyle = "black";
+
+            //#region Circles
 
             ctx.beginPath();
 
@@ -502,21 +519,94 @@ class Arrows {
             ctx.arc(p.z, p.w, radius * 2, 0, Math.PI * 2);
 
             ctx.stroke();
+
+            //#endregion
         });
 
         this.intersections.forEach(intersect => {
             ctx.beginPath();
-            let p = screen_v(intersect, size);
+
+            let p = screen_v(intersect.point, size);
             ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+
             ctx.fill();
+
+            ctx.beginPath();
+
+            ctx.moveTo(axis_dis_scr.x, axis_dis_scr.y);
+
+            //let endp = normalize_v2(sub_v2(axis_dis_pos, intersect.point));
+            //endp = mul_v2_f(endp, this.arrow_tolerance  * 100);
+            //endp = add_v2(endp, axis_dis_scr);
+
+                        
+
+            let d1 = div_v2(intersect.a.start, intersect.b.start);
+            let d2 = div_v2(intersect.a.end, intersect.b.end);
+
+            let a = sub_v2(axis_dis_pos, intersect.a.start);
+
+            a = mul_v2(a, d2);
+            let endp = screen_v(a, size);
+
+            ctx.lineTo(endp.x, endp.y);
+
+            ctx.stroke();
         });
     }
 
     solve() {
         this.intersections = [];
+        let dots = [];
 
         for (let i = 0; i < this.arrows.length; i+=2) {
-            this.intersections.push(this.find_intersection(this.arrows[i], this.arrows[i + 1]));
+            let a = this.arrows[i];
+            let b = this.arrows[i + 1];
+
+            let intersection = this.find_intersection(a, b);
+
+            a.magnitude = sub_v2(a.start, a.end);
+            b.magnitude = sub_v2(b.start, b.end);
+
+            a.mag_norm = normalize_v2(a.magnitude);
+            b.mag_norm = normalize_v2(b.magnitude);
+
+            let dot = sum_v2(mul_v2(a.mag_norm, b.mag_norm));
+
+            let int_mag_norm = normalize_v2(add_v2(a.mag_norm, b.mag_norm));
+
+            dots.push(dot);
+            this.intersections.push({point:intersection, dot:dot, mag_norm:int_mag_norm, a:a, b:b});
+        }
+
+        let length = 0;
+
+        dots.forEach(val => {
+            length += val * val;
+        });
+
+        length = Math.sqrt(length);
+
+        let norm_dots = [];
+
+        dots.forEach(val => {
+            norm_dots.push(val / length);
+        });
+        
+        for (let i = 0; i < norm_dots.length; i++) {
+            let num = norm_dots[i];
+            let den = 1;
+            for (let j = 0; j < norm_dots.length; j++) {
+                if (i == j) continue;
+                den *= norm_dots[j];
+            }
+            let frac = num / den;
+            let angle = Math.atan(frac);
+            let deg = angle / Math.PI * 180;
+            this.intersections[i]['angle'] = deg;
+            this.intersections[i]['frac'] = frac;
+            this.intersections[i]['mag'] = num;
+            this.intersections[i]['dot_angle'] = Math.acos(this.intersections[i].dot) / Math.PI * 180;
         }
     }
 }
@@ -576,6 +666,31 @@ class Parameters {
         this.draw();
     }
 
+    next_arrow_type() {
+        let types = {'x':0,'y':0,'z':0};
+
+        for (let i = 0; i < this.arrows.arrows.length; i++) {
+            let arrow = this.arrows.arrows[i];
+            if (!arrow || !arrow.axis)
+                continue;
+            let arrow_type = arrow.axis.replace('-', '').toLowerCase();
+            types[arrow_type]++;
+        }
+
+        let l = types['x'];
+        let lesser = undefined;
+        for (const [key, value] of Object.entries(types)) {
+            if (value == 0)
+                return key;
+            if (value < l)
+                lesser = key;
+            if (value % 2 == 1)
+                return key;
+        }
+
+        return lesser;
+    }
+
     axis_count_input(event) {
         let e = this.e_axis_count();
 
@@ -588,7 +703,7 @@ class Parameters {
         for (let i = 0; i < c-l; i++) {
             let p = this.arrows.find_free_placement(0.05);
 
-            this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), 'x'));
+            this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), this.next_arrow_type()));
         }
 
         this.update_arrow_select();
@@ -667,8 +782,20 @@ class Parameters {
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
         
         for (let i = 0; i < this.arrows.intersections.length; i++) {
+            let str = '<div id="axis_info">';
             let intersect = this.arrows.intersections[i];
-            e.innerHTML += `<p>${i + 1} intersect: ${intersect.x.toFixed(3)},${intersect.y.toFixed(3)}</p>`;
+
+            str += `<p>${i + 1}</p>`
+            str += `<p>intersect: ${intersect.point.x.toFixed(3)},${intersect.point.y.toFixed(3)}</p>`;
+            str += `<p>dot: ${intersect.dot.toFixed(3)}</p>`;
+            str += `<p>mag: ${intersect.mag.toFixed(3)}</p>`;
+            str += `<p>angle: ${intersect.angle.toFixed(3)}</p>`;
+            str += `<p>frac: ${intersect.frac.toFixed(3)}</p>`;
+            str += `<p>dot angle: ${intersect.dot_angle.toFixed(3)}</p>`;
+
+            str += '</div>';
+
+            e.innerHTML += str;
         }
     }
 
