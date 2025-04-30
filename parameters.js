@@ -12,6 +12,10 @@ function get_vec(x, y) {
     return {x:x, y:y};
 }
 
+function str_v2(v, digits=3) {
+    return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}`;
+}
+
 function vec2(x,y) {
     return {x:x, y:y};
 }
@@ -781,6 +785,25 @@ class Parameters {
         e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
         
+        for (let i = 0; i < this.arrows.arrows.length; i++) {
+            let str = '<div id="arrow_info">';
+            let arrow = this.arrows.arrows[i];
+            
+            str += `<p>${i + 1} ${arrow.axis}</p>`;
+            str += `<p>start: ${str_v2(arrow.start)}</p>`;
+            str += `<p>end: ${str_v2(arrow.end)}</p>`;
+            str += `<p>mag: ${str_v2(arrow.magnitude)}</p>`;
+            str += `<p>mag_norm: ${str_v2(arrow.mag_norm)}</p>`;
+
+            let x_int = (arrow.start.y * arrow.mag_norm.y) / (arrow.start.x * arrow.mag_norm.x);
+
+            str += `<p>x_int: ${x_int.toFixed(3)}</p>`;
+
+            str += '</div>';
+
+            e.innerHTML += str;
+        }
+
         for (let i = 0; i < this.arrows.intersections.length; i++) {
             let str = '<div id="axis_info">';
             let intersect = this.arrows.intersections[i];

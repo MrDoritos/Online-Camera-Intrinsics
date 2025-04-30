@@ -41,6 +41,7 @@ body {
     position: absolute;
     top:0;
     left:0;
+    image-rendering: crisp-edges;
 }
 
 #image_opacity {
@@ -51,6 +52,16 @@ body {
     width: 100%;
     height: 100%;
     opacity: 0;
+}
+
+#parameter_opts_container {
+    overflow-y: scroll;
+    height:100vh;
+    width:25%;
+}
+
+#parameter_opts {
+    overflow-x: hidden;
 }
 
 #parameter_opts p { 
