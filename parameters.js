@@ -617,6 +617,7 @@ class Arrows {
 
 class Parameters {
     held = false;
+    magnifier = false;
     selected_vector = undefined;
     current_image = undefined;
     arrows = new Arrows;
@@ -644,9 +645,76 @@ class Parameters {
         return vec2(rect.width, rect.height);
     }
     
+    add_magnifier() {
+        console.log('event');
+
+        let e = this.e_magnifier();
+
+        if (e || !this.current_image)
+            return;
+
+        this.magnifier = true;
+
+        let n = document.createElement('div');
+
+        n.setAttribute('id', 'magnifier');
+        n.innerHTML = `<img src="${this.current_image.image.src}" />`;
+
+        this.e_image_holder().appendChild(n);
+
+        console.log('add magnifier:', n);
+    }
+
+    remove_magnifier() {
+        let e = this.e_magnifier();
+
+        console.log('remove magnifier:', e);
+    
+        this.magnifier = false;
+
+        if (e)
+            e.parentNode.removeChild(e);
+    }
+
+    update_magnifier(event) {
+        let e = this.e_magnifier();
+
+        if (!e)
+            return;
+
+        let pos = this.get_mouse_pos(event);
+
+        console.log('update magnifier:', str_v2(pos));
+
+        e.style.setProperty('top', `${pos.x}px`);
+        e.style.setProperty('left', `${pos.y}px`);
+    }
+
+    key_up(event) {
+        //console.log('key up:', event);
+        //this.magnifier = false;
+    }
+
+    key_down(event) {
+        //console.log('key down:', event);
+        //if (event.shiftKey) {
+        //    this.magnifier = true;
+        //}
+    }
+
+    key_press(event) {
+        //console.log('key press:', event);
+    }
+
     mouse_up(event) {
         this.held = false;
         this.selected_vector = undefined;
+
+        console.log('mouse_up:',event);
+
+        if (this.magnifier) {
+            this.remove_magnifier();
+        }
     }
 
     mouse_down(event) {
@@ -655,9 +723,22 @@ class Parameters {
         let pos = this.get_mouse_rel(event);
         let size = this.get_size(event);
         this.selected_vector = this.arrows.find_arrow_by_mousepos_closest(pos, this.arrows.get_tolerance(size));
+
+        //console.log('mouse_down:',event);
+
+        if (event.shiftKey) {
+            this.add_magnifier();
+        }
     }
 
     mouse_move(event) {
+        if (this.magnifier || this.shiftKey) {
+            if (!this.magnifier)
+                this.add_magnifier();
+            //console.log('mouse_move:',event);
+            this.update_magnifier(event);
+        }
+
         let vector = this.selected_vector;
 
         if (!vector)
@@ -873,6 +954,14 @@ class Parameters {
         return document.getElementById('image_canvas');
     }
 
+    e_image_holder() {
+        return document.getElementById('image_holder');
+    }
+
+    e_magnifier() {
+        return document.getElementById('magnifier');
+    }
+
     e_arrows_canvas() {
         return document.getElementById('arrows_canvas');
     }
@@ -916,8 +1005,11 @@ body.addEventListener('load', function(event){prm.init();});
 
 arrows_canvas.addEventListener('mouseup', function(event){prm.mouse_up(event);});
 arrows_canvas.addEventListener('mousedown', function(event){prm.mouse_down(event);});
+body.addEventListener('mousemove', function(event){prm.mouse_move(event);});
+body.addEventListener('keyup', function(event){prm.key_up(event);});
+body.addEventListener('keydown', function(event){prm.key_down(event);});
+body.addEventListener('keypress', function(event){prm.key_press(event);});
 arrows_canvas.addEventListener('contextmenu', function(event){prm.mouse_down(event);});
-arrows_canvas.addEventListener('mousemove', function(event){prm.mouse_move(event);});
 arrows_canvas.addEventListener('change', function(event){prm.draw();});
 
 prm.e_axis_count().addEventListener('input', function(event){prm.axis_count_input(event);});
