@@ -640,6 +640,17 @@ class Parameters {
         return {x, y};
     }
 
+    get_mouse_rel_within(event, element) {
+        let rect = event.target.getBoundingClientRect();
+        let x = event.clientX;
+        let y = event.clientY;
+        x -= element.clientLeft;
+        y -= element.clientTop;
+        x = (x / element.clientWidth) * 2 - 1;
+        y = (y / element.clientHeight) * 2 - 1;
+        return {x, y};
+    }
+
     get_size(event) {
         let rect = event.target.getBoundingClientRect();
         return vec2(rect.width, rect.height);
@@ -660,7 +671,8 @@ class Parameters {
         n.setAttribute('id', 'magnifier');
         n.innerHTML = `<img src="${this.current_image.image.src}" />`;
 
-        this.e_image_holder().appendChild(n);
+        //this.e_image_holder().insertAdjacentElement(this.e_image_opacity(), n);
+        this.e_image_opacity().insertAdjacentElement('afterend', n);
 
         console.log('add magnifier:', n);
     }
@@ -678,16 +690,30 @@ class Parameters {
 
     update_magnifier(event) {
         let e = this.e_magnifier();
+        let i = this.e_magnifier_image();
+        let ic = this.e_image_canvas();
 
-        if (!e)
+        if (!e || !i)
             return;
 
         let pos = this.get_mouse_pos(event);
+        let rel = this.get_mouse_rel(event);
 
         console.log('update magnifier:', str_v2(pos));
 
-        e.style.setProperty('top', `${pos.x}px`);
-        e.style.setProperty('left', `${pos.y}px`);
+        e.style.setProperty('top', `${pos.y}px`);
+        e.style.setProperty('left', `${pos.x}px`);
+
+
+        //let imgpos = this.get_mouse_rel_within(event, ic);
+        let wrel = this.get_mouse_rel_within(event, ic);
+        let tw = this.current_image.width; //ic.clientWidth;
+        let th = this.current_image.height; //ic.clientHeight;
+        let imgpos = screen_wh(this.get_mouse_rel_within(event, ic), tw, th);        
+        console.log('mag_pos', str_v2(wrel), str_v2(imgpos), tw, th);
+
+        i.style.setProperty('top', `-${imgpos.y - (e.clientHeight / 2)}px`);
+        i.style.setProperty('left', `-${imgpos.x - (e.clientWidth / 2)}px`);
     }
 
     key_up(event) {
@@ -999,6 +1025,10 @@ class Parameters {
 
     e_magnifier() {
         return document.getElementById('magnifier');
+    }
+
+    e_magnifier_image() {
+        return this.e_magnifier().firstChild;
     }
 
     e_arrows_canvas() {
