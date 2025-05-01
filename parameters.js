@@ -848,6 +848,37 @@ class Parameters {
         this.draw();
     }
 
+    parameter_load_input(event) {
+        let e = this.e_parameter_load();
+
+        if (!e || !e.files || !e.files.length)
+            return;
+        let form = e.files[0];
+        let reader = new FileReader();
+        let _this = this;
+
+        reader.onload = function(e) {
+            _this.arrows = Object.assign(Arrows.prototype, JSON.parse(reader.result));
+            _this.draw();
+        };
+
+        reader.readAsText(form);
+    }
+
+    parameter_save_input(event) {
+        const blob = new Blob([JSON.stringify(this.arrows, null, 2)], {
+            type: "application/json",
+        });
+        const elem = window.document.createElement('a');
+        elem.href = window.URL.createObjectURL(blob);
+        elem.download = 'parameters.json';
+        if (this.current_image && this.e_image_load().files[0].name)
+            elem.download = this.e_image_load().files[0].name + '_' + elem.download;
+        document.body.appendChild(elem);
+        elem.click();        
+        document.body.removeChild(elem);
+    }
+
     update_ui_scale() {
         let e = this.e_range_ui_scale();
         this.arrows.arrow_tolerance = 0.75 + ((e.value*0.05-0.5));
@@ -942,6 +973,14 @@ class Parameters {
         this.draw();
     }
 
+    e_parameter_load() {
+        return document.getElementById('parameter_load');
+    }
+
+    e_parameter_save() {
+        return document.getElementById('parameter_save');
+    }
+
     e_parameter_images() {
         return document.getElementById('parameter_images');
     }
@@ -1016,3 +1055,5 @@ prm.e_axis_count().addEventListener('input', function(event){prm.axis_count_inpu
 prm.e_image_load().addEventListener('input', function(event){prm.image_load_input(event);});
 prm.e_range_opacity().addEventListener('input', function(event){prm.range_opacity_input(event);});
 prm.e_range_ui_scale().addEventListener('input', function(event){prm.range_ui_scale_input(event);});
+prm.e_parameter_save().addEventListener('click', function(event){prm.parameter_save_input(event);});
+prm.e_parameter_load().addEventListener('input', function(event){prm.parameter_load_input(event);})
