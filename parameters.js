@@ -294,6 +294,8 @@ class Arrows {
     camera_rotation_matrix = [];
     principal_point = vec2(0,0);
     focal_length = 1;
+    opacity = 50;
+    magnifier_scale = .1;
     axis_types = {
         'x': 'red',
         '-x': 'red',
@@ -703,6 +705,7 @@ class Parameters {
     selected_vector = undefined;
     current_image = undefined;
     arrows = new Arrows;
+    diff_move_rel = undefined;
 
     elements = {
         'focal_length': 'range_focal_length',
@@ -728,12 +731,12 @@ class Parameters {
     };
 
     elements_func = {
-        'magnifier_image': function() { return this.get_element('magnifier').firstChild; },
+        'magnifier_image': function(ptr) { return ptr.get_element('magnifier').firstChild; },
     };
 
     get_element(name) {
         if (name in this.elements_func)
-            return this.elements_func[name]();
+            return this.elements_func[name](this);
         return document.getElementById(this.elements[name]);
     }
 
@@ -770,21 +773,53 @@ class Parameters {
         return {x, y};
     }
 
-    get_mouse_rel_image(event) {
+    get_mouse_rel_image(event, start, scale) {
         let ic = this.get_element('image_canvas');
+        let ac = this.get_element('arrows_canvas');
         
-        let w = ic.clientWidth;
-        let h = ic.clientHeight;
+        let l = ac.clientLeft + ac.offsetLeft;
+        let t = ac.clientTop + ac.offsetTop;
+        let w = ac.clientWidth;
+        let h = ac.clientHeight;
 
         if (this.current_image) {
-            w = this.current_image.width;
-            h = this.current_image.height;
+            l = ic.clientLeft + ic.offsetLeft;
+            t = ic.clientTop + ic.offsetTop;
+            w = ic.clientWidth;
+            h = ic.clientHeight;
         }
 
-        let wrel = this.get_mouse_rel_within(event, ic);
-        console.log('wrel', wrel);
+        let ex = event.clientX;
+        let ey = event.clientY;
 
-        return wrel;
+        let rect = event.target.getBoundingClientRect();
+        let scrx = ex - l;
+        let scry = ey - t;
+        let x = (scrx / w) * 2 - 1;
+        let y = (scry / w) * 2 - 1;
+
+        console.log('wrel', x, y, scrx, scry);
+
+        if (start && scale) {
+            return {
+                x:(x-start.x)*scale+start.x,
+                y:(y-start.y)*scale+start.y,
+                scrx:(scrx-start.scrx)*scale+start.scrx,
+                scry:(scry-start.scry)*scale+start.scry,
+                ex:(ex-start.ex)*scale+start.ex,
+                ey:(ey-start.ey)*scale+start.ey
+            }
+        }
+
+        return {x,y,scrx,scry,ex,ey};
+    }
+
+    get_mouse_rel_image_autoscale(event) {
+        if (this.magnifier && !this.diff_move_rel)
+            return this.diff_move_rel = this.get_mouse_rel_image(event);
+        if (this.diff_move_rel)
+            return this.get_mouse_rel_image(event, this.diff_move_rel, this.arrows.magnifier_scale);
+        return this.get_mouse_rel_image(event);
     }
 
     get_size(event) {
@@ -792,9 +827,7 @@ class Parameters {
         return vec2(rect.width, rect.height);
     }
     
-    add_magnifier() {
-        console.log('event');
-
+    add_magnifier(event) {
         let e = this.get_element('magnifier');
 
         if (e || !this.current_image)
@@ -803,14 +836,38 @@ class Parameters {
         this.magnifier = true;
 
         let n = document.createElement('div');
+        let i = document.createElement('img');
 
         n.setAttribute('id', 'magnifier');
-        n.innerHTML = `<img src="${this.current_image.image.src}" />`;
+        //n.innerHTML = `<img src="${this.current_image.image.src}" />`;
+        i.setAttribute('src', this.current_image.image.src);
+        n.appendChild(i);
+
+        
+        this.set_magnifier_position(event, n, i);
 
         //this.e_image_holder().insertAdjacentElement(this.e_image_opacity(), n);
         this.get_element('image_opacity').insertAdjacentElement('afterend', n);
 
         console.log('add magnifier:', n);
+    }
+
+    set_magnifier_position(event, div, img) {
+        let pos = this.get_mouse_rel_image_autoscale(event);
+        let scale = this.arrows.arrow_tolerance * 8;
+
+        div.style.setProperty('left', `${pos.ex}px`);
+        div.style.setProperty('top', `${pos.ey}px`);
+        div.style.setProperty('width', `${scale}em`);
+        div.style.setProperty('height', `${scale}em`);
+
+        let tw = this.current_image.width; //ic.clientWidth;
+        let th = this.current_image.height; //ic.clientHeight;
+        let imgpos = screen_wh(pos, tw, th);        
+        //console.log('mag_pos', str_v2(wrel), str_v2(imgpos), tw, th);
+
+        img.style.setProperty('left', `-${imgpos.x - (div.clientWidth / 2)}px`);
+        img.style.setProperty('top', `-${imgpos.y - (div.clientHeight / 2)}px`);
     }
 
     remove_magnifier() {
@@ -827,29 +884,11 @@ class Parameters {
     update_magnifier(event) {
         let e = this.get_element('magnifier');
         let i = this.get_element('magnifier_image');
-        let ic = this.get_element('image_canvas');
 
-        if (!e || !i)
-            return;
+        if (e && i)
+            this.set_magnifier_position(event, e, i);
 
-        let pos = this.get_mouse_pos(event);
-        let rel = this.get_mouse_rel(event);
-
-        //console.log('update magnifier:', str_v2(pos));
-
-        e.style.setProperty('top', `${pos.y}px`);
-        e.style.setProperty('left', `${pos.x}px`);
-
-
-        //let imgpos = this.get_mouse_rel_within(event, ic);
-        let wrel = this.get_mouse_rel_within(event, ic);
-        let tw = this.current_image.width; //ic.clientWidth;
-        let th = this.current_image.height; //ic.clientHeight;
-        let imgpos = screen_wh(this.get_mouse_rel_within(event, ic), tw, th);        
-        //console.log('mag_pos', str_v2(wrel), str_v2(imgpos), tw, th);
-
-        i.style.setProperty('top', `-${imgpos.y - (e.clientHeight / 2)}px`);
-        i.style.setProperty('left', `-${imgpos.x - (e.clientWidth / 2)}px`);
+        this.add_magnifier(event);
     }
 
     key_up(event) {
@@ -871,6 +910,7 @@ class Parameters {
     mouse_up(event) {
         this.held = false;
         this.selected_vector = undefined;
+        this.diff_move_rel = undefined;
 
         //console.log('mouse_up:',event);
 
@@ -880,37 +920,30 @@ class Parameters {
     }
 
     mouse_down(event) {
+        if (event.shiftKey)
+            this.add_magnifier(event);
+
         this.held = true;
 
-        //let pos = this.get_mouse_rel_within(event, this.e_image_canvas());
-        let pos = this.get_mouse_rel_image(event);
+        let pos = this.get_mouse_rel_image_autoscale(event);
         let size = this.get_size(event);
         this.selected_vector = this.arrows.find_arrow_by_mousepos_closest(pos, this.arrows.get_tolerance(size));
 
-        //console.log('mouse_down:',event);
-
-        if (event.shiftKey) {
-            this.add_magnifier();
-        }
+        console.log('mouse_down:',event);
     }
 
     mouse_move(event) {
-        if (this.magnifier || this.shiftKey) {
-            if (!this.magnifier)
-                this.add_magnifier();
-            //console.log('mouse_move:',event);
+        if (this.magnifier || this.shiftKey)
             this.update_magnifier(event);
-        }
 
         let vector = this.selected_vector;
 
         if (!vector)
             return;
 
-        let pos = this.get_mouse_rel(event);
+        let pos = this.get_mouse_rel_image_autoscale(event);
 
         copy_v(vector.vector, pos);
-        //this.arrows.draw(this.e_arrows_canvas());
         this.draw();
     }
 
@@ -968,6 +1001,23 @@ class Parameters {
         this.draw();
     }
 
+    update_arrows_canvas() {
+        if (!this.current_image)
+            return;
+
+        let ic = this.get_element('image_canvas');
+        let ac = this.get_element('arrows_canvas');
+
+        ac.style.setProperty('left', `${ic.offsetLeft}px`);
+        ac.style.setProperty('top', `${ic.offsetTop}px`);
+        ac.style.setProperty('width', `${ic.clientWidth}px`);
+        ac.style.setProperty('height', `${ic.clientHeight}px`);
+        //ac.width = ic.width;
+        //ac.height = ic.height;
+        //ac.top = ic.top;
+        //ac.left = ic.left;
+    }
+    
     image_load_input(event) {
         let e = this.get_element('image_load');
 
@@ -978,6 +1028,7 @@ class Parameters {
 
         let reader = new FileReader();
         let e_image = this.get_element('image_canvas');
+        let ac = this.get_element('arrows_canvas');
         let _this = this;
 
         reader.onload = function(e) {
@@ -988,6 +1039,8 @@ class Parameters {
                     height: image.height,
                     image: image
                 };
+                
+                _this.update_arrows_canvas();
 
                 _this.draw();
             }
@@ -1033,7 +1086,7 @@ class Parameters {
             if (s[0].trim() != target)
                 return;
             let p = field.substring(s[0].length + 1);
-            console.log('cookie', p);
+            //console.log('cookie', p);
             this.arrows = Object.assign(Arrows.prototype, JSON.parse(p));
             loaded = true;
         });
@@ -1074,7 +1127,12 @@ class Parameters {
     }
 
     set_ui() {
-
+        let a = this.arrows;
+        this.get_element('range_ui_scale').value = (a.arrow_tolerance - 0.75 + 0.5) * 20;
+        this.get_element('range_opacity').value = a.opacity;
+        this.get_element('range_focal_length').value = a.focal_length * 100;
+        this.update_arrow_select();
+        this.update_info();
     }
 
     update_ui_scale() {
@@ -1084,7 +1142,8 @@ class Parameters {
 
     update_opacity() {
         let e = this.get_element('range_opacity');
-        this.get_element('image_opacity').style.setProperty('opacity', `${e.value}%`);
+        let v = this.arrows.opacity = e.value;
+        this.get_element('image_opacity').style.setProperty('opacity', `${v}%`);
     }
 
     update_focal_length() {
@@ -1191,6 +1250,8 @@ class Parameters {
             this.update_opacity();
             this.update_ui_scale();
             this.update_arrow_select();
+        } else {
+            this.set_ui();
         }
 
         this.draw();
@@ -1206,8 +1267,8 @@ let prm_events = [
     ['body', 'keyup', function(event){prm.key_up(event);}],
     ['body', 'keydown', function(event){prm.key_down(event);}],
     ['body', 'keypress', function(event){prm.key_press(event);}],
+    ['body', 'mouseup', function(event){prm.mouse_up(event);}],
 
-    ['arrows_canvas', 'mouseup', function(event){prm.mouse_up(event);}],
     ['arrows_canvas', 'mousedown', function(event){prm.mouse_down(event);}],
     ['arrows_canvas', 'contextmenu', function(event){prm.mouse_down(event);}],
     ['arrows_canvas', 'change', function(event){prm.draw();}],
