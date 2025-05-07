@@ -16,6 +16,10 @@ function str_v2(v, digits=3) {
     return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}`;
 }
 
+function str_v3(v, digits=3) {
+    return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}, ${v.z.toFixed(digits)}`;
+}
+
 function vec2(x,y) {
     return {x:x, y:y};
 }
@@ -162,7 +166,7 @@ function distance_nosqrt_v(v1, v2) {
 
 function distance_v3(v1, v2) {
     let diff = sub_v3(v2, v1);
-    return Math.sqrt(sum_v3(mul_v(diff, diff)));
+    return Math.sqrt(sum_v3(mul_v3(diff, diff)));
 }
 
 function distance_v(v1, v2) {
@@ -171,7 +175,7 @@ function distance_v(v1, v2) {
 
 function distance_v2(v1, v2) {
     let diff = sub_v2(v2, v1);
-    return Math.sqrt(sum_v3(mul_v(diff, diff)));
+    return Math.sqrt(sum_v2(mul_v2(diff, diff)));
 }
 
 function length_v2(v) {
@@ -255,6 +259,14 @@ function inverse_m2(m) {
 
 }
 
+function cross_v3(v1, v2) {
+    return vec3(
+        (v1.y * v2.z) - (v1.z * v2.y),
+        (v1.z * v2.x) - (v1.x * v2.z),
+        (v1.x * v2.y) - (v1.y * v2.x)
+    );
+}
+
 function rotate_v2(vector, radians) {
     let m = rotation_m2(radians);
     //return op_m2_v2(m, vector, op_mul);
@@ -279,6 +291,8 @@ function emplace_pixel(data, pixel, x, y, width, height) {
 class Arrows {
     arrows = [];
     intersections = [];
+    camera_rotation_matrix = [];
+    principal_point = vec2(0,0);
     axis_types = {
         'x': 'red',
         '-x': 'red',
@@ -300,6 +314,9 @@ class Arrows {
         let vec = undefined;
         let val = undefined;
 
+        if (distance_nosqrt_v(this.principal_point, mpos) <= tolerance)
+            return {arrow:undefined, vector:this.principal_point, distance:tolerance};
+
         this.arrows.forEach(arrow => {
             let a = distance_nosqrt_v(arrow.start, mpos);
             let b = distance_nosqrt_v(arrow.end, mpos);
@@ -319,6 +336,9 @@ class Arrows {
         let closest = undefined;
         let closest_vec = undefined;
         let closest_val = undefined;
+
+        if (distance_nosqrt_v(this.principal_point, mpos) <= tolerance)
+            return {arrow:undefined, vector:this.principal_point, distance:tolerance};
 
         this.arrows.forEach(arrow => {
             let a = distance_nosqrt_v(arrow.start, mpos);
@@ -535,6 +555,7 @@ class Arrows {
 
             ctx.fill();
 
+            /*
             ctx.beginPath();
 
             ctx.moveTo(axis_dis_scr.x, axis_dis_scr.y);
@@ -556,7 +577,40 @@ class Arrows {
             ctx.lineTo(endp.x, endp.y);
 
             ctx.stroke();
+            */
         });
+
+        let ii = 0;
+        if (this.camera_rotation_matrix)
+        this.camera_rotation_matrix.forEach(vec => {
+            let v = div_v3_f(vec, 4);
+            let p = this.project_v3(v);
+            let s = screen_v(p, size);
+            let c = axis_dis_scr;
+
+            ctx.strokeStyle = ["red", "lime", "dodgerblue"][ii++];
+
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y);
+            ctx.lineTo(s.x, s.y);
+            ctx.stroke();
+        });
+
+        {
+            let s = screen_v(this.principal_point, size);
+
+            ctx.strokeStyle = "orange";
+
+            ctx.beginPath();
+            
+            ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+
+            ctx.stroke();
+        }
+    }
+
+    project_v3(v) {
+        return vec2(v.x / v.z, v.y / v.z);
     }
 
     solve() {
@@ -612,6 +666,31 @@ class Arrows {
             this.intersections[i]['mag'] = num;
             this.intersections[i]['dot_angle'] = Math.acos(this.intersections[i].dot) / Math.PI * 180;
         }
+
+        if (this.intersections.length < 2)
+            return;
+
+        let vn1 = this.intersections[0]['mag_norm'];
+        let vn2 = this.intersections[1]['mag_norm'];
+        let p = this.principal_point;
+
+        let f = -1;
+
+        let OFu = vec3(vn1.x - p.x, vn1.y - p.y, f);
+        let OFv = vec3(vn2.x - p.x, vn2.y - p.y, f);
+
+        let s1 = length_v3(OFu);
+        let s2 = length_v3(OFv);
+
+        let vpRc = normalize_v3(OFu);
+        let upRc = normalize_v3(OFv);
+        let wpRc = cross_v3(upRc, vpRc);
+
+        this.camera_rotation_matrix = [
+            normalize_v3(vec3(OFu.x / s1, OFv.y / s2, wpRc.x)),
+            normalize_v3(vec3(OFu.y / s1, OFv.y / s2,wpRc.y)),
+            normalize_v3(vec3(-f / s1, -f / s2, wpRc.z))
+        ]
     }
 }
 
@@ -923,6 +1002,15 @@ class Parameters {
         e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
         
+        {
+            let str = '<div id="principal_point_info">';
+            str += '<p>Principal Point</p>';
+            str += `<p>${str_v2(this.arrows.principal_point)}</p>`;
+            str += '</div>';
+
+            e.innerHTML += str;
+        }
+
         for (let i = 0; i < this.arrows.arrows.length; i++) {
             let str = '<div id="arrow_info">';
             let arrow = this.arrows.arrows[i];
@@ -946,7 +1034,7 @@ class Parameters {
             let str = '<div id="axis_info">';
             let intersect = this.arrows.intersections[i];
 
-            str += `<p>${i + 1}</p>`
+            str += `<p>${i + 1}</p>`;
             str += `<p>intersect: ${intersect.point.x.toFixed(3)},${intersect.point.y.toFixed(3)}</p>`;
             str += `<p>dot: ${intersect.dot.toFixed(3)}</p>`;
             str += `<p>mag: ${intersect.mag.toFixed(3)}</p>`;
@@ -955,6 +1043,19 @@ class Parameters {
             str += `<p>dot angle: ${intersect.dot_angle.toFixed(3)}</p>`;
 
             str += '</div>';
+
+            e.innerHTML += str;
+        }
+
+        if (this.arrows.camera_rotation_matrix && this.arrows.camera_rotation_matrix.length > 2){
+            let str = '<div id="camera_info">';
+            let mtx = this.arrows.camera_rotation_matrix;
+
+            str += `<p>Camera</p>`;
+            str += `<p>${str_v3(mtx[0])}</p>`;
+            str += `<p>${str_v3(mtx[1])}</p>`;
+            str += `<p>${str_v3(mtx[2])}</p>`;
+            str += `</div>`;
 
             e.innerHTML += str;
         }
