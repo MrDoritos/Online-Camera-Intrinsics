@@ -798,7 +798,7 @@ class Parameters {
         let x = (scrx / w) * 2 - 1;
         let y = (scry / w) * 2 - 1;
 
-        console.log('wrel', x, y, scrx, scry);
+        //console.log('wrel', x, y, scrx, scry);
 
         if (start && scale) {
             return {
@@ -854,26 +854,46 @@ class Parameters {
 
     set_magnifier_position(event, div, img) {
         let pos = this.get_mouse_rel_image_autoscale(event);
-        let scale = this.arrows.arrow_tolerance * 8;
+        let scale = this.arrows.arrow_tolerance * 100;
 
-        div.style.setProperty('left', `${pos.ex}px`);
-        div.style.setProperty('top', `${pos.ey}px`);
-        div.style.setProperty('width', `${scale}em`);
-        div.style.setProperty('height', `${scale}em`);
+        let ac = this.get_element('arrows_canvas');
+        let tw = this.current_image.width;
+        let th = this.current_image.height;
+        //tw = ac.width;
+        //th = ac.height;
+        let imgpos = screen_wh(pos, tw, th);
 
-        let tw = this.current_image.width; //ic.clientWidth;
-        let th = this.current_image.height; //ic.clientHeight;
-        let imgpos = screen_wh(pos, tw, th);        
-        //console.log('mag_pos', str_v2(wrel), str_v2(imgpos), tw, th);
+        let divx = pos.ex;
+        let divy = pos.ey;
+        let divw = scale;
+        let divh = scale;
 
-        img.style.setProperty('left', `-${imgpos.x - (div.clientWidth / 2)}px`);
-        img.style.setProperty('top', `-${imgpos.y - (div.clientHeight / 2)}px`);
+        div.style.setProperty('left', `${divx}px`);
+        div.style.setProperty('top', `${divy}px`);
+        div.style.setProperty('width', `${divw}px`);
+        div.style.setProperty('height', `${divh}px`);
+
+        let imgw = tw;
+        let imgh = th;
+        let imgx = -(imgpos.x - (divw * 0.5));
+        let imgy = -(imgpos.y - (divh * 0.5));
+        //imgx = divx - (imgw * 0.5);
+        //imgy = divy - (imgh * 0.5);
+        //imgx = -(divx + imgw);
+        //imgy = -(divy + imgh);
+
+        img.style.setProperty('left', `${imgx}px`);
+        img.style.setProperty('top', `${imgy}px`);
+        img.style.setProperty('width', `${imgw}px`);
+        img.style.setProperty('height', `${imgh}px`);
+
+        console.log('magnifier', div, img, divx, divy, divw, divh, imgx, imgy, imgw, imgh);
     }
 
     remove_magnifier() {
         let e = this.get_element('magnifier');
 
-        console.log('remove magnifier:', e);
+        //console.log('remove magnifier:', e);
     
         this.magnifier = false;
 
@@ -929,7 +949,7 @@ class Parameters {
         let size = this.get_size(event);
         this.selected_vector = this.arrows.find_arrow_by_mousepos_closest(pos, this.arrows.get_tolerance(size));
 
-        console.log('mouse_down:',event);
+        //console.log('mouse_down:',event);
     }
 
     mouse_move(event) {
