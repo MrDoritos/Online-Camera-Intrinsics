@@ -704,18 +704,41 @@ class Parameters {
     current_image = undefined;
     arrows = new Arrows;
 
-    ranges = {
+    elements = {
         'focal_length': 'range_focal_length',
         'opacity': 'range_opacity',
-        'ui_scale': 'range_ui_scale'
-    }
-    
-    get_element(id) {
-        return document.getElementById(id);
+        'ui_scale': 'range_ui_scale',
+        'range_focal_length': 'range_focal_length',
+        'range_opacity': 'range_opacity',
+        'range_ui_scale': 'range_ui_scale',
+        'parameter_load': 'parameter_load',
+        'parameter_save': 'parameter_save',
+        'parameter_images': 'parameter_images',
+        'parameter_info': 'parameter_info',
+        'image_canvas': 'image_canvas',
+        'image_holder': 'image_holder',
+        'magnifier': 'magnifier',
+        'arrows_canvas': 'arrows_canvas',
+        'parameter_body': 'parameter_body',
+        'body': 'parameter_body',
+        'axis_count': 'axis_count',
+        'axis_types': 'axis_types',
+        'image_load': 'image_load',
+        'image_opacity': 'image_opacity',
+    };
+
+    elements_func = {
+        'magnifier_image': function() { return this.get_element('magnifier').firstChild; },
+    };
+
+    get_element(name) {
+        if (name in this.elements_func)
+            return this.elements_func[name]();
+        return document.getElementById(this.elements[name]);
     }
 
-    get_range(name) {
-        return this.get_element(this.ranges[name]);
+    add_event(name, event, func) {
+        this.get_element(name).addEventListener(event, func);
     }
 
     Parameters() {
@@ -748,7 +771,7 @@ class Parameters {
     }
 
     get_mouse_rel_image(event) {
-        let ic = this.e_image_canvas();
+        let ic = this.get_element('image_canvas');
         
         let w = ic.clientWidth;
         let h = ic.clientHeight;
@@ -772,7 +795,7 @@ class Parameters {
     add_magnifier() {
         console.log('event');
 
-        let e = this.e_magnifier();
+        let e = this.get_element('magnifier');
 
         if (e || !this.current_image)
             return;
@@ -785,13 +808,13 @@ class Parameters {
         n.innerHTML = `<img src="${this.current_image.image.src}" />`;
 
         //this.e_image_holder().insertAdjacentElement(this.e_image_opacity(), n);
-        this.e_image_opacity().insertAdjacentElement('afterend', n);
+        this.get_element('image_opacity').insertAdjacentElement('afterend', n);
 
         console.log('add magnifier:', n);
     }
 
     remove_magnifier() {
-        let e = this.e_magnifier();
+        let e = this.get_element('magnifier');
 
         console.log('remove magnifier:', e);
     
@@ -802,9 +825,9 @@ class Parameters {
     }
 
     update_magnifier(event) {
-        let e = this.e_magnifier();
-        let i = this.e_magnifier_image();
-        let ic = this.e_image_canvas();
+        let e = this.get_element('magnifier');
+        let i = this.get_element('magnifier_image');
+        let ic = this.get_element('image_canvas');
 
         if (!e || !i)
             return;
@@ -917,7 +940,7 @@ class Parameters {
     }
 
     axis_count_input(event) {
-        let e = this.e_axis_count();
+        let e = this.get_element('axis_count');
 
         let c = e.value * 2;
         let l = this.arrows.arrows.length;
@@ -946,7 +969,7 @@ class Parameters {
     }
 
     image_load_input(event) {
-        let e = this.e_image_load();
+        let e = this.get_element('image_load');
 
         if (!e || !e.files || !e.files.length)
             return;
@@ -954,7 +977,7 @@ class Parameters {
         let form = e.files[0];
 
         let reader = new FileReader();
-        let e_image = this.e_image_canvas();
+        let e_image = this.get_element('image_canvas');
         let _this = this;
 
         reader.onload = function(e) {
@@ -1019,7 +1042,7 @@ class Parameters {
     }
 
     parameter_load_input(event) {
-        let e = this.e_parameter_load();
+        let e = this.get_element('parameter_load');
 
         if (!e || !e.files || !e.files.length)
             return;
@@ -1039,36 +1062,37 @@ class Parameters {
         const blob = new Blob([JSON.stringify(this.arrows, null, 2)], {
             type: "application/json",
         });
+        let e = this.get_element('image_load');
         const elem = window.document.createElement('a');
         elem.href = window.URL.createObjectURL(blob);
         elem.download = 'parameters.json';
-        if (this.current_image && this.e_image_load().files[0].name)
-            elem.download = this.e_image_load().files[0].name + '_' + elem.download;
+        if (this.current_image && e.files[0].name)
+            elem.download = e.files[0].name + '_' + elem.download;
         document.body.appendChild(elem);
         elem.click();        
         document.body.removeChild(elem);
     }
 
     set_ui() {
-        
+
     }
 
     update_ui_scale() {
-        let e = this.e_range_ui_scale();
+        let e = this.get_element('range_ui_scale');
         this.arrows.arrow_tolerance = 0.75 + ((e.value*0.05-0.5));
     }
 
     update_opacity() {
-        let e = this.e_range_opacity();
-        this.e_image_opacity().style.setProperty('opacity', `${e.value}%`);
+        let e = this.get_element('range_opacity');
+        this.get_element('image_opacity').style.setProperty('opacity', `${e.value}%`);
     }
 
     update_focal_length() {
-        this.arrows.focal_length = this.get_range('focal_length').value * 0.01;
+        this.arrows.focal_length = this.get_element('focal_length').value * 0.01;
     }
 
     update_info() {
-        let e = this.e_parameter_info();
+        let e = this.get_element('parameter_info');
         let c = this.current_image;
 
         e.innerHTML = '<p style="text-align: center">Info</p>';
@@ -1136,7 +1160,7 @@ class Parameters {
     }
 
     update_arrow_select() {
-        let e = this.e_axis_types();
+        let e = this.get_element('axis_types');
         
         e.innerHTML = `<p style="text-align:center">Axis</p>`;
         for (let i = 0; i < this.arrows.arrows.length; i++) {
@@ -1151,22 +1175,16 @@ class Parameters {
     }
 
     draw() {
-        this.arrows.draw(this.e_arrows_canvas());
+        this.arrows.draw(this.get_element('arrows_canvas'));
         this.update_info();
         this.cookie_save();
     }
 
     init() {
-        //this.arrows.arrows = [
-        //    get_arrow(vec2(0,0),vec2(0.5,0),'x'),
-        //    get_arrow(vec2(0,0.1),vec2(0.5,0.1),'y')
-        //];
-
         for (let i = 1; i < 4; i++) {
-            this.e_axis_count().innerHTML +=
+            this.get_element('axis_count').innerHTML +=
                 `<option ${i == 1 ? 'selected' : ''} value="${i}">${i}</option>`
         }
-
 
         if (!this.cookie_load()) {
             this.axis_count_input();
@@ -1177,95 +1195,34 @@ class Parameters {
 
         this.draw();
     }
-
-    e_parameter_load() {
-        return document.getElementById('parameter_load');
-    }
-
-    e_parameter_save() {
-        return document.getElementById('parameter_save');
-    }
-
-    e_parameter_images() {
-        return document.getElementById('parameter_images');
-    }
-
-    e_parameter_info() {
-        return document.getElementById('parameter_info');
-    }
-
-    e_image_canvas() {
-        return document.getElementById('image_canvas');
-    }
-
-    e_image_holder() {
-        return document.getElementById('image_holder');
-    }
-
-    e_magnifier() {
-        return document.getElementById('magnifier');
-    }
-
-    e_magnifier_image() {
-        return this.e_magnifier().firstChild;
-    }
-
-    e_arrows_canvas() {
-        return document.getElementById('arrows_canvas');
-    }
-
-    e_body() {
-        return document.getElementById('parameter_body');
-    }
-
-    e_axis_count() {
-        return document.getElementById('axis_count');
-    }
-
-    e_axis_types() {
-        return document.getElementById('axis_types');
-    }
-
-    e_image_load() {
-        return document.getElementById('image_load');
-    }
-
-    e_range_opacity() {
-        return document.getElementById('range_opacity');
-    }
-
-    e_range_ui_scale() {
-        return document.getElementById('range_ui_scale');
-    }
-
-    e_image_opacity() {
-        return document.getElementById('image_opacity');
-    }
 }
 
 let prm = new Parameters();
 
-let arrows_canvas = prm.e_arrows_canvas();
-let body = prm.e_body();
-
-//body.addEventListener('load', function(event){prm.init();});
-
-arrows_canvas.addEventListener('mouseup', function(event){prm.mouse_up(event);});
-arrows_canvas.addEventListener('mousedown', function(event){prm.mouse_down(event);});
-body.addEventListener('mousemove', function(event){prm.mouse_move(event);});
-body.addEventListener('keyup', function(event){prm.key_up(event);});
-body.addEventListener('keydown', function(event){prm.key_down(event);});
-body.addEventListener('keypress', function(event){prm.key_press(event);});
-arrows_canvas.addEventListener('contextmenu', function(event){prm.mouse_down(event);});
-arrows_canvas.addEventListener('change', function(event){prm.draw();});
-
-prm.e_axis_count().addEventListener('input', function(event){prm.axis_count_input(event);});
-prm.e_image_load().addEventListener('input', function(event){prm.image_load_input(event);});
-prm.e_range_opacity().addEventListener('input', function(event){prm.range_opacity_input(event);});
-prm.e_range_ui_scale().addEventListener('input', function(event){prm.range_ui_scale_input(event);});
-prm.e_parameter_save().addEventListener('click', function(event){prm.parameter_save_input(event);});
-prm.e_parameter_load().addEventListener('input', function(event){prm.parameter_load_input(event);});
-prm.get_range('focal_length').addEventListener('input', function(event){prm.range_focal_length_input(event);});
-
 prm.init();
+
+let prm_events = [
+    ['body', 'mousemove', function(event){prm.mouse_move(event);}],
+    ['body', 'keyup', function(event){prm.key_up(event);}],
+    ['body', 'keydown', function(event){prm.key_down(event);}],
+    ['body', 'keypress', function(event){prm.key_press(event);}],
+
+    ['arrows_canvas', 'mouseup', function(event){prm.mouse_up(event);}],
+    ['arrows_canvas', 'mousedown', function(event){prm.mouse_down(event);}],
+    ['arrows_canvas', 'contextmenu', function(event){prm.mouse_down(event);}],
+    ['arrows_canvas', 'change', function(event){prm.draw();}],
+
+    ['axis_count', 'input', function(event){prm.axis_count_input(event);}],
+    ['image_load', 'input', function(event){prm.image_load_input(event);}],
+    ['range_opacity', 'input', function(event){prm.range_opacity_input(event);}],
+    ['range_ui_scale', 'input', function(event){prm.range_ui_scale_input(event);}],
+    ['parameter_save', 'click', function(event){prm.parameter_save_input(event);}],
+    ['parameter_load', 'input', function(event){prm.parameter_load_input(event);}],
+    ['focal_length', 'input', function(event){prm.range_focal_length_input(event);}]    
+];
+
+prm_events.forEach((field) => {
+    prm.add_event(field[0], field[1], field[2]);
+});
+
 prm.image_load_input();
