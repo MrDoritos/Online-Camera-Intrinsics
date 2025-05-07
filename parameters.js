@@ -293,6 +293,7 @@ class Arrows {
     intersections = [];
     camera_rotation_matrix = [];
     principal_point = vec2(0,0);
+    focal_length = 1;
     axis_types = {
         'x': 'red',
         '-x': 'red',
@@ -528,7 +529,7 @@ class Arrows {
 
             //#endregion
 
-            ctx.strokeStyle = "black";
+            //ctx.strokeStyle = "black";
 
             //#region Circles
 
@@ -546,6 +547,8 @@ class Arrows {
 
             //#endregion
         });
+
+        ctx.strokeStyle = "black";
 
         this.intersections.forEach(intersect => {
             ctx.beginPath();
@@ -674,7 +677,7 @@ class Arrows {
         let vn2 = this.intersections[1]['mag_norm'];
         let p = this.principal_point;
 
-        let f = -1;
+        let f = -this.focal_length;
 
         let OFu = vec3(vn1.x - p.x, vn1.y - p.y, f);
         let OFv = vec3(vn2.x - p.x, vn2.y - p.y, f);
@@ -700,6 +703,20 @@ class Parameters {
     selected_vector = undefined;
     current_image = undefined;
     arrows = new Arrows;
+
+    ranges = {
+        'focal_length': 'range_focal_length',
+        'opacity': 'range_opacity',
+        'ui_scale': 'range_ui_scale'
+    }
+    
+    get_element(id) {
+        return document.getElementById(id);
+    }
+
+    get_range(name) {
+        return this.get_element(this.ranges[name]);
+    }
 
     Parameters() {
 
@@ -728,6 +745,23 @@ class Parameters {
         x = (x / element.clientWidth) * 2 - 1;
         y = (y / element.clientHeight) * 2 - 1;
         return {x, y};
+    }
+
+    get_mouse_rel_image(event) {
+        let ic = this.e_image_canvas();
+        
+        let w = ic.clientWidth;
+        let h = ic.clientHeight;
+
+        if (this.current_image) {
+            w = this.current_image.width;
+            h = this.current_image.height;
+        }
+
+        let wrel = this.get_mouse_rel_within(event, ic);
+        console.log('wrel', wrel);
+
+        return wrel;
     }
 
     get_size(event) {
@@ -778,7 +812,7 @@ class Parameters {
         let pos = this.get_mouse_pos(event);
         let rel = this.get_mouse_rel(event);
 
-        console.log('update magnifier:', str_v2(pos));
+        //console.log('update magnifier:', str_v2(pos));
 
         e.style.setProperty('top', `${pos.y}px`);
         e.style.setProperty('left', `${pos.x}px`);
@@ -789,7 +823,7 @@ class Parameters {
         let tw = this.current_image.width; //ic.clientWidth;
         let th = this.current_image.height; //ic.clientHeight;
         let imgpos = screen_wh(this.get_mouse_rel_within(event, ic), tw, th);        
-        console.log('mag_pos', str_v2(wrel), str_v2(imgpos), tw, th);
+        //console.log('mag_pos', str_v2(wrel), str_v2(imgpos), tw, th);
 
         i.style.setProperty('top', `-${imgpos.y - (e.clientHeight / 2)}px`);
         i.style.setProperty('left', `-${imgpos.x - (e.clientWidth / 2)}px`);
@@ -815,7 +849,7 @@ class Parameters {
         this.held = false;
         this.selected_vector = undefined;
 
-        console.log('mouse_up:',event);
+        //console.log('mouse_up:',event);
 
         if (this.magnifier) {
             this.remove_magnifier();
@@ -825,7 +859,8 @@ class Parameters {
     mouse_down(event) {
         this.held = true;
 
-        let pos = this.get_mouse_rel(event);
+        //let pos = this.get_mouse_rel_within(event, this.e_image_canvas());
+        let pos = this.get_mouse_rel_image(event);
         let size = this.get_size(event);
         this.selected_vector = this.arrows.find_arrow_by_mousepos_closest(pos, this.arrows.get_tolerance(size));
 
@@ -953,6 +988,36 @@ class Parameters {
         this.draw();
     }
 
+    range_focal_length_input(event) {
+        this.update_focal_length();
+        this.draw();
+    }
+
+    async cookie_save() {
+        let str = JSON.stringify(this.arrows);
+        document.cookie = `parameters=${str}; path=/; expires=Tue, 19 Jan 2038 04:14:07 GMT`;
+    }
+
+    cookie_load() {
+        let cookie = document.cookie;
+        let target = 'parameters';
+        let loaded = false;
+
+        cookie.split(';').forEach((field) => {
+            let s = field.split('=');
+            if (!s.length)
+                return;
+            if (s[0].trim() != target)
+                return;
+            let p = field.substring(s[0].length + 1);
+            console.log('cookie', p);
+            this.arrows = Object.assign(Arrows.prototype, JSON.parse(p));
+            loaded = true;
+        });
+
+        return loaded;
+    }
+
     parameter_load_input(event) {
         let e = this.e_parameter_load();
 
@@ -984,6 +1049,10 @@ class Parameters {
         document.body.removeChild(elem);
     }
 
+    set_ui() {
+        
+    }
+
     update_ui_scale() {
         let e = this.e_range_ui_scale();
         this.arrows.arrow_tolerance = 0.75 + ((e.value*0.05-0.5));
@@ -994,6 +1063,10 @@ class Parameters {
         this.e_image_opacity().style.setProperty('opacity', `${e.value}%`);
     }
 
+    update_focal_length() {
+        this.arrows.focal_length = this.get_range('focal_length').value * 0.01;
+    }
+
     update_info() {
         let e = this.e_parameter_info();
         let c = this.current_image;
@@ -1001,6 +1074,7 @@ class Parameters {
         e.innerHTML = '<p style="text-align: center">Info</p>';
         e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
+        e.innerHTML += `<p>focal length: ${this.arrows.focal_length.toFixed(3)}</p>`;
         
         {
             let str = '<div id="principal_point_info">';
@@ -1079,6 +1153,7 @@ class Parameters {
     draw() {
         this.arrows.draw(this.e_arrows_canvas());
         this.update_info();
+        this.cookie_save();
     }
 
     init() {
@@ -1092,10 +1167,13 @@ class Parameters {
                 `<option ${i == 1 ? 'selected' : ''} value="${i}">${i}</option>`
         }
 
-        this.axis_count_input();
-        this.update_opacity();
-        this.update_ui_scale();
-        this.update_arrow_select();
+
+        if (!this.cookie_load()) {
+            this.axis_count_input();
+            this.update_opacity();
+            this.update_ui_scale();
+            this.update_arrow_select();
+        }
 
         this.draw();
     }
@@ -1170,8 +1248,7 @@ let prm = new Parameters();
 let arrows_canvas = prm.e_arrows_canvas();
 let body = prm.e_body();
 
-prm.init();
-body.addEventListener('load', function(event){prm.init();});
+//body.addEventListener('load', function(event){prm.init();});
 
 arrows_canvas.addEventListener('mouseup', function(event){prm.mouse_up(event);});
 arrows_canvas.addEventListener('mousedown', function(event){prm.mouse_down(event);});
@@ -1187,4 +1264,8 @@ prm.e_image_load().addEventListener('input', function(event){prm.image_load_inpu
 prm.e_range_opacity().addEventListener('input', function(event){prm.range_opacity_input(event);});
 prm.e_range_ui_scale().addEventListener('input', function(event){prm.range_ui_scale_input(event);});
 prm.e_parameter_save().addEventListener('click', function(event){prm.parameter_save_input(event);});
-prm.e_parameter_load().addEventListener('input', function(event){prm.parameter_load_input(event);})
+prm.e_parameter_load().addEventListener('input', function(event){prm.parameter_load_input(event);});
+prm.get_range('focal_length').addEventListener('input', function(event){prm.range_focal_length_input(event);});
+
+prm.init();
+prm.image_load_input();
