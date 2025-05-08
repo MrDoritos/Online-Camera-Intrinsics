@@ -706,6 +706,8 @@ class Parameters {
     current_image = undefined;
     arrows = new Arrows;
     diff_move_rel = undefined;
+    final_move_rel = undefined;
+    diff_move_scale = 1;
 
     elements = {
         'focal_length': 'range_focal_length',
@@ -728,6 +730,8 @@ class Parameters {
         'axis_types': 'axis_types',
         'image_load': 'image_load',
         'image_opacity': 'image_opacity',
+        'magnifier_scale': 'range_magnifier_scale',
+        'range_magnifier_scale': 'range_magnifier_scale'
     };
 
     elements_func = {
@@ -796,9 +800,9 @@ class Parameters {
         let scrx = ex - l;
         let scry = ey - t;
         let x = (scrx / w) * 2 - 1;
-        let y = (scry / w) * 2 - 1;
+        let y = (scry / h) * 2 - 1;
 
-        //console.log('wrel', x, y, scrx, scry);
+        console.log('wrel', x, y, scrx, scry);
 
         if (start && scale) {
             return {
@@ -815,11 +819,12 @@ class Parameters {
     }
 
     get_mouse_rel_image_autoscale(event) {
-        if (this.magnifier && !this.diff_move_rel)
-            return this.diff_move_rel = this.get_mouse_rel_image(event);
+        let pos = undefined;
         if (this.diff_move_rel)
-            return this.get_mouse_rel_image(event, this.diff_move_rel, this.arrows.magnifier_scale);
-        return this.get_mouse_rel_image(event);
+            pos = this.get_mouse_rel_image(event, this.diff_move_rel, this.diff_move_scale);
+        else
+            pos = this.diff_move_rel = this.get_mouse_rel_image(event);
+        return pos;
     }
 
     get_size(event) {
@@ -887,7 +892,7 @@ class Parameters {
         img.style.setProperty('width', `${imgw}px`);
         img.style.setProperty('height', `${imgh}px`);
 
-        console.log('magnifier', div, img, divx, divy, divw, divh, imgx, imgy, imgw, imgh);
+        console.log('magnifier', div, img, '\n', divx, divy, divw, divh, imgx, imgy, imgw, imgh);
     }
 
     remove_magnifier() {
@@ -903,12 +908,16 @@ class Parameters {
 
     update_magnifier(event) {
         let e = this.get_element('magnifier');
+
+        if (!e)
+            return this.add_magnifier(event);
+
         let i = this.get_element('magnifier_image');
 
-        if (e && i)
-            this.set_magnifier_position(event, e, i);
+        if (!i)
+            return;
 
-        this.add_magnifier(event);
+        this.set_magnifier_position(event, e, i);
     }
 
     key_up(event) {
@@ -940,8 +949,8 @@ class Parameters {
     }
 
     mouse_down(event) {
-        if (event.shiftKey)
-            this.add_magnifier(event);
+        //if (event.shiftKey)
+        //    this.add_magnifier(event);
 
         this.held = true;
 
@@ -953,13 +962,21 @@ class Parameters {
     }
 
     mouse_move(event) {
-        if (this.magnifier || this.shiftKey)
-            this.update_magnifier(event);
-
         let vector = this.selected_vector;
 
         if (!vector)
             return;
+
+        let use_magnifier = this.held && event.shiftKey;
+
+        if (use_magnifier) {
+            this.update_magnifier(event);
+            this.diff_move_scale = this.arrows.magnifier_scale;
+        } else {
+            this.diff_move_scale = 1;
+            if (this.magnifier)
+                this.remove_magnifier();
+        }
 
         let pos = this.get_mouse_rel_image_autoscale(event);
 
@@ -1025,17 +1042,27 @@ class Parameters {
         if (!this.current_image)
             return;
 
+        console.log('resize');
+
         let ic = this.get_element('image_canvas');
         let ac = this.get_element('arrows_canvas');
+
+        let l = ic.offsetLeft;
+        let t = ic.offsetTop;
+        let w = ic.clientWidth;
+        let h = ic.clientHeight;
 
         ac.style.setProperty('left', `${ic.offsetLeft}px`);
         ac.style.setProperty('top', `${ic.offsetTop}px`);
         ac.style.setProperty('width', `${ic.clientWidth}px`);
         ac.style.setProperty('height', `${ic.clientHeight}px`);
+        ac.setAttribute('width', w);
+        ac.setAttribute('height', h);
         //ac.width = ic.width;
         //ac.height = ic.height;
         //ac.top = ic.top;
         //ac.left = ic.left;
+        this.arrows.draw(this.get_element('arrows_canvas'));
     }
     
     image_load_input(event) {
@@ -1087,6 +1114,10 @@ class Parameters {
     range_focal_length_input(event) {
         this.update_focal_length();
         this.draw();
+    }
+
+    range_magnifier_scale_input(event) {
+        this.update_magnifier_scale();
     }
 
     async cookie_save() {
@@ -1151,8 +1182,13 @@ class Parameters {
         this.get_element('range_ui_scale').value = (a.arrow_tolerance - 0.75 + 0.5) * 20;
         this.get_element('range_opacity').value = a.opacity;
         this.get_element('range_focal_length').value = a.focal_length * 100;
+        this.get_element('range_magnifier_scale').value = a.magnifier_scale * 100;
         this.update_arrow_select();
         this.update_info();
+    }
+
+    update_magnifier_scale() {
+        this.arrows.magnifier_scale = 0.01 * this.get_element('range_magnifier_scale').value;
     }
 
     update_ui_scale() {
@@ -1299,11 +1335,14 @@ let prm_events = [
     ['range_ui_scale', 'input', function(event){prm.range_ui_scale_input(event);}],
     ['parameter_save', 'click', function(event){prm.parameter_save_input(event);}],
     ['parameter_load', 'input', function(event){prm.parameter_load_input(event);}],
-    ['focal_length', 'input', function(event){prm.range_focal_length_input(event);}]    
+    ['focal_length', 'input', function(event){prm.range_focal_length_input(event);}],
+    ['magnifier_scale', 'input', function(event){prm.range_magnifier_scale_input(event);}],
 ];
 
 prm_events.forEach((field) => {
     prm.add_event(field[0], field[1], field[2]);
 });
+
+new ResizeObserver(() => prm.update_arrows_canvas()).observe(prm.get_element('parameter_images'));
 
 prm.image_load_input();
