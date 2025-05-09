@@ -144,9 +144,9 @@ class VCDS {
 
         let table = "<div id='log_view_container_div'><table>";
         {
-            table += "<tr><th><p>Seconds</p></th>";
+            table += "<tr><th><div id='vertical'><p>Seconds</p></div></th>";
             log.blocks.forEach(function(block) {
-                table += `<th><p>${block.name}</p></th>`;
+                table += `<th><div id='header_flex'><div id='header'><p>${block.name}</p></div></div></th>`;
             }.bind(this));
             table += "</tr>";
 
