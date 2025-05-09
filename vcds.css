@@ -1,0 +1,61 @@
+#log_body {
+    margin:0;
+    padding:0;
+    background-color: lightgray;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+#log_load_div, #log_view_div {
+    border: 1px solid black;
+}
+
+#log_view_div {
+    max-height: 30vh;
+    min-height: 1.2em;
+    overflow-y: scroll;
+    margin-bottom: 0.2em;
+    padding-bottom: 0.2em;
+}
+
+#log_view_header_div {
+    display: inline-block;
+    background-color: white;
+    width: 100%;
+    position:fixed;
+    height:1.2em;
+}
+
+#log_view_header_div > * {
+    display: inline;
+    margin: 0;
+}
+
+#log_view_header_div > p {
+    margin-left: 0.2em;
+    text-wrap: nowrap;
+    position: fixed;
+}
+
+#log_close, #log_toggle {
+    cursor: pointer;
+    user-select: none;
+    font-family: monospace;
+    font-size: math;
+    padding: 0 0.3em;
+}
+
+#log_close {
+    background-color: red;
+    position:fixed;
+    right:0;
+}
+
+#log_toggle {
+    background-color: blue;
+}
+
+#log_view_container_div > * {
+    margin: 1.4em 0 0 0;
+    font-family: monospace;
+    font-size: math;
+}
