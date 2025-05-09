@@ -59,3 +59,49 @@
     font-family: monospace;
     font-size: math;
 }
+
+table tr:hover {
+    background-color: rgba(150,0,0,0.3) !important;
+}
+
+table tr:nth-child(even) {
+    background-color: rgba(180,180,180,0.4);
+}
+
+table:nth-child(even) {
+    background-color: rgba(200,200,200,0.4);
+}
+
+table tr:nth-child(1), table td:nth-child(1) {
+    background-color: rgba(150,150,150,1.0);
+}
+
+table tr, table tr td, table tr th {
+    margin: 0;
+    padding: 0;
+    height: 2.7vh;
+    max-width: 10em;
+    overflow-x: visible;
+    width: 10em;
+}
+
+table td p {
+    padding: 0.2em;
+    margin: 0;
+    font-size: 2vh;
+    text-align: center;
+    white-space: nowrap;
+    overflow-x: clip;
+}
+
+table th p {
+    padding: 0.2em;
+    margin:0;
+    font-size: 2vh;
+    text-align: center;
+}
+
+table tr:first-child {
+    position: sticky;
+    top: 0;
+}
