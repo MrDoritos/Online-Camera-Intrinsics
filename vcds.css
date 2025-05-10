@@ -69,6 +69,12 @@
     font-size: math;
 }
 
+#log_view_canvas_container {
+    width: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+}
+
 #log_view_canvas_div {
     resize:both;
     overflow: hidden;
@@ -77,10 +83,22 @@
     width: 100%;
 }
 
+.log_view_height_limit {
+    max-height: fit-content;
+}
+
 #log_view_canvas {
     height: 100%;
     width: 100%;
     image-rendering: pixelated;
+}
+
+#log_view_buttons_div div {
+    display:flex;
+}
+
+#log_view_buttons_div div > * {
+    margin: 0;
 }
 
 table tr:hover {

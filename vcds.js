@@ -98,7 +98,9 @@ class Log {
         for (let i = 0, j = 0; i < b.length && i < b2.length && i < b3.length && b4.length; i+=2, j++) {
             let block = {
                 group:b[i],
-                field:b[i+1]
+                field:b[i+1],
+                visible:true,
+                depth:0
             };
             block.group_num = Number(block.group.match('[0-9]+')[0]);
             block.field_num = Number(block.field.match('[0-9]+')[0]);
@@ -167,21 +169,43 @@ class VCDS {
 
         let delta_time = log.seconds_max - log.seconds_min;
     
-        element.width = log.rows.length;
+        element.width = log.rows.length * 2;
 
-        let line_width = element.width / rect.width * 5;
+        if (element.width > 6000) element.width = 6000;
+        if (element.width < 800) element.width = 800;
 
-        ctx.lineWidth = `${line_width}px`;
+        let ar = rect.height / rect.width;
+
+        //if (ar > 0.3)
+        //    ar = 0.3;
+
+        element.height = ar * element.width;
+
+        //if (element.height < 200) element.height = 200;
+        //if (element.height > 1000) element.height = 1000;
+
+        //let line_width = (element.width / rect.width) * 5 + 2;
+        let line_width = element.height / 100;
+
+        ctx.lineWidth = line_width;
 
         let border_radius = line_width;
 
         let width = element.width - border_radius * 2;
         let height = element.height - border_radius * 2;
 
-        console.log(element, ctx, rect, line_width);
+        //console.log(element, ctx, rect, line_width);
 
-        for (let i = 0; i < log.blocks.length; i++) {
-            let block = log.blocks[i];
+        let layers = log.blocks.toSorted(function(a,b){return a.depth < b.depth});
+
+        //console.log(layers);
+
+        for (let i = 0; i < layers.length; i++) {
+            let block = layers[i];
+
+            if (!block.visible)
+                continue;
+
             let delta_value = block.max - block.min;
             let x = 0;
             let y = 0;
@@ -190,7 +214,7 @@ class VCDS {
 
             ctx.beginPath();
 
-            ctx.moveTo(x, height - ((log.rows[0].columns[block.stub].value - block.min) / delta_value) * height - border_radius);
+            ctx.moveTo(x - border_radius, height - (((log.rows[0].columns[block.stub].value - block.min) / delta_value) * height - border_radius));
 
             log.rows.forEach(function(row) {
                 let column = row.columns[block.stub];
@@ -202,6 +226,8 @@ class VCDS {
 
                 //ctx.closePath();
             }.bind(this));
+
+            ctx.lineTo(width + border_radius * 2, height - (y * height - border_radius));
 
             ctx.stroke();
         }
@@ -224,7 +250,21 @@ class VCDS {
 
         e.innerHTML = "";
 
-        let table = "<div id='log_view_canvas_div'><canvas id='log_view_canvas' width=800 height=800></canvas></div><div id='log_view_container_div'><table>";
+        let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
+        canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
+        canvas_div += "<div id='log_view_buttons_div'>";
+        {
+            log.blocks.forEach(function(block) {
+                canvas_div += `<div>`;
+                canvas_div += `<input class="${block.stub}" name="${log.name}" type="checkbox" checked />`;
+                canvas_div += `<p style="background-color:${block.color}">${block.name}</p>`;
+                canvas_div += `</div>`;
+            }.bind(this));
+        }
+        canvas_div += "</div>";
+        canvas_div += "</div>";
+
+        let table = canvas_div + "<div id='log_view_container_div'><table>";
         {
             table += "<tr><th><div id='vertical'><p>Seconds</p></div></th>";
             log.blocks.forEach(function(block) {
@@ -256,22 +296,61 @@ class VCDS {
         e.innerHTML += table;
 
         body.insertBefore(e, this.get_element('log_load_div'));
-        this.render_log(log, document.querySelector(`div#log_view_div[name='${log.name}'] canvas#log_view_canvas`));
+        this.render_log(log, document.querySelector(`div#log_view_div[name='${log.name}'] canvas`));
     }
 
     log_close_click(event) {
         this.get_element('log_body').removeChild(event.parentElement.parentElement);
     }
 
+    get_css_rule(rule) {
+        let styles = document.styleSheets[0].cssRules;
+
+        if (!styles)
+            return;
+
+        for (let i = 0; i < styles.length; i++)
+            if (styles[i].selectorText == rule)
+                return styles[i];
+    }
+
+    get_css_field(rule, field) {
+        let css_rule = this.get_css_rule(rule);
+
+        if (!css_rule)
+            return;
+
+        return css_rule.style[field];
+    }
+
+    set_css_style(rule, field, value) {
+        let style = this.get_css_rule(rule);
+
+        if (!style)
+            return;
+
+        style[field] = value;
+    }
+
     log_toggle_click(event) {
         //let e = event.parentElement.getElementById('log_view_container_div');
         let name = event.getAttribute('name');
-        let e = document.querySelector(`div#log_view_div[name='${name}'] div#log_view_container_div`);
+        let q = `div#log_view_div[name='${name}']`
+        let e1 = document.querySelector(q + ' div#log_view_container_div');
+        let e2 = document.querySelector(q + ' div#log_view_canvas_div');
+        let e3 = document.querySelector(q + ' div#log_view_canvas_container');
+
         if (event.innerText.includes('-')) {
-            e.style.setProperty('display', 'none');
+            e1.style.setProperty('display', 'none');
+            e2.style.setProperty('resize', 'horizontal');
+            //e3.style.setProperty('max-height', '10vh');
+            this.set_css_style('.log_view_height_limit', 'max-height', '10vh');
             event.innerText = '+';
         } else {
-            e.style.setProperty('display', "");
+            e1.style.setProperty('display', "");
+            e2.style.setProperty('resize', 'both');
+            //e3.style.setProperty('max-height', "");
+            this.set_css_style('.log_view_height_limit', 'max-height', 'fit-content');
             event.innerText = '-';
         }
     }
