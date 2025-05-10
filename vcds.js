@@ -33,6 +33,24 @@ class Log {
     rows = undefined;
     csv = undefined;
 
+    seconds_min = 0;
+    seconds_max = 0;
+
+    colors = [ 
+        "orange",
+        "green",
+        "yellow",
+        "blue",
+        "red",
+        "pink",
+        "cyan",
+        "goldenrod",
+        "coral",
+        "greenyellow",
+        "magenta",
+        "maroon"
+    ];
+
     constructor(filename, text) {
         this.filename = filename;
         this.text = text;
@@ -77,7 +95,7 @@ class Log {
         this.blocks = [];
         let stubs = [];
 
-        for (let i = 0; i < b.length && i < b2.length && i < b3.length && b4.length; i+=2) {
+        for (let i = 0, j = 0; i < b.length && i < b2.length && i < b3.length && b4.length; i+=2, j++) {
             let block = {
                 group:b[i],
                 field:b[i+1]
@@ -88,6 +106,11 @@ class Log {
             block.unit = b4[i].trim();
             block.combined_name = b2[i];
             block.stub = block.group + block.field;
+
+            block.min = 0;
+            block.max = 0;
+            block.color = this.colors[j];
+
             stubs.push(block.stub);
             this.blocks.push(block);
         }
@@ -103,11 +126,18 @@ class Log {
 
             let d = r.slice(2);
             for (let i = 0, b = 0; i < d.length; i+=2, b++) {
+                let block = this.blocks[b];
                 let db = row.columns[stubs[b]] = {};
                 db.value = Number(d[i]);
-                db.seconds = Number(d[i+1]);
+                db.seconds = Number(d[i-1]);
+
+                if (db.value < block.min)
+                    block.min = db.value;
+                if (db.value > block.max)
+                    block.max = db.value;
             }
 
+            this.seconds_max = row.seconds;
             this.rows.push(row);
         }.bind(this));
     }
@@ -131,6 +161,58 @@ class VCDS {
         this.log_load_input();
     }
 
+    render_log(log, element) {
+        let ctx = element.getContext('2d');
+        let rect = element.getBoundingClientRect();
+
+        let delta_time = log.seconds_max - log.seconds_min;
+    
+        element.width = log.rows.length;
+
+        let line_width = element.width / rect.width * 5;
+
+        ctx.lineWidth = `${line_width}px`;
+
+        let border_radius = line_width;
+
+        let width = element.width - border_radius * 2;
+        let height = element.height - border_radius * 2;
+
+        console.log(element, ctx, rect, line_width);
+
+        for (let i = 0; i < log.blocks.length; i++) {
+            let block = log.blocks[i];
+            let delta_value = block.max - block.min;
+            let x = 0;
+            let y = 0;
+
+            ctx.strokeStyle = block.color;
+
+            ctx.beginPath();
+
+            ctx.moveTo(x, height - ((log.rows[0].columns[block.stub].value - block.min) / delta_value) * height - border_radius);
+
+            log.rows.forEach(function(row) {
+                let column = row.columns[block.stub];
+
+                x = (column.seconds - log.seconds_min) / delta_time;
+                y = (column.value - block.min) / delta_value;
+
+                ctx.lineTo(x * width + border_radius, height - (y * height - border_radius));
+
+                //ctx.closePath();
+            }.bind(this));
+
+            ctx.stroke();
+        }
+
+        log.rows.forEach(function(row) {
+            for (const [k, v] of Object.entries(row.columns)) {
+
+            }
+        }.bind(this));
+    }
+
     add_log(log) {
         this.logs[log.name] = log;
 
@@ -142,11 +224,11 @@ class VCDS {
 
         e.innerHTML = "";
 
-        let table = "<div id='log_view_container_div'><table>";
+        let table = "<div id='log_view_canvas_div'><canvas id='log_view_canvas' width=800 height=800></canvas></div><div id='log_view_container_div'><table>";
         {
             table += "<tr><th><div id='vertical'><p>Seconds</p></div></th>";
             log.blocks.forEach(function(block) {
-                table += `<th><div id='header_flex'><div id='header'><p>${block.name}</p></div></div></th>`;
+                table += `<th><div id='header_flex' style="background-color:${block.color}"><div id='header'><p>${block.name}</p></div></div></th>`;
             }.bind(this));
             table += "</tr>";
 
@@ -174,6 +256,7 @@ class VCDS {
         e.innerHTML += table;
 
         body.insertBefore(e, this.get_element('log_load_div'));
+        this.render_log(log, document.querySelector(`div#log_view_div[name='${log.name}'] canvas#log_view_canvas`));
     }
 
     log_close_click(event) {

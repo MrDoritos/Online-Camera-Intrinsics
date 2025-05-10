@@ -69,6 +69,20 @@
     font-size: math;
 }
 
+#log_view_canvas_div {
+    resize:both;
+    overflow: hidden;
+    height: 30vh;
+    max-width: 100%;
+    width: 100%;
+}
+
+#log_view_canvas {
+    height: 100%;
+    width: 100%;
+    image-rendering: pixelated;
+}
+
 table tr:hover {
     background-color: rgba(150,0,0,0.3) !important;
 }
