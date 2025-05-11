@@ -20,6 +20,10 @@ function str_v3(v, digits=3) {
     return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}, ${v.z.toFixed(digits)}`;
 }
 
+function str_m3(m, digits=3) {
+    return `${str_v3(m[0],digits)}\n${str_v3(m[1],digits)}\n${str_v3(m[2],digits)}`;
+}
+
 function vec2(x,y) {
     return {x:x, y:y};
 }
@@ -98,6 +102,10 @@ function add_v2(v1, v2) {
     return op_v2(v1, v2, op_add);
 }
 
+function add_v3(v1, v2) {
+    return op_v3(v1, v2, op_add);
+}
+
 function mul_v(v1, v2) {
     return get_vec(v1.x * v2.x, v1.y * v2.y);
 }
@@ -114,8 +122,20 @@ function mul_v2_f(v, f) {
     return mul_v2(v, vec2(f,f));
 }
 
+function mul_v3_f(v, f) {
+    return mul_v3(v, vec3(f,f,f));
+}
+
 function mul_m2_v2(m, v) {
     return op_m2_v2(m, v, op_mul);
+}
+
+function mul_m3_v3(m, v) {
+    return vec3(
+        op_span_v3(mul_v3_f(m[0], v.x), op_add),
+        op_span_v3(mul_v3_f(m[1], v.y), op_add),
+        op_span_v3(mul_v3_f(m[2], v.z), op_add)
+    );
 }
 
 function div_v2(v1, v2) {
@@ -235,6 +255,10 @@ function dupe_v2(v) {
     return vec2(v.x, v.y);
 }
 
+function dupe_v3(v) {
+    return vec3(v.x, v.y, v.z);
+}
+
 function matrix2(v1, v2) {
     return [
         dupe_v2(v1),
@@ -256,7 +280,21 @@ function determinant_m2(m) {
 }
 
 function inverse_m2(m) {
+    let d = 1 / determinant_m2(m);
+    
+    return [
+        vec2(m[1].y * d, m[0].y * d),
+        vec2(m[1].x * d, m[0].x * d),
+    ]
+}
 
+function inverse_m3(m) {
+    let r1 = add_v3(m[0], m[1]);
+    r1 = div_v3_f(r1, r1.x);
+    let r2 = sub_v3(m[1], mul_v3_f(r1, 2));
+    r2 = mul_v3_f(r2, -0.5);
+    let r3 = sub_v3(m[2], r2);
+    return [r1, r3, r2];
 }
 
 function cross_v3(v1, v2) {
@@ -265,6 +303,14 @@ function cross_v3(v1, v2) {
         (v1.z * v2.x) - (v1.x * v2.z),
         (v1.x * v2.y) - (v1.y * v2.x)
     );
+}
+
+function dot_v2(v1, v2) {
+    return sum_v2(mul_v2(v1, v2));
+}
+
+function midpoint_v2(v1, v2) {
+    return add_v2(mul_v2_f(sub_v2(v1, v2), 0.5), v2);
 }
 
 function rotate_v2(vector, radians) {
@@ -288,6 +334,14 @@ function emplace_pixel(data, pixel, x, y, width, height) {
         data[offset + i] = pixel[i];
 }
 
+/*
+
+    To-Do
+
+    * Optional separate image shift and manual principal point
+
+*/
+
 class Arrows {
     arrows = [];
     intersections = [];
@@ -296,6 +350,7 @@ class Arrows {
     focal_length = 1;
     opacity = 50;
     magnifier_scale = .1;
+    horizontal_fov = 0;
     axis_types = {
         'x': 'red',
         '-x': 'red',
@@ -586,12 +641,21 @@ class Arrows {
         });
 
         let ii = 0;
-        if (this.camera_rotation_matrix)
+        if (this.camera_rotation_matrix) {
+
+        let av = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)];
+        let inv = this.camera_rotation_matrix;
+        //inv = inverse_m3(this.camera_rotation_matrix);
+        //console.log(inv);
         this.camera_rotation_matrix.forEach(vec => {
-            let v = div_v3_f(vec, 4);
+            //let v = div_v3_f(vec, 4);
+            let v = vec;
+            //v = mul_m3_v3(inv, vec);
+            v = add_v3(v, vec3(0,0,2));
             let p = this.project_v3(v);
             let s = screen_v(p, size);
             let c = axis_dis_scr;
+            //let vec = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
 
             ctx.strokeStyle = ["red", "lime", "dodgerblue"][ii++];
 
@@ -600,6 +664,7 @@ class Arrows {
             ctx.lineTo(s.x, s.y);
             ctx.stroke();
         });
+        }
 
         {
             let s = screen_v(this.principal_point, size);
@@ -615,7 +680,40 @@ class Arrows {
     }
 
     project_v3(v) {
-        return vec2(v.x / v.z, v.y / v.z);
+        //let p = this.principal_point;
+        //let f = this.focal_length;
+        //let d2 = vec2(v.x / v.z, v.y / v.z);
+        //return mul_v2_f(d2, f);
+        //return vec2(v.x * p.x + v.x * f, v.y * p.y + v.y * f);
+        //return mul_v2_f(v, 1/v.z);
+        return vec2(v.x / v.z, -v.y / v.z);
+    }
+
+    get_focal_length(vu, vv, p) {
+        let dirFuFv = sub_v2(vu, vv);
+        dirFuFv = normalize_v2(dirFuFv);
+        let vp = sub_v2(p, vv);
+        let proj = dot_v2(dirFuFv, vp);
+        let uvp = add_v2(mul_v2_f(dirFuFv, proj), vv);
+
+        let ppuv = length_v2(sub_v2(p, uvp));
+        let vpuv = length_v2(sub_v2(vv, uvp));
+        let upuv = length_v2(sub_v2(vu, uvp));
+
+        let suv = vpuv * upuv - ppuv * ppuv;
+
+        return Math.sqrt(suv);
+    }
+
+    get_focal_length_absolute(focal_length_relative, mm) {
+        return (mm * (focal_length_relative * 0.5));
+    }
+
+    get_field_of_view(focal_length_relative, mm, w, ar=1) {
+        //let sw = w * ar;
+        //let 
+        //(360 * Math.atan(32/(2*focal_length_relative))) / Math.PI
+        return (360 * Math.atan(ar/focal_length_relative)) / Math.PI;
     }
 
     solve() {
@@ -675,6 +773,10 @@ class Arrows {
         if (this.intersections.length < 2)
             return;
 
+        this.focal_length = this.get_focal_length(this.intersections[0].point, this.intersections[1].point, this.principal_point);
+        //this.horizontal_fov = this.get_field_of_view(this.focal_length, 32, 36);
+        this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
+
         let vn1 = this.intersections[0]['mag_norm'];
         let vn2 = this.intersections[1]['mag_norm'];
         let p = this.principal_point;
@@ -687,15 +789,20 @@ class Arrows {
         let s1 = length_v3(OFu);
         let s2 = length_v3(OFv);
 
-        let vpRc = normalize_v3(OFu);
-        let upRc = normalize_v3(OFv);
+        let vpRc = normalize_v3(OFv);
+        let upRc = normalize_v3(OFu);
         let wpRc = cross_v3(upRc, vpRc);
 
         this.camera_rotation_matrix = [
-            normalize_v3(vec3(OFu.x / s1, OFv.y / s2, wpRc.x)),
+            normalize_v3(vec3(OFu.x / s1, OFv.x / s2, wpRc.x)),
             normalize_v3(vec3(OFu.y / s1, OFv.y / s2,wpRc.y)),
             normalize_v3(vec3(-f / s1, -f / s2, wpRc.z))
         ]
+
+        let mtx = this.camera_rotation_matrix;
+        //mtx[2].x = 0;
+        //mtx[2].y = 2/mtx[2].z;
+        //mtx[2].y *= -1;
     }
 }
 
@@ -708,6 +815,7 @@ class Parameters {
     diff_move_rel = undefined;
     final_move_rel = undefined;
     diff_move_scale = 1;
+    last_save = 0;
 
     elements = {
         'focal_length': 'range_focal_length',
@@ -802,7 +910,7 @@ class Parameters {
         let x = (scrx / w) * 2 - 1;
         let y = (scry / h) * 2 - 1;
 
-        console.log('wrel', x, y, scrx, scry);
+        //console.log('wrel', x, y, scrx, scry);
 
         if (start && scale) {
             return {
@@ -1120,12 +1228,22 @@ class Parameters {
         this.update_magnifier_scale();
     }
 
-    async cookie_save() {
+    async parameter_save_local() {
         let str = JSON.stringify(this.arrows);
-        document.cookie = `parameters=${str}; path=/; expires=Tue, 19 Jan 2038 04:14:07 GMT`;
+        //document.cookie = `parameters=${str}; path=/; expires=Tue, 19 Jan 2038 04:14:07 GMT`;
+        localStorage.setItem('parameters', str);
     }
 
-    cookie_load() {
+    parameter_load_local() {
+        const params = localStorage.getItem('parameters');
+
+        if (!params)
+            return false;
+
+        this.arrows = Object.assign(Arrows.prototype, JSON.parse(params));
+
+        return true;
+        /*
         let cookie = document.cookie;
         let target = 'parameters';
         let loaded = false;
@@ -1143,6 +1261,7 @@ class Parameters {
         });
 
         return loaded;
+        */
     }
 
     parameter_load_input(event) {
@@ -1184,6 +1303,7 @@ class Parameters {
         this.get_element('range_focal_length').value = a.focal_length * 100;
         this.get_element('range_magnifier_scale').value = a.magnifier_scale * 100;
         this.update_arrow_select();
+        a.solve();
         this.update_info();
     }
 
@@ -1214,6 +1334,8 @@ class Parameters {
         e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
         e.innerHTML += `<p>focal length: ${this.arrows.focal_length.toFixed(3)}</p>`;
+        e.innerHTML += `<p>focal length 35mm: ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 35).toFixed(3)}</p>`;
+        e.innerHTML += `<p>horizontal fov: ${this.arrows.horizontal_fov.toFixed(3)}</p>`;
         
         {
             let str = '<div id="principal_point_info">';
@@ -1270,6 +1392,8 @@ class Parameters {
             str += `<p>${str_v3(mtx[2])}</p>`;
             str += `</div>`;
 
+            //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
+
             e.innerHTML += str;
         }
     }
@@ -1292,7 +1416,10 @@ class Parameters {
     draw() {
         this.arrows.draw(this.get_element('arrows_canvas'));
         this.update_info();
-        this.cookie_save();
+        if (Date.now() > this.last_save + 1000) {
+            this.parameter_save_local();
+            this.last_save = Date.now();
+        }
     }
 
     init() {
@@ -1301,7 +1428,7 @@ class Parameters {
                 `<option ${i == 1 ? 'selected' : ''} value="${i}">${i}</option>`
         }
 
-        if (!this.cookie_load()) {
+        if (!this.parameter_load_local()) {
             this.axis_count_input();
             this.update_opacity();
             this.update_ui_scale();
