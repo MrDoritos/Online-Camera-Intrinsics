@@ -734,16 +734,18 @@ class Arrows {
             ctx.stroke();
         }
 
+        let prim_scale = 0.1;
+
         function draw_point(vector) {
-            let s = screen_v(mul_v2_f(vector, 0.2), size);
+            let s = screen_v(mul_v2_f(vector, prim_scale), size);
             ctx.beginPath();
             ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
             ctx.stroke();
         }
 
         function draw_line(line) {
-            let a = mul_v2_f(line.start, 0.2);
-            let b = mul_v2_f(line.end, 0.2);
+            let a = mul_v2_f(line.start, prim_scale);
+            let b = mul_v2_f(line.end, prim_scale);
             let sa = screen_v(a, size);
             let sb = screen_v(b, size);
             ctx.beginPath();    
@@ -857,8 +859,8 @@ class Arrows {
         return Math.sqrt(suv);
     }
 
-    get_focal_length_absolute(focal_length_relative, mm) {
-        return (mm * (focal_length_relative * 0.5));
+    get_focal_length_absolute(focal_length_relative, width) {
+        return (width * (focal_length_relative * 0.5));
     }
 
     get_field_of_view(focal_length_relative, mm, w, ar=1) {
@@ -1327,6 +1329,25 @@ class Parameters {
 
         let ic = this.get_element('image_canvas');
         let ac = this.get_element('arrows_canvas');
+        let is = this.get_element('image_holder');
+
+        {
+            let sw = is.clientWidth;
+            let sh = is.clientHeight;
+            let iw = this.current_image.width;
+            let ih = this.current_image.height;
+
+            let rw = sw;
+            let rh = sh;
+
+            if (sw / sh > iw / ih)
+                rw = (iw * sh) / ih;
+            else
+                rh = (ih * sw) / iw;
+
+            ic.style.setProperty('width', `${rw}px`);
+            ic.style.setProperty('height', `${rh}px`);
+        }
 
         let l = ic.offsetLeft;
         let t = ic.offsetTop;
@@ -1507,7 +1528,7 @@ class Parameters {
         e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
         e.innerHTML += `<p>focal length: ${this.arrows.focal_length.toFixed(3)}</p>`;
-        e.innerHTML += `<p>focal length 35mm: ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 35).toFixed(3)}</p>`;
+        e.innerHTML += `<p>focal length 35mm: ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 36).toFixed(3)}</p>`;
         e.innerHTML += `<p>horizontal fov: ${this.arrows.horizontal_fov.toFixed(3)}</p>`;
         
         {
@@ -1519,7 +1540,7 @@ class Parameters {
             e.innerHTML += str;
         }
 
-        for (let i = 0; i < this.arrows.arrows.length; i++) {
+        for (let i = 0; false && i < this.arrows.arrows.length; i++) {
             let str = '<div id="arrow_info">';
             let arrow = this.arrows.arrows[i];
             
@@ -1538,7 +1559,7 @@ class Parameters {
             e.innerHTML += str;
         }
 
-        for (let i = 0; i < this.arrows.intersections.length; i++) {
+        for (let i = 0; false && i < this.arrows.intersections.length; i++) {
             let str = '<div id="axis_info">';
             let intersect = this.arrows.intersections[i];
 
@@ -1557,8 +1578,8 @@ class Parameters {
 
         if (this.arrows.intersections.length > 2) {
             let is = this.arrows.intersections;
-            e.innerHTML += `<p>3rd int: ${str_v2(this.arrows.third_vertex(is[0].point, is[1].point, this.arrows.principal_point))}</p>`;
-            e.innerHTML += `<p>pp: ${str_v2(this.arrows.calculated_principal_point)}`
+            e.innerHTML += `<p>3rd intercept: ${str_v2(this.arrows.third_vertex(is[0].point, is[1].point, this.arrows.principal_point))}</p>`;
+            e.innerHTML += `<p>calc prin p: ${str_v2(this.arrows.calculated_principal_point)}`
         }
 
         if (this.arrows.camera_rotation_matrix && this.arrows.camera_rotation_matrix.length > 2){
