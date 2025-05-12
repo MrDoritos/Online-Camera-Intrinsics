@@ -415,6 +415,7 @@ class Arrows {
         '-z': 'dodgerblue'
     };
     arrow_tolerance = 1;
+    debug_mode = false;
 
     get_tolerance(size) {
         return this.arrow_tolerance / Math.sqrt((size.x * size.y * 3));
@@ -754,7 +755,7 @@ class Arrows {
             ctx.stroke();
         }
 
-        if (this.intersections.length > 1 && this.tv && this.oc)
+        if (this.intersections.length > 1 && this.tv && this.oc && this.debug_mode)
         {
             let a = this.intersections[0].point;
             let b = this.intersections[1].point;
@@ -933,6 +934,7 @@ class Arrows {
 
         let p = this.principal_point;
         this.calculated_principal_point = this.ortho_center(this.intersections[0].point, this.intersections[1].point, this.intersections[2].point);
+        this.calculated_third_vanishing_point = this.third_vertex(this.intersections[0].point, this.intersections[1].point, this.principal_point);
 
         /*
         {
@@ -1012,7 +1014,8 @@ class Parameters {
         'image_load': 'image_load',
         'image_opacity': 'image_opacity',
         'magnifier_scale': 'range_magnifier_scale',
-        'range_magnifier_scale': 'range_magnifier_scale'
+        'range_magnifier_scale': 'range_magnifier_scale',
+        'checkbox_debug': 'checkbox_debug',
     };
 
     elements_func = {
@@ -1422,6 +1425,11 @@ class Parameters {
         this.update_magnifier_scale();
     }
 
+    checkbox_debug_input(event) {
+        this.arrows.debug_mode = event.target.checked;
+        this.draw();
+    }
+
     async parameter_save_local() {
         let str = JSON.stringify(this.arrows);
         //document.cookie = `parameters=${str}; path=/; expires=Tue, 19 Jan 2038 04:14:07 GMT`;
@@ -1496,7 +1504,10 @@ class Parameters {
         this.get_element('range_opacity').value = a.opacity;
         this.get_element('range_focal_length').value = a.focal_length * 100;
         this.get_element('range_magnifier_scale').value = a.magnifier_scale * 100;
+        this.get_element('checkbox_debug').checked = a.debug_mode;
         this.update_arrow_select();
+        this.update_opacity();
+        this.update_arrow_count();
         a.solve();
         this.update_info();
     }
@@ -1525,11 +1536,11 @@ class Parameters {
         let c = this.current_image;
 
         e.innerHTML = '<p style="text-align: center">Info</p>';
-        e.innerHTML += `<p>width: ${c ? c.width : ''}</p>`;
-        e.innerHTML += `<p>height: ${c ? c.height : ''}</p>`;
-        e.innerHTML += `<p>focal length: ${this.arrows.focal_length.toFixed(3)}</p>`;
-        e.innerHTML += `<p>focal length 35mm: ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 36).toFixed(3)}</p>`;
-        e.innerHTML += `<p>horizontal fov: ${this.arrows.horizontal_fov.toFixed(3)}</p>`;
+        e.innerHTML += `<p>Width: ${c ? c.width : ''}</p>`;
+        e.innerHTML += `<p>Height: ${c ? c.height : ''}</p>`;
+        e.innerHTML += `<p>Focal Length: ${this.arrows.focal_length.toFixed(3)}</p>`;
+        e.innerHTML += `<p>Focal Length (35mm): ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 36).toFixed(3)}</p>`;
+        e.innerHTML += `<p>Horizontal FOV: ${this.arrows.horizontal_fov.toFixed(3)}</p>`;
         
         {
             let str = '<div id="principal_point_info">';
@@ -1540,47 +1551,49 @@ class Parameters {
             e.innerHTML += str;
         }
 
-        for (let i = 0; false && i < this.arrows.arrows.length; i++) {
-            let str = '<div id="arrow_info">';
-            let arrow = this.arrows.arrows[i];
-            
-            str += `<p>${i + 1} ${arrow.axis}</p>`;
-            str += `<p>start: ${str_v2(arrow.start)}</p>`;
-            str += `<p>end: ${str_v2(arrow.end)}</p>`;
-            str += `<p>mag: ${str_v2(arrow.magnitude)}</p>`;
-            str += `<p>mag_norm: ${str_v2(arrow.mag_norm)}</p>`;
+        if (this.arrows.debug_mode) {
+            for (let i = 0; i < this.arrows.arrows.length; i++) {
+                let str = '<div id="arrow_info">';
+                let arrow = this.arrows.arrows[i];
+                
+                str += `<p>${i + 1} ${arrow.axis}</p>`;
+                str += `<p>start: ${str_v2(arrow.start)}</p>`;
+                str += `<p>end: ${str_v2(arrow.end)}</p>`;
+                str += `<p>mag: ${str_v2(arrow.magnitude)}</p>`;
+                str += `<p>mag_norm: ${str_v2(arrow.mag_norm)}</p>`;
 
-            let x_int = (arrow.start.y * arrow.mag_norm.y) / (arrow.start.x * arrow.mag_norm.x);
+                let x_int = (arrow.start.y * arrow.mag_norm.y) / (arrow.start.x * arrow.mag_norm.x);
 
-            str += `<p>x_int: ${x_int.toFixed(3)}</p>`;
+                str += `<p>x_int: ${x_int.toFixed(3)}</p>`;
 
-            str += '</div>';
+                str += '</div>';
 
-            e.innerHTML += str;
+                e.innerHTML += str;
+            }
+
+            for (let i = 0; i < this.arrows.intersections.length; i++) {
+                let str = '<div id="axis_info">';
+                let intersect = this.arrows.intersections[i];
+
+                str += `<p>${i + 1}</p>`;
+                str += `<p>intersect: ${intersect.point.x.toFixed(3)},${intersect.point.y.toFixed(3)}</p>`;
+                str += `<p>dot: ${intersect.dot.toFixed(3)}</p>`;
+                str += `<p>mag: ${intersect.mag.toFixed(3)}</p>`;
+                str += `<p>angle: ${intersect.angle.toFixed(3)}</p>`;
+                str += `<p>frac: ${intersect.frac.toFixed(3)}</p>`;
+                str += `<p>dot angle: ${intersect.dot_angle.toFixed(3)}</p>`;
+
+                str += '</div>';
+
+                e.innerHTML += str;
+            }
         }
 
-        for (let i = 0; false && i < this.arrows.intersections.length; i++) {
-            let str = '<div id="axis_info">';
-            let intersect = this.arrows.intersections[i];
+        if (this.arrows.intersections.length > 2)
+            e.innerHTML += `<p>Calculated Principal Point</p><p>${str_v2(this.arrows.calculated_principal_point)}</p>`;
 
-            str += `<p>${i + 1}</p>`;
-            str += `<p>intersect: ${intersect.point.x.toFixed(3)},${intersect.point.y.toFixed(3)}</p>`;
-            str += `<p>dot: ${intersect.dot.toFixed(3)}</p>`;
-            str += `<p>mag: ${intersect.mag.toFixed(3)}</p>`;
-            str += `<p>angle: ${intersect.angle.toFixed(3)}</p>`;
-            str += `<p>frac: ${intersect.frac.toFixed(3)}</p>`;
-            str += `<p>dot angle: ${intersect.dot_angle.toFixed(3)}</p>`;
-
-            str += '</div>';
-
-            e.innerHTML += str;
-        }
-
-        if (this.arrows.intersections.length > 2) {
-            let is = this.arrows.intersections;
-            e.innerHTML += `<p>3rd intercept: ${str_v2(this.arrows.third_vertex(is[0].point, is[1].point, this.arrows.principal_point))}</p>`;
-            e.innerHTML += `<p>calc prin p: ${str_v2(this.arrows.calculated_principal_point)}`
-        }
+        if (this.arrows.intersections.length > 1)
+            e.innerHTML += `<p>Calculated 3rd Vanishing Point</p><p>${str_v2(this.arrows.calculated_third_vanishing_point)}</p>`;
 
         if (this.arrows.camera_rotation_matrix && this.arrows.camera_rotation_matrix.length > 2){
             let str = '<div id="camera_info">';
@@ -1611,6 +1624,15 @@ class Parameters {
         }
     }
 
+    update_arrow_count() {
+        let e = this.get_element('axis_count');
+        e.innerHTML = "";
+        for (let i = 1; i < 4; i++) {
+            e.innerHTML +=
+                `<option ${i == this.arrows.arrows.length / 2 ? 'selected' : ''} value="${i}">${i}</option>`;
+        }
+    }
+
     draw() {
         this.arrows.draw(this.get_element('arrows_canvas'));
         this.update_info();
@@ -1621,16 +1643,12 @@ class Parameters {
     }
 
     init() {
-        for (let i = 1; i < 4; i++) {
-            this.get_element('axis_count').innerHTML +=
-                `<option ${i == 1 ? 'selected' : ''} value="${i}">${i}</option>`
-        }
-
         if (!this.parameter_load_local()) {
             this.axis_count_input();
             this.update_opacity();
             this.update_ui_scale();
             this.update_arrow_select();
+            this.update_arrow_count();
         } else {
             this.set_ui();
         }
@@ -1662,6 +1680,7 @@ let prm_events = [
     ['parameter_load', 'input', function(event){prm.parameter_load_input(event);}],
     ['focal_length', 'input', function(event){prm.range_focal_length_input(event);}],
     ['magnifier_scale', 'input', function(event){prm.range_magnifier_scale_input(event);}],
+    ['checkbox_debug', 'click', function(event){prm.checkbox_debug_input(event);}],
 ];
 
 prm_events.forEach((field) => {
