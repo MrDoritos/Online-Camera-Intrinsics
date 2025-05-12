@@ -494,14 +494,11 @@ class Arrows {
         ];
     }
 
-    find_intersection(a1, a2) {
-        let mag1 = this.get_arrow_magnitude(a1);
-        let mag2 = this.get_arrow_magnitude(a2);
-
-        let v1 = a1.start;
-        let v2 = a1.end;
-        let v3 = a2.start;
-        let v4 = a2.end;
+    intersection(line1, line2) {
+        let v1 = line1.start;
+        let v2 = line1.end;
+        let v3 = line2.start;
+        let v4 = line2.end;
 
         let m1 = matrix2(v1, v2);
         let m2 = matrix2(v3, v4);
@@ -542,6 +539,10 @@ class Arrows {
         let py = pyn / pyd;
 
         return vec2(px, py);
+    }
+
+    find_intersection(a1, a2) {
+        return this.intersection(a1, a2);
     }
 
     get_canvas_pos(arrow, size) {
@@ -732,6 +733,57 @@ class Arrows {
 
             ctx.stroke();
         }
+
+        function draw_point(vector) {
+            let s = screen_v(mul_v2_f(vector, 0.2), size);
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function draw_line(line) {
+            let a = mul_v2_f(line.start, 0.2);
+            let b = mul_v2_f(line.end, 0.2);
+            let sa = screen_v(a, size);
+            let sb = screen_v(b, size);
+            ctx.beginPath();    
+            ctx.moveTo(sa.x, sa.y);
+            ctx.lineTo(sb.x, sb.y);
+            ctx.stroke();
+        }
+
+        if (this.intersections.length > 1 && this.tv && this.oc)
+        {
+            let a = this.intersections[0].point;
+            let b = this.intersections[1].point;
+
+            let sa = screen_v(a, size);
+            let sb = screen_v(b, size);
+
+            ctx.strokeStyle = "magenta";
+            ctx.lineWidth = this.arrow_tolerance * 0.5;
+
+            draw_line({start:a,end:b});
+            
+            draw_line(this.tv.line1);
+            draw_line(this.tv.line2);
+            
+
+            let cpp = this.calculated_principal_point;
+            ctx.strokeStyle = "black";
+            draw_line({start:this.oc.v1, end:cpp});
+            draw_line({start:this.oc.v2, end:cpp});
+            draw_line({start:this.oc.v3, end:cpp});
+
+            ctx.strokeStyle = "aqua";
+            draw_line(this.oc.line1);
+            draw_line(this.oc.line2);
+            draw_point(this.oc.v1);
+            draw_point(this.oc.v2);
+            draw_point(this.oc.v3);
+
+            draw_point(this.calculated_principal_point);
+        }
     }
 
     project_v3(v) {
@@ -742,6 +794,51 @@ class Arrows {
         //return vec2(v.x * p.x + v.x * f, v.y * p.y + v.y * f);
         //return mul_v2_f(v, 1/v.z);
         return vec2(v.x / v.z, v.y / v.z);
+    }
+
+    third_vertex(v1, v2, p) {
+        let a_prime = sub_v2(p, v1);
+        let dir_v2_v1 = normalize_v2(sub_v2(v2, v1));
+        let dir_a_prime = normalize_v2(a_prime);
+        let length_a_prime = length_v2(a_prime);
+
+        let dot = dot_v2(dir_v2_v1, dir_a_prime);
+        let theta = Math.acos(dot);
+        let hypotenuse = distance_v2(v1, v2);
+        let opposite = Math.sin(theta) * hypotenuse;
+        let adjacent = Math.sqrt(opposite * opposite + hypotenuse * hypotenuse);
+
+        let b_prime_to_v1 = mul_v2_f(dir_a_prime, adjacent);
+        let b_prime = sub_v2(b_prime_to_v1, v2);
+
+        let length_mp = Math.cos(theta) * length_a_prime;
+        let mp = mul_v2_f(dir_v2_v1, length_mp);
+        mp = add_v2(mp, v1);
+
+        let line1 = {start:mp, end:p};
+        let line2 = {start:v2, end:b_prime};
+
+        this.tv = {line1, line2};
+
+        return this.find_intersection(line1, line2);
+    }
+
+    ortho_center(v1, v2, v3) {
+        let dir_v1_v3 = normalize_v2(sub_v2(v1, v3));
+        let dir_v2_v3 = normalize_v2(sub_v2(v2, v3));
+
+        let slope13 = dir_v1_v3.y / dir_v1_v3.x;
+        let slope23 = dir_v2_v3.y / dir_v2_v3.x;
+
+        let perp13 = -1 / slope13;
+        let perp23 = -1 / slope23;
+
+        let line1 = {start:v2, end:sub_v2(v2, vec2(1, perp13))};
+        let line2 = {start:v1, end:add_v2(v1, vec2(1, perp23))};
+
+        this.oc = {line1, line2, v1, v2, v3};
+
+        return this.find_intersection(line1, line2);
     }
 
     get_focal_length(vu, vv, p) {
@@ -833,6 +930,7 @@ class Arrows {
         this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
 
         let p = this.principal_point;
+        this.calculated_principal_point = this.ortho_center(this.intersections[0].point, this.intersections[1].point, this.intersections[2].point);
 
         /*
         {
@@ -1457,6 +1555,12 @@ class Parameters {
             e.innerHTML += str;
         }
 
+        if (this.arrows.intersections.length > 2) {
+            let is = this.arrows.intersections;
+            e.innerHTML += `<p>3rd int: ${str_v2(this.arrows.third_vertex(is[0].point, is[1].point, this.arrows.principal_point))}</p>`;
+            e.innerHTML += `<p>pp: ${str_v2(this.arrows.calculated_principal_point)}`
+        }
+
         if (this.arrows.camera_rotation_matrix && this.arrows.camera_rotation_matrix.length > 2){
             let str = '<div id="camera_info">';
             let mtx = this.arrows.camera_rotation_matrix;
@@ -1466,6 +1570,7 @@ class Parameters {
 
             //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
 
+            e.innerHTML += `</div>`;
             e.innerHTML += str;
         }
     }
