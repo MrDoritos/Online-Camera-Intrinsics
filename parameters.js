@@ -138,6 +138,32 @@ function mul_m3_v3(m, v) {
     );
 }
 
+function xy_m3(m, row, col) {
+    return m[row][['x','y','z'][col]];
+}
+
+function col_m(col) {
+    return ['x','y','z','w'][col];
+}
+
+function mul_m3(m1, m2) {
+    let output = [vec3(0,0,0),vec3(0,0,0),vec3(0,0,0)];
+
+    for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+            let sum = 0;
+
+            for (let sr = 0; sr < 3; sr++) {
+                sum += xy_m3(m1, sr, c) * xy_m3(m2, r, sr);
+            }
+
+            output[r][col_m(c)] = sum;
+        }
+    }
+
+    return output;
+}
+
 function div_v2(v1, v2) {
     return op_v2(v1, v2, op_div);
 }
@@ -210,6 +236,13 @@ function norm_v(v) {
     return get_vec(v.x * .5 + .5, v.y * .5 + .5);
 }
 
+function clip_v2(v, min_f, max_f) {
+    return {
+        x:v.x > max_f ? max_f : v.x < min_f ? min_f : v.x,
+        y:v.y > max_f ? max_f : v.y < min_f ? min_f : v.y
+    };
+}
+
 function greater_v3(v) {
     let greater = v.x;
     if (v.y > greater)
@@ -279,6 +312,15 @@ function determinant_m2(m) {
     return (m[0].x * m[1].y) - (m[1].x * m[0].y);
 }
 
+function determinant_m3(m) {
+    return (m[0].x * m[1].y * m[2].z) +
+           (m[0].y * m[1].z * m[2].x) +
+           (m[0].z * m[1].x * m[2].y) -
+           (m[0].x * m[1].z * m[2].y) -
+           (m[0].y * m[1].x * m[2].z) -
+           (m[0].z * m[1].y * m[2].x);
+}
+
 function inverse_m2(m) {
     let d = 1 / determinant_m2(m);
     
@@ -289,12 +331,25 @@ function inverse_m2(m) {
 }
 
 function inverse_m3(m) {
-    let r1 = add_v3(m[0], m[1]);
-    r1 = div_v3_f(r1, r1.x);
-    let r2 = sub_v3(m[1], mul_v3_f(r1, 2));
-    r2 = mul_v3_f(r2, -0.5);
-    let r3 = sub_v3(m[2], r2);
-    return [r1, r3, r2];
+    let det = determinant_m3(m);
+
+    return [
+        {
+            x:(m[1].y * m[2].z - m[1].z * m[2].y) / det,
+            y:(m[0].z * m[2].y - m[0].y * m[2].z) / det,
+            z:(m[0].y * m[1].z - m[0].z * m[1].y) / det
+        },
+        {
+            x:(m[1].z * m[2].x - m[1].x * m[2].z) / det,
+            y:(m[0].x * m[2].z - m[0].z * m[2].x) / det,
+            z:(m[0].z * m[1].x - m[0].x * m[1].z) / det
+        },
+        {
+            x:(m[1].x * m[2].y - m[1].y * m[2].x) / det,
+            y:(m[0].y * m[2].x - m[0].x * m[2].y) / det,
+            z:(m[0].x * m[1].y - m[0].y * m[1].x) / det
+        }
+    ];
 }
 
 function cross_v3(v1, v2) {
@@ -641,17 +696,17 @@ class Arrows {
         });
 
         let ii = 0;
+        let av = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)];
         if (this.camera_rotation_matrix) {
 
-        let av = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)];
         let inv = this.camera_rotation_matrix;
         //inv = inverse_m3(this.camera_rotation_matrix);
         //console.log(inv);
-        this.camera_rotation_matrix.forEach(vec => {
+        this.view_transform_matrix.forEach(vec => {
             //let v = div_v3_f(vec, 4);
             let v = vec;
             //v = mul_m3_v3(inv, vec);
-            v = add_v3(v, vec3(0,0,2));
+            v = add_v3(v, vec3(0,0,4));
             let p = this.project_v3(v);
             let s = screen_v(p, size);
             let c = axis_dis_scr;
@@ -686,7 +741,7 @@ class Arrows {
         //return mul_v2_f(d2, f);
         //return vec2(v.x * p.x + v.x * f, v.y * p.y + v.y * f);
         //return mul_v2_f(v, 1/v.z);
-        return vec2(v.x / v.z, -v.y / v.z);
+        return vec2(v.x / v.z, v.y / v.z);
     }
 
     get_focal_length(vu, vv, p) {
@@ -777,14 +832,30 @@ class Arrows {
         //this.horizontal_fov = this.get_field_of_view(this.focal_length, 32, 36);
         this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
 
-        let vn1 = this.intersections[0]['mag_norm'];
-        let vn2 = this.intersections[1]['mag_norm'];
         let p = this.principal_point;
 
-        let f = -this.focal_length;
+        /*
+        {
+            let ip1 = this.intersections[0].point;
+            let ip2 = this.intersections[1].point;
+            let mp = midpoint_v2(ip1, ip2);
+            let dirZ = normalize_v2(sub_v2(mp, p));
+            let dir1 = normalize_v2(sub_v2(ip1, p));
+            let dir2 = normalize_v2(sub_v2(ip2, p));
+            this.camera_rotation_matrix = [
+                
+            ];
+            return;
+        }
+        */
 
-        let OFu = vec3(vn1.x - p.x, vn1.y - p.y, f);
-        let OFv = vec3(vn2.x - p.x, vn2.y - p.y, f);
+        let vn1 = this.intersections[0].point;//['mag_norm'];
+        let vn2 = this.intersections[1].point;//['mag_norm'];
+
+        let f = this.focal_length;
+
+        let OFu = vec3(vn1.x - p.x, vn1.y - p.y, -f);
+        let OFv = vec3(vn2.x - p.x, vn2.y - p.y, -f);
 
         let s1 = length_v3(OFu);
         let s2 = length_v3(OFv);
@@ -795,9 +866,11 @@ class Arrows {
 
         this.camera_rotation_matrix = [
             normalize_v3(vec3(OFu.x / s1, OFv.x / s2, wpRc.x)),
-            normalize_v3(vec3(OFu.y / s1, OFv.y / s2,wpRc.y)),
+            normalize_v3(vec3(OFu.y / s1, OFv.y / s2, wpRc.y)),
             normalize_v3(vec3(-f / s1, -f / s2, wpRc.z))
         ]
+        this.view_transform_matrix = mul_m3(this.camera_rotation_matrix, [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]);
+        this.view_transform_matrix = inverse_m3(this.view_transform_matrix);
 
         let mtx = this.camera_rotation_matrix;
         //mtx[2].x = 0;
@@ -1087,6 +1160,8 @@ class Parameters {
         }
 
         let pos = this.get_mouse_rel_image_autoscale(event);
+
+        pos = clip_v2(pos, -1, 1);
 
         copy_v(vector.vector, pos);
         this.draw();
@@ -1386,11 +1461,8 @@ class Parameters {
             let str = '<div id="camera_info">';
             let mtx = this.arrows.camera_rotation_matrix;
 
-            str += `<p>Camera</p>`;
-            str += `<p>${str_v3(mtx[0])}</p>`;
-            str += `<p>${str_v3(mtx[1])}</p>`;
-            str += `<p>${str_v3(mtx[2])}</p>`;
-            str += `</div>`;
+            str += `<p>Camera\n${str_m3(mtx)}</p>`.replaceAll('\n', '<br/>');
+            str += `<p>View\n${str_m3(this.arrows.view_transform_matrix)}</p>`.replaceAll('\n', '<br/>');
 
             //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
 
