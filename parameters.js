@@ -952,16 +952,102 @@ class Arrows {
         return arrows;
     }
 
+    solve_2vp_supplemental() {
+        let vns = this.vanishing_points;
+        let vn1 = vns[0].point, vn2 = vns[1].point;
+        this.focal_length = this.get_focal_length(vn1, vn2, this.principal_point);
+        this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
+        this.calculated_third_vanishing_point = this.third_vertex(vn1, vn2, this.principal_point);
+        return [vn1, vn2, this.calculated_third_vanishing_point, this.principal_point, this.focal_length];
+    }
+
+    solve_3vp_supplemental() {
+        let vns = this.vanishing_points;
+        let vn1 = vns[0].point, vn2 = vns[1].point, vn3 = vns[2].point;
+        this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
+        this.calculated_principal_point = this.ortho_center(vn1, vn2, vn3);
+        this.focal_length = this.get_focal_length(vn1, vn2, this.calculated_principal_point);
+        return [vn1, vn2, vn3, this.calculated_principal_point, this.focal_length];
+    }
+
+    get_vanishing_point(vn, p, f) {
+        let point = vec3(vn.x - p.x, vn.y - p.y, -f);
+        point.length = length_v3(point);
+        point.normalized = normalize_v3(point);
+        return point;
+    }
+
+    get_view_transform_matrix(rotation_matrix, unit_vector_matrix) {
+        let view_transform_matrix = mul_m3(rotation_matrix, unit_vector_matrix);
+        view_transform_matrix = inverse_m3(view_transform_matrix);
+        return view_transform_matrix;
+    }
+    
     solve_1vp() {
 
     }
 
     solve_2vp() {
+        let v = this.solve_2vp_supplemental();
 
+        let vn1 = v[0];
+        let vn2 = v[1];
+        let p = v[3];
+        let f = v[4];
+
+        let OFu = this.get_vanishing_point(vn1, p, f);
+        let OFv = this.get_vanishing_point(vn2, p, f);
+
+        let s1 = OFu.length;
+        let s2 = OFv.length;
+
+        let vpRc = OFv.normalized;
+        let upRc = OFu.normalized;
+        let wpRc = cross_v3(upRc, vpRc);
+
+        this.camera_rotation_matrix = [
+            normalize_v3(vec3(OFu.x / s1, OFv.x / s2, wpRc.x)),
+            normalize_v3(vec3(OFu.y / s1, OFv.y / s2, wpRc.y)),
+            normalize_v3(vec3(-f / s1, -f / s2, wpRc.z))
+        ];
+
+        //this.view_transform_matrix = mul_m3(this.camera_rotation_matrix, [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]);
+        //this.view_transform_matrix = inverse_m3(this.view_transform_matrix);
+        this.view_transform_matrix = 
+            this.get_view_transform_matrix(this.camera_rotation_matrix, 
+                [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
+            );
     }
 
     solve_3vp() {
+        let v = this.solve_3vp_supplemental();
 
+        let vn1 = v[0], vn2 = v[1], vn3 = v[2];
+        let p = v[3];
+        let f = v[4];
+
+        let OFu = this.get_vanishing_point(vn1, p, f);
+        let OFv = this.get_vanishing_point(vn2, p, f);
+        let OFw = this.get_vanishing_point(vn3, p, f);
+
+        let s1 = OFu.length;
+        let s2 = OFv.length;
+        let s3 = OFw.length;
+
+        let up = OFu.normalized;
+        let vp = OFv.normalized;
+        let wp = OFw.normalized;
+
+        this.camera_rotation_matrix = [
+            normalize_v3(vec3(OFu.x / s1, OFv.x / s2, wp.x)),
+            normalize_v3(vec3(OFu.y / s1, OFv.y / s2, wp.y)),
+            normalize_v3(vec3(-f / s1, -f / s2, wp.z)),
+        ];
+
+        this.view_transform_matrix = 
+            this.get_view_transform_matrix(this.camera_rotation_matrix,
+                [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
+            );
     }
 
     solve() {
@@ -969,61 +1055,11 @@ class Arrows {
         this.arrow_placement = this.solve_arrow_placement(this.arrows);
         this.vanishing_points = this.solve_vanishing_points(this.arrow_placement);
 
-        if (this.vanishing_points.length < 2)
-            return;
-
-        this.focal_length = this.get_focal_length(this.vanishing_points[0].point, this.vanishing_points[1].point, this.principal_point);
-        //this.horizontal_fov = this.get_field_of_view(this.focal_length, 32, 36);
-        this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
-
-        let p = this.principal_point;
-        this.calculated_third_vanishing_point = this.third_vertex(this.vanishing_points[0].point, this.vanishing_points[1].point, this.principal_point);
-
-        /*
-        {
-            let ip1 = this.intersections[0].point;
-            let ip2 = this.intersections[1].point;
-            let mp = midpoint_v2(ip1, ip2);
-            let dirZ = normalize_v2(sub_v2(mp, p));
-            let dir1 = normalize_v2(sub_v2(ip1, p));
-            let dir2 = normalize_v2(sub_v2(ip2, p));
-            this.camera_rotation_matrix = [
-                
-            ];
-            return;
+        switch (this.vanishing_points.length) {
+            case 1: this.solve_1vp(); break;
+            case 2: this.solve_2vp(); break;
+            case 3: this.solve_3vp(); break;
         }
-        */
-
-        let vn1 = this.vanishing_points[0].point;//['mag_norm'];
-        let vn2 = this.vanishing_points[1].point;//['mag_norm'];
-
-        let f = this.focal_length;
-
-        let OFu = vec3(vn1.x - p.x, vn1.y - p.y, -f);
-        let OFv = vec3(vn2.x - p.x, vn2.y - p.y, -f);
-
-        let s1 = length_v3(OFu);
-        let s2 = length_v3(OFv);
-
-        let vpRc = normalize_v3(OFv);
-        let upRc = normalize_v3(OFu);
-        let wpRc = cross_v3(upRc, vpRc);
-
-        this.camera_rotation_matrix = [
-            normalize_v3(vec3(OFu.x / s1, OFv.x / s2, wpRc.x)),
-            normalize_v3(vec3(OFu.y / s1, OFv.y / s2, wpRc.y)),
-            normalize_v3(vec3(-f / s1, -f / s2, wpRc.z))
-        ]
-        this.view_transform_matrix = mul_m3(this.camera_rotation_matrix, [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]);
-        this.view_transform_matrix = inverse_m3(this.view_transform_matrix);
-
-        if (this.vanishing_points.length < 3)
-            return;
-
-        this.calculated_principal_point = this.ortho_center(this.vanishing_points[0].point, this.vanishing_points[1].point, this.vanishing_points[2].point);
-        //mtx[2].x = 0;
-        //mtx[2].y = 2/mtx[2].z;
-        //mtx[2].y *= -1;
     }
 }
 
