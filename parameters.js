@@ -33,7 +33,7 @@ function vec3(x,y,z) {
 }
 
 function get_arrow(v1, v2, axis) {
-    return {start:v1, end:v2, axis:axis};
+    return {start:v1, end:v2, axis:axis, primary_axis:axis.replace('-','')};
 }
 
 function op_v2(v1, v2, op) {
@@ -399,8 +399,12 @@ function emplace_pixel(data, pixel, x, y, width, height) {
 
 class Arrows {
     arrows = [];
-    intersections = [];
+    arrow_placement = {};
+    vanishing_points = [];
     camera_rotation_matrix = [];
+    view_transform_matrix = [];
+    calculated_principal_point = vec2(0,0);
+    calculated_third_vanishing_point = vec2(0,0);
     principal_point = vec2(0,0);
     focal_length = 1;
     opacity = 50;
@@ -664,7 +668,7 @@ class Arrows {
 
         ctx.strokeStyle = "black";
 
-        this.intersections.forEach(intersect => {
+        this.vanishing_points.forEach(intersect => {
             ctx.beginPath();
 
             let p = screen_v(intersect.point, size);
@@ -755,10 +759,10 @@ class Arrows {
             ctx.stroke();
         }
 
-        if (this.intersections.length > 1 && this.tv && this.oc && this.debug_mode)
+        if (this.vanishing_points.length > 1 && this.tv && this.oc && this.debug_mode)
         {
-            let a = this.intersections[0].point;
-            let b = this.intersections[1].point;
+            let a = this.vanishing_points[0].point;
+            let b = this.vanishing_points[1].point;
 
             let sa = screen_v(a, size);
             let sb = screen_v(b, size);
@@ -871,70 +875,109 @@ class Arrows {
         return (360 * Math.atan(ar/focal_length_relative)) / Math.PI;
     }
 
+    solve_arrow_placement(arrows) {
+        let arrows_by_axis = {};
+
+        for (let i = 0; i < arrows.length; i++) {
+            let arrow = arrows[i];
+
+            if (!arrows_by_axis[arrow.primary_axis])
+                arrows_by_axis[arrow.primary_axis] = [];
+
+            arrow.direction = arrow.primary_axis == arrow.axis ? 1 : -1;
+
+            arrows_by_axis[arrow.primary_axis].push(arrow);
+        }
+
+        let filtered_axis = {};
+
+        for (const [axis, arrows] of Object.entries(arrows_by_axis)) {
+            if (!arrows || arrows.length < 1 || arrows.length > 2)
+                continue;
+
+            if (!filtered_axis[axis])
+                filtered_axis[axis] = [];
+
+            filtered_axis[axis] = arrows;
+        }
+
+        return filtered_axis;
+    }
+
+    solve_vanishing_points(arrow_placement) {
+        let vanishing_points = [];
+
+        for (const [axis, arrows] of Object.entries(arrow_placement)) {
+            if (arrows.length != 2)
+                continue;
+
+            let a = arrows[0];
+            let b = arrows[1];
+
+            let vanishing_point = {
+                point:this.find_intersection(a, b),
+                dot:sum_v2(mul_v2(a.mag_norm, b.mag_norm)),
+                int_mag_norm:normalize_v2(add_v2(a.mag_norm, b.mag_norm)),
+                a:a,
+                b:b,
+                axis:axis
+            };
+
+            vanishing_point.angle = Math.acos(vanishing_point.dot) / Math.PI * 180;
+
+            vanishing_points.push(vanishing_point);
+        }
+
+        return vanishing_points;
+    }
+
+    solve_supplemental_axis(arrow_placement) {
+        let supplemental = [];
+
+        for (const [axis, arrows] of Object.entries(arrow_placement)) {
+            if (arrows.length != 1)
+                continue;
+
+            supplemental.push(arrows[0]);
+        }
+
+        return supplemental;
+    }
+
+    solve_arrows(arrows) {
+        arrows.forEach(function(arrow) {
+            arrow.magnitude = sub_v2(arrow.start, arrow.end);
+            arrow.mag_norm = normalize_v2(arrow.magnitude);
+        }.bind(this));
+        return arrows;
+    }
+
+    solve_1vp() {
+
+    }
+
+    solve_2vp() {
+
+    }
+
+    solve_3vp() {
+
+    }
+
     solve() {
-        this.intersections = [];
-        let dots = [];
+        this.arrows = this.solve_arrows(this.arrows);
+        this.arrow_placement = this.solve_arrow_placement(this.arrows);
+        this.vanishing_points = this.solve_vanishing_points(this.arrow_placement);
 
-        for (let i = 0; i < this.arrows.length; i+=2) {
-            let a = this.arrows[i];
-            let b = this.arrows[i + 1];
-
-            let intersection = this.find_intersection(a, b);
-
-            a.magnitude = sub_v2(a.start, a.end);
-            b.magnitude = sub_v2(b.start, b.end);
-
-            a.mag_norm = normalize_v2(a.magnitude);
-            b.mag_norm = normalize_v2(b.magnitude);
-
-            let dot = sum_v2(mul_v2(a.mag_norm, b.mag_norm));
-
-            let int_mag_norm = normalize_v2(add_v2(a.mag_norm, b.mag_norm));
-
-            dots.push(dot);
-            this.intersections.push({point:intersection, dot:dot, mag_norm:int_mag_norm, a:a, b:b});
-        }
-
-        let length = 0;
-
-        dots.forEach(val => {
-            length += val * val;
-        });
-
-        length = Math.sqrt(length);
-
-        let norm_dots = [];
-
-        dots.forEach(val => {
-            norm_dots.push(val / length);
-        });
-        
-        for (let i = 0; i < norm_dots.length; i++) {
-            let num = norm_dots[i];
-            let den = 1;
-            for (let j = 0; j < norm_dots.length; j++) {
-                if (i == j) continue;
-                den *= norm_dots[j];
-            }
-            let frac = num / den;
-            let angle = Math.atan(frac);
-            let deg = angle / Math.PI * 180;
-            this.intersections[i]['angle'] = deg;
-            this.intersections[i]['frac'] = frac;
-            this.intersections[i]['mag'] = num;
-            this.intersections[i]['dot_angle'] = Math.acos(this.intersections[i].dot) / Math.PI * 180;
-        }
-
-        if (this.intersections.length < 2)
+        if (this.vanishing_points.length < 2)
             return;
 
-        this.focal_length = this.get_focal_length(this.intersections[0].point, this.intersections[1].point, this.principal_point);
+        this.focal_length = this.get_focal_length(this.vanishing_points[0].point, this.vanishing_points[1].point, this.principal_point);
         //this.horizontal_fov = this.get_field_of_view(this.focal_length, 32, 36);
         this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
 
         let p = this.principal_point;
-        this.calculated_principal_point = this.ortho_center(this.intersections[0].point, this.intersections[1].point, this.intersections[2].point);
-        this.calculated_third_vanishing_point = this.third_vertex(this.intersections[0].point, this.intersections[1].point, this.principal_point);
+        this.calculated_third_vanishing_point = this.third_vertex(this.vanishing_points[0].point, this.vanishing_points[1].point, this.principal_point);
 
         /*
         {
@@ -951,8 +994,8 @@ class Arrows {
         }
         */
 
-        let vn1 = this.intersections[0].point;//['mag_norm'];
-        let vn2 = this.intersections[1].point;//['mag_norm'];
+        let vn1 = this.vanishing_points[0].point;//['mag_norm'];
+        let vn2 = this.vanishing_points[1].point;//['mag_norm'];
 
         let f = this.focal_length;
 
@@ -974,7 +1017,10 @@ class Arrows {
         this.view_transform_matrix = mul_m3(this.camera_rotation_matrix, [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]);
         this.view_transform_matrix = inverse_m3(this.view_transform_matrix);
 
-        let mtx = this.camera_rotation_matrix;
+        if (this.vanishing_points.length < 3)
+            return;
+
+        this.calculated_principal_point = this.ortho_center(this.vanishing_points[0].point, this.vanishing_points[1].point, this.vanishing_points[2].point);
         //mtx[2].x = 0;
         //mtx[2].y = 2/mtx[2].z;
         //mtx[2].y *= -1;
@@ -1176,7 +1222,7 @@ class Parameters {
         img.style.setProperty('width', `${imgw}px`);
         img.style.setProperty('height', `${imgh}px`);
 
-        console.log('magnifier', div, img, '\n', divx, divy, divw, divh, imgx, imgy, imgw, imgh);
+        //console.log('magnifier', div, img, '\n', divx, divy, divw, divh, imgx, imgy, imgw, imgh);
     }
 
     remove_magnifier() {
@@ -1317,8 +1363,10 @@ class Parameters {
     axis_type_input(event) {
         for (let i = 0; i < this.arrows.arrows.length; i++) {
             let arrow = this.arrows.arrows[i];
-            if (i == event.getAttribute("name"))
+            if (i == event.getAttribute("name")) {
                 arrow.axis = event.value;
+                arrow.primary_axis = event.value.replace('-', '');
+            }
         }
 
         this.draw();
@@ -1327,8 +1375,6 @@ class Parameters {
     update_arrows_canvas() {
         if (!this.current_image)
             return;
-
-        console.log('resize');
 
         let ic = this.get_element('image_canvas');
         let ac = this.get_element('arrows_canvas');
@@ -1531,6 +1577,10 @@ class Parameters {
         this.arrows.focal_length = this.get_element('focal_length').value * 0.01;
     }
 
+    update_debug_checkbox() {
+        this.arrows.debug_mode = this.get_element('checkbox_debug').checked;
+    }
+
     update_info() {
         let e = this.get_element('parameter_info');
         let c = this.current_image;
@@ -1571,17 +1621,15 @@ class Parameters {
                 e.innerHTML += str;
             }
 
-            for (let i = 0; i < this.arrows.intersections.length; i++) {
+            for (let i = 0; i < this.arrows.vanishing_points.length; i++) {
                 let str = '<div id="axis_info">';
-                let intersect = this.arrows.intersections[i];
+                let intersect = this.arrows.vanishing_points[i];
 
                 str += `<p>${i + 1}</p>`;
-                str += `<p>intersect: ${intersect.point.x.toFixed(3)},${intersect.point.y.toFixed(3)}</p>`;
+                str += `<p>intersect: ${str_v2(intersect.point)}</p>`;
                 str += `<p>dot: ${intersect.dot.toFixed(3)}</p>`;
-                str += `<p>mag: ${intersect.mag.toFixed(3)}</p>`;
+                str += `<p>int_mag_norm: ${str_v2(intersect.int_mag_norm)}</p>`;
                 str += `<p>angle: ${intersect.angle.toFixed(3)}</p>`;
-                str += `<p>frac: ${intersect.frac.toFixed(3)}</p>`;
-                str += `<p>dot angle: ${intersect.dot_angle.toFixed(3)}</p>`;
 
                 str += '</div>';
 
@@ -1589,10 +1637,10 @@ class Parameters {
             }
         }
 
-        if (this.arrows.intersections.length > 2)
+        if (this.arrows.vanishing_points.length > 2)
             e.innerHTML += `<p>Calculated Principal Point</p><p>${str_v2(this.arrows.calculated_principal_point)}</p>`;
 
-        if (this.arrows.intersections.length > 1)
+        if (this.arrows.vanishing_points.length > 1)
             e.innerHTML += `<p>Calculated 3rd Vanishing Point</p><p>${str_v2(this.arrows.calculated_third_vanishing_point)}</p>`;
 
         if (this.arrows.camera_rotation_matrix && this.arrows.camera_rotation_matrix.length > 2){
@@ -1654,10 +1702,11 @@ class Parameters {
             this.update_opacity();
             this.update_ui_scale();
             this.update_arrow_select();
+            this.update_debug_checkbox();
         }.bind(this);
 
         try {    
-            if (!this.parameter_load_input())
+            if (!this.parameter_load_local())
                 initialize();
             else
                 this.set_ui();
