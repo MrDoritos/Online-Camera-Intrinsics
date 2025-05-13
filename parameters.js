@@ -699,7 +699,7 @@ class Arrows {
 
         let ii = 0;
         let av = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)];
-        if (this.camera_rotation_matrix) {
+        if (this.camera_rotation_matrix && this.view_transform_matrix) {
 
         let inv = this.camera_rotation_matrix;
         //inv = inverse_m3(this.camera_rotation_matrix);
@@ -1626,10 +1626,15 @@ class Parameters {
 
     update_arrow_count() {
         let e = this.get_element('axis_count');
+
+        let c = 1;
+        if (this.arrows && this.arrows.arrows && this.arrows.length)
+            c = this.arrows.arrows.length / 2;
+
         e.innerHTML = "";
         for (let i = 1; i < 4; i++) {
             e.innerHTML +=
-                `<option ${i == this.arrows.arrows.length / 2 ? 'selected' : ''} value="${i}">${i}</option>`;
+                `<option ${i == c ? 'selected' : ''} value="${i}">${i}</option>`;
         }
     }
 
@@ -1643,14 +1648,23 @@ class Parameters {
     }
 
     init() {
-        if (!this.parameter_load_local()) {
+        let initialize = function() {
+            this.update_arrow_count();
             this.axis_count_input();
             this.update_opacity();
             this.update_ui_scale();
             this.update_arrow_select();
-            this.update_arrow_count();
-        } else {
-            this.set_ui();
+        }.bind(this);
+
+        try {    
+            if (!this.parameter_load_input())
+                initialize();
+            else
+                this.set_ui();
+        } catch (error) {
+            console.log("init:", error);
+            localStorage.clear();
+            initialize();
         }
 
         this.draw();
