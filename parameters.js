@@ -406,6 +406,7 @@ class Arrows {
     calculated_principal_point = vec2(0,0);
     calculated_third_vanishing_point = vec2(0,0);
     principal_point = vec2(0,0);
+    axis_view_origin = vec2(0,0);
     focal_length = 1;
     opacity = 50;
     magnifier_scale = .1;
@@ -427,13 +428,29 @@ class Arrows {
         //return this.arrow_tolerance;
     }
 
+    find_alt_moveable(mpos, tolerance) {
+        let alt_moveable = [
+            this.principal_point,
+            this.axis_view_origin,
+        ];
+
+        let ret = undefined;
+
+        alt_moveable.forEach(function (vector) {
+            if (distance_nosqrt_v(vector, mpos) <= tolerance)
+                ret = {arrow:undefined, vector:vector, distance:tolerance};
+        }.bind(this));
+
+        return ret;
+    }
+
     find_arrow_by_mousepos_first(mpos, tolerance) {
         let ret = undefined;
         let vec = undefined;
         let val = undefined;
 
-        if (distance_nosqrt_v(this.principal_point, mpos) <= tolerance)
-            return {arrow:undefined, vector:this.principal_point, distance:tolerance};
+        if (ret = this.find_alt_moveable(mpos, tolerance))
+            return ret;
 
         this.arrows.forEach(arrow => {
             let a = distance_nosqrt_v(arrow.start, mpos);
@@ -455,8 +472,8 @@ class Arrows {
         let closest_vec = undefined;
         let closest_val = undefined;
 
-        if (distance_nosqrt_v(this.principal_point, mpos) <= tolerance)
-            return {arrow:undefined, vector:this.principal_point, distance:tolerance};
+        if (closest = this.find_alt_moveable(mpos, tolerance))
+            return closest;
 
         this.arrows.forEach(arrow => {
             let a = distance_nosqrt_v(arrow.start, mpos);
@@ -579,6 +596,28 @@ class Arrows {
         let axis_dis_pos = vec2(0,0);
         let axis_dis_scr = screen_v(axis_dis_pos, size);
         
+        let prim_scale = 0.1;
+
+        function draw_point(vector, scale=undefined) {
+            let sc = scale ? scale : prim_scale;
+            let s = screen_v(mul_v2_f(vector, sc), size);
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function draw_line(line, scale=undefined) {
+            let sc = scale ? scale : prim_scale;
+            let a = mul_v2_f(line.start, sc);
+            let b = mul_v2_f(line.end, sc);
+            let sa = screen_v(a, size);
+            let sb = screen_v(b, size);
+            ctx.beginPath();    
+            ctx.moveTo(sa.x, sa.y);
+            ctx.lineTo(sb.x, sb.y);
+            ctx.stroke();
+        }
+
         //let arrow = new Arrow(new vec2(0.0, 0.0), new vec2(0.0, 0.5));
         //emplace_pixel(imgdata, {r:128, g:128, b:0}, 0.25, 0.75, w, h);
         
@@ -711,11 +750,13 @@ class Arrows {
         this.view_transform_matrix.forEach(vec => {
             //let v = div_v3_f(vec, 4);
             let v = vec;
+            let o = this.axis_view_origin;
             //v = mul_m3_v3(inv, vec);
-            v = add_v3(v, vec3(0,0,4));
+            v = add_v3(v, vec3(o.x,o.y,4));
             let p = this.project_v3(v);
             let s = screen_v(p, size);
             let c = axis_dis_scr;
+            c = screen_v(o, size);
             //let vec = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
 
             ctx.strokeStyle = ["red", "lime", "dodgerblue"][ii++];
@@ -725,6 +766,7 @@ class Arrows {
             ctx.lineTo(s.x, s.y);
             ctx.stroke();
         });
+        draw_point(this.axis_view_origin, 1);
         }
 
         {
@@ -739,25 +781,6 @@ class Arrows {
             ctx.stroke();
         }
 
-        let prim_scale = 0.1;
-
-        function draw_point(vector) {
-            let s = screen_v(mul_v2_f(vector, prim_scale), size);
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        function draw_line(line) {
-            let a = mul_v2_f(line.start, prim_scale);
-            let b = mul_v2_f(line.end, prim_scale);
-            let sa = screen_v(a, size);
-            let sb = screen_v(b, size);
-            ctx.beginPath();    
-            ctx.moveTo(sa.x, sa.y);
-            ctx.lineTo(sb.x, sb.y);
-            ctx.stroke();
-        }
 
         if (this.vanishing_points.length > 1 && this.tv && this.oc && this.debug_mode)
         {
