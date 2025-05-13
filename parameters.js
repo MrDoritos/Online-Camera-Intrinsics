@@ -20,8 +20,23 @@ function str_v3(v, digits=3) {
     return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}, ${v.z.toFixed(digits)}`;
 }
 
+function str_m(m, r, c, digits=3) {
+    let str = '';
+    for (let i = 0; i < r; i++) {
+        for (let j = 0; j < c; j++) {
+            str += `${m[i][col_m(j)].toFixed(digits)}${j == c-1 ? '\n' : ', '}`;
+        }
+        
+    }
+    return str.trimEnd();
+}
+
 function str_m3(m, digits=3) {
     return `${str_v3(m[0],digits)}\n${str_v3(m[1],digits)}\n${str_v3(m[2],digits)}`;
+}
+
+function str_m4(m, digits=3) {
+    return str_m(m, 4, 4, digits);
 }
 
 function vec2(x,y) {
@@ -30,6 +45,10 @@ function vec2(x,y) {
 
 function vec3(x,y,z) {
     return {x:x, y:y, z:z};
+}
+
+function vec4(x,y,z,w) {
+    return {x,y,z,w};
 }
 
 function get_arrow(v1, v2, axis) {
@@ -146,7 +165,7 @@ function col_m(col) {
     return ['x','y','z','w'][col];
 }
 
-function mul_m3(m1, m2) {
+function left_op_m3(m1, m2, op) {
     let output = [vec3(0,0,0),vec3(0,0,0),vec3(0,0,0)];
 
     for (let r = 0; r < 3; r++) {
@@ -154,7 +173,7 @@ function mul_m3(m1, m2) {
             let sum = 0;
 
             for (let sr = 0; sr < 3; sr++) {
-                sum += xy_m3(m1, sr, c) * xy_m3(m2, r, sr);
+                sum += op(xy_m3(m1, sr, c), xy_m3(m2, r, sr));
             }
 
             output[r][col_m(c)] = sum;
@@ -162,6 +181,16 @@ function mul_m3(m1, m2) {
     }
 
     return output;
+}
+
+//left multiply
+function mul_m3(m1, m2) {
+    return left_op_m3(m1, m2, op_mul);
+}
+
+//left divide?
+function div_m3(m1, m2) {
+
 }
 
 function div_v2(v1, v2) {
@@ -403,6 +432,7 @@ class Arrows {
     vanishing_points = [];
     camera_rotation_matrix = [];
     view_transform_matrix = [];
+    projection_matrix = [];
     calculated_principal_point = vec2(0,0);
     calculated_third_vanishing_point = vec2(0,0);
     principal_point = vec2(0,0);
@@ -993,6 +1023,22 @@ class Arrows {
         return [vn1, vn2, vn3, this.calculated_principal_point, this.focal_length];
     }
 
+    get_projection_matrix(focal_length_relative, principal_point, ar) {
+        let f = focal_length_relative / 2;
+        let p = principal_point;
+
+        return [
+            vec4(1/f   , 0     , p.x   , 0     ),
+            vec4(0     , 1/f*ar, p.y   , 0     ),
+            vec4(0     , 0     ,-1     ,-0.02  ),
+            vec4(0     , 0     , 0     , 1     ),
+        ];
+    }
+
+    solve_projection_matrix(view_transform_matrix, projection_matrix) {
+
+    }
+
     get_vanishing_point(vn, p, f) {
         let point = vec3(vn.x - p.x, vn.y - p.y, -f);
         point.length = length_v3(point);
@@ -1040,6 +1086,8 @@ class Arrows {
             this.get_view_transform_matrix(this.camera_rotation_matrix, 
                 [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
             );
+
+        this.projection_matrix = this.get_projection_matrix(f, p, 1);
     }
 
     solve_3vp() {
@@ -1071,6 +1119,8 @@ class Arrows {
             this.get_view_transform_matrix(this.camera_rotation_matrix,
                 [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
             );
+
+        this.projection_matrix = this.get_projection_matrix(f, p, 1);
     }
 
     solve() {
@@ -1708,6 +1758,9 @@ class Parameters {
 
             str += `<p>Camera\n${str_m3(mtx)}</p>`.replaceAll('\n', '<br/>');
             str += `<p>View\n${str_m3(this.arrows.view_transform_matrix)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.projection_matrix && this.arrows.debug_mode)
+                str += `<p>Projection\n${str_m4(this.arrows.projection_matrix)}</p>`.replaceAll('\n', '<br/>');
 
             //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
 
