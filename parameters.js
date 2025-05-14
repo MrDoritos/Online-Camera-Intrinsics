@@ -28,25 +28,41 @@ function str_v2(v, digits=3) {
 
 function str_v3(v, digits=3) {
     //return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}, ${v.z.toFixed(digits)}`;
-    str_vs(v, 3, digits);
+    return str_vs(v, 3, digits);
 }
 
 function str_m(m, r, c, digits=3) {
     let str = '';
     for (let i = 0; i < r; i++) {
-        for (let j = 0; j < c; j++) {
-            str += `${m[i][col_m(j)].toFixed(digits)}${j == c-1 ? '\n' : ', '}`;
-        }    
+        str += str_vs(m[i], c, digits);
+        //for (let j = 0; j < c; j++) {
+        //    str += `${m[i][col_m(j)].toFixed(digits)}${j == c-1 ? '\n' : ', '}`;
+        //}    
     }
     return str.trimEnd();
 }
 
 function str_m3(m, digits=3) {
-    return `${str_v3(m[0],digits)}\n${str_v3(m[1],digits)}\n${str_v3(m[2],digits)}`;
+    return str_m(m, 3, 3, digits);
+    //return `${str_v3(m[0],digits)}\n${str_v3(m[1],digits)}\n${str_v3(m[2],digits)}`;
 }
 
 function str_m4(m, digits=3) {
     return str_m(m, 4, 4, digits);
+}
+
+function vec(w) {
+    let v = {};
+    for (let i = 0; i < w; i++)
+        v[['x','y','z','w'][i]] = 0;
+    return v;
+}
+
+function mat(w,h) {
+    let m = [];
+    for (let i = 0; i < h; i++)
+        m.push(vec(w));
+    return m;
 }
 
 function vec2(x,y) {
@@ -80,6 +96,15 @@ function op_v3(v1, v2, op) {
     );
 }
 
+function op_v4(v1, v2, op) {
+    return vec4(
+        op(v1.x, v2.x),
+        op(v1.y, v2.y),
+        op(v1.z, v2.z),
+        op(v1.w, v2.w)
+    );
+}
+
 function op_m2_v2(m, v, op) {
     return {
         x:(op(m[0].x, v.x) + op(m[0].y, v.x)),
@@ -93,6 +118,10 @@ function op_span_v2(v, op) {
 
 function op_span_v3(v, op) {
     return op(op(v.x, v.y), v.z);
+}
+
+function op_span_v4(v, op) {
+    return op(op(op(v.x, v.y), v.z), v.w);
 }
 
 function op_sub(a, b) {
@@ -131,6 +160,10 @@ function add_v3(v1, v2) {
     return op_v3(v1, v2, op_add);
 }
 
+function add_v4(v1, v2) {
+    return op_v4(v1, v2, op_add);
+}
+
 function mul_v2(v1, v2) {
     return op_v2(v1, v2, op_mul);
 }
@@ -139,12 +172,20 @@ function mul_v3(v1, v2) {
     return op_v3(v1, v2, op_mul);
 }
 
+function mul_v4(v1, v2) {
+    return op_v4(v1, v2, op_mul);
+}
+
 function mul_v2_f(v, f) {
     return mul_v2(v, vec2(f,f));
 }
 
 function mul_v3_f(v, f) {
     return mul_v3(v, vec3(f,f,f));
+}
+
+function mul_v4_f(v, f) {
+    return mul_v4(v, vec4(f,f,f,f));
 }
 
 function mul_m2_v2(m, v) {
@@ -159,8 +200,17 @@ function mul_m3_v3(m, v) {
     );
 }
 
+function mul_m4_v4(m, v) {
+    return vec4(
+        op_span_v4(mul_v4_f(m[0], v.x), op_add),
+        op_span_v4(mul_v4_f(m[1], v.y), op_add),
+        op_span_v4(mul_v4_f(m[2], v.z), op_add),
+        op_span_v4(mul_v4_f(m[3], v.w), op_add)
+    );
+}
+
 function xy_m3(m, row, col) {
-    return m[row][['x','y','z'][col]];
+    return m[row][['x','y','z','w'][col]];
 }
 
 function col_m(col) {
@@ -168,7 +218,7 @@ function col_m(col) {
 }
 
 function left_op_m(m1, m2, cc, rc, op) {
-    let output = [vec3(0,0,0),vec3(0,0,0),vec3(0,0,0)];
+    let output = mat(cc, rc);
 
     for (let r = 0; r < rc; r++) {
         for (let c = 0; c < cc; c++) {
@@ -188,6 +238,10 @@ function left_op_m(m1, m2, cc, rc, op) {
 //left multiply
 function mul_m3(m1, m2) {
     return left_op_m(m1, m2, 3, 3, op_mul);
+}
+
+function mul_m4(m1, m2) {
+    return left_op_m(m1, m2, 4, 4, op_mul);
 }
 
 //left divide?
@@ -311,11 +365,37 @@ function dupe_v3(v) {
     return vec3(v.x, v.y, v.z);
 }
 
+function dupe_v4(v) {
+    return vec4(v.x, v.y, v.z, v.w);
+}
+
+function dupe_m4(m) {
+    return [
+        dupe_v4(m[0]),
+        dupe_v4(m[1]),
+        dupe_v4(m[2]),
+        dupe_v4(m[3]),
+    ];
+}
+
 function matrix2(v1, v2) {
     return [
         dupe_v2(v1),
         dupe_v2(v2)
     ];
+}
+
+function vec4_v3(v) {
+    return vec4(v.x, v.y, v.z, 0);
+}
+
+function matrix4_m3(m) {
+    return [
+        vec4_v3(m[0]),
+        vec4_v3(m[1]),
+        vec4_v3(m[2]),
+        vec4(0,0,0,1)
+    ]
 }
 
 function rotation_m2(radians) {
@@ -324,6 +404,31 @@ function rotation_m2(radians) {
     return [
         {x:c,y:-s},
         {x:s,y:c}
+    ];
+}
+
+function translate_m4(m, translation) {
+    let r = dupe_m4(m), t = translation;
+    r[0].w += (t.x * m[0].x) + (t.y * m[0].y) + (t.z * m[0].z);
+    r[1].w += (t.x * m[1].x) + (t.y * m[1].y) + (t.z * m[1].z);
+    r[2].w += (t.x * m[2].x) + (t.y * m[2].y) + (t.z * m[2].z);
+    return r;
+}
+
+function translate_v3_m4(m, t) {
+    let r = vec3(0,0,0);
+    r.x = (t.x * m[0].x) + (t.y * m[0].y) + (t.z * m[0].z) + m[0].w;
+    r.y = (t.x * m[1].x) + (t.y * m[1].y) + (t.z * m[1].z) + m[1].w;
+    r.z = (t.x * m[2].x) + (t.y * m[2].y) + (t.z * m[2].z) + m[2].w;
+    return r;
+}
+
+function translation_m4(translation) {
+    return [
+        vec4(1,0,0,translation.x),
+        vec4(0,1,0,translation.y),
+        vec4(0,0,1,translation.z),
+        vec4(0,0,0,1)
     ];
 }
 
@@ -367,6 +472,54 @@ function inverse_m3(m) {
             x:(m[1].x * m[2].y - m[1].y * m[2].x) / det,
             y:(m[0].y * m[2].x - m[0].x * m[2].y) / det,
             z:(m[0].x * m[1].y - m[0].y * m[1].x) / det
+        }
+    ];
+}
+
+function determinant_m4(m) {
+    return (
+        m[0].w * m[1].z * m[2].y * m[3].x - m[0].z * m[1].w * m[2].y * m[3].x - 
+        m[0].w * m[1].y * m[2].z * m[3].x + m[0].y * m[1].w * m[2].z * m[3].x + 
+        m[0].z * m[1].y * m[2].w * m[3].x - m[0].y * m[1].z * m[2].w * m[3].x - 
+        m[0].w * m[1].z * m[2].x * m[3].y + m[0].z * m[1].w * m[2].x * m[3].y + 
+        m[0].w * m[1].x * m[2].z * m[3].y - m[0].x * m[1].w * m[2].z * m[3].y - 
+        m[0].z * m[1].x * m[2].w * m[3].y + m[0].x * m[1].z * m[2].w * m[3].y + 
+        m[0].w * m[1].y * m[2].x * m[3].z - m[0].y * m[1].w * m[2].x * m[3].z - 
+        m[0].w * m[1].x * m[2].y * m[3].z + m[0].x * m[1].w * m[2].y * m[3].z + 
+        m[0].y * m[1].x * m[2].w * m[3].z - m[0].x * m[1].y * m[2].w * m[3].z - 
+        m[0].z * m[1].y * m[2].x * m[3].w + m[0].y * m[1].z * m[2].x * m[3].w + 
+        m[0].z * m[1].x * m[2].y * m[3].w - m[0].x * m[1].z * m[2].y * m[3].w - 
+        m[0].y * m[1].x * m[2].z * m[3].w + m[0].x * m[1].y * m[2].z * m[3].w
+    ); 
+}
+
+function inverse_m4(m) {
+    let det = determinant_m4(m);
+
+    return [
+        {
+            x: (m[1].z * m[2].w * m[3].y - m[1].w * m[2].z * m[3].y + m[1].w * m[2].y * m[3].z - m[1].y * m[2].w * m[3].z - m[1].z * m[2].y * m[3].w + m[1].y * m[2].z * m[3].w)/det,
+            y: (m[0].w * m[2].z * m[3].y - m[0].z * m[2].w * m[3].y - m[0].w * m[2].y * m[3].z + m[0].y * m[2].w * m[3].z + m[0].z * m[2].y * m[3].w - m[0].y * m[2].z * m[3].w)/det,
+            z: (m[0].z * m[1].w * m[3].y - m[0].w * m[1].z * m[3].y + m[0].w * m[1].y * m[3].z - m[0].y * m[1].w * m[3].z - m[0].z * m[1].y * m[3].w + m[0].y * m[1].z * m[3].w)/det,
+            w: (m[0].w * m[1].z * m[2].y - m[0].z * m[1].w * m[2].y - m[0].w * m[1].y * m[2].z + m[0].y * m[1].w * m[2].z + m[0].z * m[1].y * m[2].w - m[0].y * m[1].z * m[2].w)/det
+        },
+        {
+            x: (m[1].w * m[2].z * m[3].x - m[1].z * m[2].w * m[3].x - m[1].w * m[2].x * m[3].z + m[1].x * m[2].w * m[3].z + m[1].z * m[2].x * m[3].w - m[1].x * m[2].z * m[3].w)/det,
+            y: (m[0].z * m[2].w * m[3].x - m[0].w * m[2].z * m[3].x + m[0].w * m[2].x * m[3].z - m[0].x * m[2].w * m[3].z - m[0].z * m[2].x * m[3].w + m[0].x * m[2].z * m[3].w)/det,
+            z: (m[0].w * m[1].z * m[3].x - m[0].z * m[1].w * m[3].x - m[0].w * m[1].x * m[3].z + m[0].x * m[1].w * m[3].z + m[0].z * m[1].x * m[3].w - m[0].x * m[1].z * m[3].w)/det,
+            w: (m[0].z * m[1].w * m[2].x - m[0].w * m[1].z * m[2].x + m[0].w * m[1].x * m[2].z - m[0].x * m[1].w * m[2].z - m[0].z * m[1].x * m[2].w + m[0].x * m[1].z * m[2].w)/det
+        },
+        {
+            x: (m[1].y * m[2].w * m[3].x - m[1].w * m[2].y * m[3].x + m[1].w * m[2].x * m[3].y - m[1].x * m[2].w * m[3].y - m[1].y * m[2].x * m[3].w + m[1].x * m[2].y * m[3].w)/det,
+            y: (m[0].w * m[2].y * m[3].x - m[0].y * m[2].w * m[3].x - m[0].w * m[2].x * m[3].y + m[0].x * m[2].w * m[3].y + m[0].y * m[2].x * m[3].w - m[0].x * m[2].y * m[3].w)/det,
+            z: (m[0].y * m[1].w * m[3].x - m[0].w * m[1].y * m[3].x + m[0].w * m[1].x * m[3].y - m[0].x * m[1].w * m[3].y - m[0].y * m[1].x * m[3].w + m[0].x * m[1].y * m[3].w)/det,
+            w: (m[0].w * m[1].y * m[2].x - m[0].y * m[1].w * m[2].x - m[0].w * m[1].x * m[2].y + m[0].x * m[1].w * m[2].y + m[0].y * m[1].x * m[2].w - m[0].x * m[1].y * m[2].w)/det
+        },
+        {
+            x: (m[1].z * m[2].y * m[3].x - m[1].y * m[2].z * m[3].x - m[1].z * m[2].x * m[3].y + m[1].x * m[2].z * m[3].y + m[1].y * m[2].x * m[3].z - m[1].x * m[2].y * m[3].z)/det,
+            y: (m[0].y * m[2].z * m[3].x - m[0].z * m[2].y * m[3].x + m[0].z * m[2].x * m[3].y - m[0].x * m[2].z * m[3].y - m[0].y * m[2].x * m[3].z + m[0].x * m[2].y * m[3].z)/det,
+            z: (m[0].z * m[1].y * m[3].x - m[0].y * m[1].z * m[3].x - m[0].z * m[1].x * m[3].y + m[0].x * m[1].z * m[3].y + m[0].y * m[1].x * m[3].z - m[0].x * m[1].y * m[3].z)/det,
+            w: (m[0].y * m[1].z * m[2].x - m[0].z * m[1].y * m[2].x + m[0].z * m[1].x * m[2].y - m[0].x * m[1].z * m[2].y - m[0].y * m[1].x * m[2].z + m[0].x * m[1].y * m[2].z)/det
         }
     ];
 }
@@ -761,35 +914,46 @@ class Arrows {
         });
 
         let ii = 0;
-        let av = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)];
+        let as = 1;
+        let av = [vec4(as,0,0,0),vec4(0,as,0,0),vec4(0,0,as,0)];
         let cam = this.camera_rotation_matrix;
         let inv = this.view_transform_matrix;
 
         if (cam && inv && cam.length && inv.length) {
 
-
+        //let unproj_matrix = inverse
         let o = this.axis_view_origin;
-        let off = vec3(o.x, o.y, 4);
-        let t = mul_m3_v3(inv, vec3(o.x, o.y, 4));
-        t = add_v3(t, vec3(0,0,4));
-        //inv = inverse_m3(this.camera_rotation_matrix);
-        //console.log(inv);
-        for (let i = 0; i < 3; i++) {
-            //let v = div_v3_f(vec, 4);
-            //let v = av[i];
-            //v = mul_m3_v3(inv, add_v3(v, t));
-            //v = add_v3(v, t);
-            //v = add_v3(v, vec3(0,0,-4));
-            let v = add_v3(this.camera_rotation_matrix[i], off);
-            let p = this.project_v3(v);
+        let ss = -1;
+        let off = vec4(ss * o.x, ss * o.y, ss, 1.0);
+        this.view_transform_matrix = translate_m4(matrix4_m3(cam), vec4(0,0,0,0));
+        this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        let off_world = translate_v3_m4(this.view_transform_matrix, off);
+        let off_world_proj = translate_v3_m4(this.projection_matrix, off_world);
 
-            //p = add_v2(p, t);
+        console.log('off:', off);
+        console.log('off_world:', off_world);
+        console.log('off_world_proj:', off_world_proj);
+
+        let points = [];
+        for (let i = 0; i < 3; i++) {
+            let ax = av[i];
+            //ax = add_v4(off_world, ax);
+            //let v = translate_v3_m4(this.matrix, av[i]);
+            //v = mul_m4_v4(this.projection_matrix, v);
+            let v = translate_v3_m4(this.view_transform_matrix, ax);
+            v = add_v3(v, off_world);
+            v = translate_v3_m4(this.projection_matrix, v);
+            //v = add_v4(v, off_world);
+            //let v = translate_v3_m4(this.pro)
+            //let p = this.project_v3(v);
+            let p = vec2(v.x, v.y);
+            console.log('v:',str_v3(v),'p:',str_v2(p));
 
             let s = screen_v(p, size);
-            let c = axis_dis_scr;
+            let c = screen_v(o, size);
+            c = screen_v(off_world_proj, size);
 
-            c = screen_v(o, size);
-            //let vec = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
+            points.push(s);
 
             ctx.strokeStyle = ["red", "lime", "dodgerblue"][ii++];
 
@@ -798,6 +962,14 @@ class Arrows {
             ctx.lineTo(s.x, s.y);
             ctx.stroke();
         }
+        ctx.strokeStyle = "black";
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        ctx.lineTo(points[1].x, points[1].y);
+        ctx.lineTo(points[2].x, points[2].y);
+        ctx.lineTo(points[0].x, points[0].y);
+        ctx.stroke();
+
         draw_point(this.axis_view_origin, 1);
         }
 
@@ -1629,11 +1801,13 @@ class Parameters {
         this.get_element('range_focal_length').value = a.focal_length * 100;
         this.get_element('range_magnifier_scale').value = a.magnifier_scale * 100;
         this.get_element('checkbox_debug').checked = a.debug_mode;
+        //this.get_element('axis_count').value = a.arrows.length/2;
+        this.update_axis_count_html();
         this.update_axis_select();
         this.update_opacity();
         this.update_axis_count();
         a.solve();
-        this.update_info();
+        //this.update_info();
     }
 
     update_magnifier_scale() {
@@ -1668,7 +1842,7 @@ class Parameters {
         e.innerHTML += `<p>Height: ${c ? c.height : ''}</p>`;
         e.innerHTML += `<p>Focal Length: ${str_v(this.arrows.focal_length)}</p>`;
         e.innerHTML += `<p>Focal Length (35mm): ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 36).toFixed(3)}</p>`;
-        e.innerHTML += `<p>Horizontal FOV: ${this.arrows.horizontal_fov.toFixed(3)}</p>`;
+        e.innerHTML += `<p>Horizontal FOV: ${str_v(this.arrows.horizontal_fov)}</p>`;
         
         {
             let str = '<div id="principal_point_info">';
@@ -1726,10 +1900,13 @@ class Parameters {
             let mtx = this.arrows.camera_rotation_matrix;
 
             str += `<p>Camera\n${str_m3(mtx)}</p>`.replaceAll('\n', '<br/>');
-            str += `<p>View\n${str_m3(this.arrows.view_transform_matrix)}</p>`.replaceAll('\n', '<br/>');
+            str += `<p>View\n${str_m4(this.arrows.view_transform_matrix)}</p>`.replaceAll('\n', '<br/>');
 
             if (this.arrows.projection_matrix && this.arrows.debug_mode)
                 str += `<p>Projection\n${str_m4(this.arrows.projection_matrix)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.matrix && this.arrows.debug_mode)
+                str += `<p>Final Matrix\n${str_m4(this.arrows.matrix)}</p>`.replaceAll('\n', '<br/>');
 
             //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
 
@@ -1741,15 +1918,6 @@ class Parameters {
     update_axis_select() {
         let e = this.get_element('axis_types');
         
-        for (let i = 0; i < this.arrows.arrows.length; i++) {
-            let arrow = this.arrows.arrows[i];
-            let s = document.querySelector(`select#axis_select[name="${i}"`);
-            if (s) {
-                arrow.axis = s.value;
-                arrow.primary_axis = s.value.replace('-', '');
-            }
-        }
-
         e.innerHTML = `<p style="text-align:center">Axis</p>`;
         for (let i = 0; i < this.arrows.arrows.length; i++) {
             let arrow = this.arrows.arrows[i];
@@ -1760,12 +1928,37 @@ class Parameters {
             str += '</select></div>';
             e.innerHTML += str;
         }
+
+        for (let i = 0; i < this.arrows.arrows.length; i++) {
+            let arrow = this.arrows.arrows[i];
+            let s = document.querySelector(`select#axis_select[name="${i}"`);
+            if (s) {
+                arrow.axis = s.value;
+                arrow.primary_axis = s.value.replace('-', '');
+            }
+        }
+    }
+
+    update_axis_count_html() {
+        let e = this.get_element('axis_count');
+
+        let l = this.arrows.arrows.length;
+
+        e.innerHTML = "";
+        for (let i = 1; i < 4; i++) {
+            e.innerHTML +=
+                `<option ${i == l/2 ? 'selected' : ''} value="${i}">${i}</option>`;
+        }
     }
 
     update_axis_count() {
         let e = this.get_element('axis_count');
 
         let c = e.value * 2;
+        
+        if (c < 2)
+            c = 2;
+
         let l = this.arrows.arrows.length;
 
         console.log(c, l);
@@ -1774,18 +1967,12 @@ class Parameters {
             this.arrows.arrows.pop();
 
         for (let i = 0; i < c-l; i++) {
-            let p = this.arrows.find_free_placement(0.05);
+            let p = this.arrows.find_free_placement(0.025);
 
             this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), this.next_arrow_type()));
         }
-
-        l = this.arrows.arrows.length;
         
-        e.innerHTML = "";
-        for (let i = 1; i < 4; i++) {
-            e.innerHTML +=
-                `<option ${i == l/2 ? 'selected' : ''} value="${i}">${i}</option>`;
-        }
+        this.update_axis_count_html();
     }
 
     draw() {
@@ -1807,10 +1994,13 @@ class Parameters {
         }.bind(this);
 
         try {    
-            if (!this.parameter_load_local())
+            if (!this.parameter_load_local()) {
+                console.log('loadlocal');
                 initialize();
-            else
+            } else {
+                console.log('setui');
                 this.set_ui();
+            }
         } catch (error) {
             console.log("init:", error);
             localStorage.clear();
