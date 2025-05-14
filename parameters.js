@@ -8,16 +8,27 @@ function get_offset(x, y, w) {
     return Math.round(Math.round(y) * w + x) * 4;
 }
 
-function get_vec(x, y) {
-    return {x:x, y:y};
+function str_v(v, digits=3) {
+    if (v != null && v != undefined)
+        return v.toFixed(digits);
+    return "NULL";
+}
+
+function str_vs(v, c, digits=3) {
+    let str = '';
+    for (let i = 0; i < c; i++)
+        str += `${str_v(v[col_m(i)], digits)}${i == c-1 ? '\n' : ', '}`;
+    return str;
 }
 
 function str_v2(v, digits=3) {
-    return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}`;
+    //return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}`;
+    return str_vs(v, 2, digits);
 }
 
 function str_v3(v, digits=3) {
-    return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}, ${v.z.toFixed(digits)}`;
+    //return `${v.x.toFixed(digits)}, ${v.y.toFixed(digits)}, ${v.z.toFixed(digits)}`;
+    str_vs(v, 3, digits);
 }
 
 function str_m(m, r, c, digits=3) {
@@ -25,8 +36,7 @@ function str_m(m, r, c, digits=3) {
     for (let i = 0; i < r; i++) {
         for (let j = 0; j < c; j++) {
             str += `${m[i][col_m(j)].toFixed(digits)}${j == c-1 ? '\n' : ', '}`;
-        }
-        
+        }    
     }
     return str.trimEnd();
 }
@@ -101,10 +111,6 @@ function op_div(a, b) {
     return a / b;
 }
 
-function sub_v(v1, v2) {
-    return get_vec(v1.x - v2.x, v1.y - v2.y);
-}
-
 function sub_v2(v1, v2) {
     return op_v2(v1, v2, op_sub);
 }
@@ -123,10 +129,6 @@ function add_v2(v1, v2) {
 
 function add_v3(v1, v2) {
     return op_v3(v1, v2, op_add);
-}
-
-function mul_v(v1, v2) {
-    return get_vec(v1.x * v2.x, v1.y * v2.y);
 }
 
 function mul_v2(v1, v2) {
@@ -165,14 +167,14 @@ function col_m(col) {
     return ['x','y','z','w'][col];
 }
 
-function left_op_m3(m1, m2, op) {
+function left_op_m(m1, m2, cc, rc, op) {
     let output = [vec3(0,0,0),vec3(0,0,0),vec3(0,0,0)];
 
-    for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
+    for (let r = 0; r < rc; r++) {
+        for (let c = 0; c < cc; c++) {
             let sum = 0;
 
-            for (let sr = 0; sr < 3; sr++) {
+            for (let sr = 0; sr < rc; sr++) {
                 sum += op(xy_m3(m1, sr, c), xy_m3(m2, r, sr));
             }
 
@@ -185,7 +187,7 @@ function left_op_m3(m1, m2, op) {
 
 //left multiply
 function mul_m3(m1, m2) {
-    return left_op_m3(m1, m2, op_mul);
+    return left_op_m(m1, m2, 3, 3, op_mul);
 }
 
 //left divide?
@@ -209,10 +211,6 @@ function div_v3_f(v, f) {
     return div_v3(v, vec3(f,f,f));
 }
 
-function sum_v(v) {
-    return v.x + v.y;
-}
-
 function sum_v2(v) {
     return op_span_v2(v, op_add);
 }
@@ -225,27 +223,19 @@ function abs_v2(v) {
     return vec2(Math.abs(v.x), Math.abs(v.y));
 }
 
-function product_v(v) {
-    return v.x * v.y;
-}
-
 function product_v2(v) {
     return op_span_v2(v, op_mul);
 }
 
-function distance_nosqrt_v(v1, v2) {
-    let diff = sub_v(v2, v1);
-    diff = mul_v(diff, diff);
-    return sum_v(diff);
+function distance_nosqrt_v2(v1, v2) {
+    let diff = sub_v2(v2, v1);
+    diff = mul_v2(diff, diff);
+    return sum_v2(diff);
 }
 
 function distance_v3(v1, v2) {
     let diff = sub_v3(v2, v1);
     return Math.sqrt(sum_v3(mul_v3(diff, diff)));
-}
-
-function distance_v(v1, v2) {
-    return Math.sqrt(distance_nosqrt_v(v1, v2));
 }
 
 function distance_v2(v1, v2) {
@@ -254,15 +244,15 @@ function distance_v2(v1, v2) {
 }
 
 function length_v2(v) {
-    return distance_v(v, vec2(0,0));
+    return distance_v2(v, vec2(0,0));
 }
 
 function length_v3(v) {
     return distance_v3(v, vec3(0,0,0));
 }
 
-function norm_v(v) {
-    return get_vec(v.x * .5 + .5, v.y * .5 + .5);
+function norm_v2(v) {
+    return vec2(v.x * .5 + .5, v.y * .5 + .5);
 }
 
 function clip_v2(v, min_f, max_f) {
@@ -299,8 +289,8 @@ function normalize_v2(v) {
 }
 
 function screen_wh(v, w, h) {
-    var n = norm_v(v);
-    return get_vec(n.x * w, n.y * h);
+    var n = norm_v2(v);
+    return vec2(n.x * w, n.y * h);
 }
 
 function screen_v(v1, v2) {
@@ -407,7 +397,7 @@ function rotate_v2(vector, radians) {
 }
 
 function pick_closer(v1, v2, point) {
-    if (distance_nosqrt_v(v1, point) < distance_nosqrt_v(v2, point))
+    if (distance_nosqrt_v2(v1, point) < distance_nosqrt_v2(v2, point))
         return v1;
     return v2;
 }
@@ -467,7 +457,7 @@ class Arrows {
         let ret = undefined;
 
         alt_moveable.forEach(function (vector) {
-            if (distance_nosqrt_v(vector, mpos) <= tolerance)
+            if (distance_nosqrt_v2(vector, mpos) <= tolerance)
                 ret = {arrow:undefined, vector:vector, distance:tolerance};
         }.bind(this));
 
@@ -483,8 +473,8 @@ class Arrows {
             return ret;
 
         this.arrows.forEach(arrow => {
-            let a = distance_nosqrt_v(arrow.start, mpos);
-            let b = distance_nosqrt_v(arrow.end, mpos);
+            let a = distance_nosqrt_v2(arrow.start, mpos);
+            let b = distance_nosqrt_v2(arrow.end, mpos);
 
             if (a <= tolerance || b <= tolerance) {
                 ret = arrow;
@@ -506,8 +496,8 @@ class Arrows {
             return closest;
 
         this.arrows.forEach(arrow => {
-            let a = distance_nosqrt_v(arrow.start, mpos);
-            let b = distance_nosqrt_v(arrow.end, mpos);
+            let a = distance_nosqrt_v2(arrow.start, mpos);
+            let b = distance_nosqrt_v2(arrow.end, mpos);
 
             let closer_vec = a < b ? arrow.start : arrow.end;
             let closer_val = a < b ? a : b; 
@@ -772,20 +762,32 @@ class Arrows {
 
         let ii = 0;
         let av = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)];
-        if (this.camera_rotation_matrix && this.view_transform_matrix) {
+        let cam = this.camera_rotation_matrix;
+        let inv = this.view_transform_matrix;
 
-        let inv = this.camera_rotation_matrix;
+        if (cam && inv && cam.length && inv.length) {
+
+
+        let o = this.axis_view_origin;
+        let off = vec3(o.x, o.y, 4);
+        let t = mul_m3_v3(inv, vec3(o.x, o.y, 4));
+        t = add_v3(t, vec3(0,0,4));
         //inv = inverse_m3(this.camera_rotation_matrix);
         //console.log(inv);
-        this.view_transform_matrix.forEach(vec => {
+        for (let i = 0; i < 3; i++) {
             //let v = div_v3_f(vec, 4);
-            let v = vec;
-            let o = this.axis_view_origin;
-            //v = mul_m3_v3(inv, vec);
-            v = add_v3(v, vec3(o.x,o.y,4));
+            //let v = av[i];
+            //v = mul_m3_v3(inv, add_v3(v, t));
+            //v = add_v3(v, t);
+            //v = add_v3(v, vec3(0,0,-4));
+            let v = add_v3(this.camera_rotation_matrix[i], off);
             let p = this.project_v3(v);
+
+            //p = add_v2(p, t);
+
             let s = screen_v(p, size);
             let c = axis_dis_scr;
+
             c = screen_v(o, size);
             //let vec = [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
 
@@ -795,7 +797,7 @@ class Arrows {
             ctx.moveTo(c.x, c.y);
             ctx.lineTo(s.x, s.y);
             ctx.stroke();
-        });
+        }
         draw_point(this.axis_view_origin, 1);
         }
 
@@ -1021,6 +1023,16 @@ class Arrows {
         this.calculated_principal_point = this.ortho_center(vn1, vn2, vn3);
         this.focal_length = this.get_focal_length(vn1, vn2, this.calculated_principal_point);
         return [vn1, vn2, vn3, this.calculated_principal_point, this.focal_length];
+    }
+
+    get_transform_matrix(rotation_matrix, translation, scale=1) {
+        let r = rotation_matrix, t = translation, s = scale;
+        return [
+            vec4(r[0].x, r[0].y, r[0].z, scale),
+            vec4(r[1].x, r[1].y, r[1].z, scale),
+            vec4(r[2].x, r[2].y, r[2].z, scale),
+            vec4(t.x   , t.y   , t.z   , 1    ),
+        ];
     }
 
     get_projection_matrix(focal_length_relative, principal_point, ar) {
@@ -1451,33 +1463,13 @@ class Parameters {
     }
 
     axis_count_input(event) {
-        let e = this.get_element('axis_count');
-
-        let c = e.value * 2;
-        let l = this.arrows.arrows.length;
-
-        for (let i = c; i < l; i++)
-            this.arrows.arrows.pop();
-
-        for (let i = 0; i < c-l; i++) {
-            let p = this.arrows.find_free_placement(0.05);
-
-            this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), this.next_arrow_type()));
-        }
-
-        this.update_arrow_select();
+        this.update_axis_count();
+        this.update_axis_select();
         this.draw();
     }
 
     axis_type_input(event) {
-        for (let i = 0; i < this.arrows.arrows.length; i++) {
-            let arrow = this.arrows.arrows[i];
-            if (i == event.getAttribute("name")) {
-                arrow.axis = event.value;
-                arrow.primary_axis = event.value.replace('-', '');
-            }
-        }
-
+        this.update_axis_select();
         this.draw();
     }
 
@@ -1518,10 +1510,7 @@ class Parameters {
         ac.style.setProperty('height', `${ic.clientHeight}px`);
         ac.setAttribute('width', w);
         ac.setAttribute('height', h);
-        //ac.width = ic.width;
-        //ac.height = ic.height;
-        //ac.top = ic.top;
-        //ac.left = ic.left;
+        
         this.arrows.draw(this.get_element('arrows_canvas'));
     }
     
@@ -1587,7 +1576,6 @@ class Parameters {
 
     async parameter_save_local() {
         let str = JSON.stringify(this.arrows);
-        //document.cookie = `parameters=${str}; path=/; expires=Tue, 19 Jan 2038 04:14:07 GMT`;
         localStorage.setItem('parameters', str);
     }
 
@@ -1600,25 +1588,6 @@ class Parameters {
         this.arrows = Object.assign(Arrows.prototype, JSON.parse(params));
 
         return true;
-        /*
-        let cookie = document.cookie;
-        let target = 'parameters';
-        let loaded = false;
-
-        cookie.split(';').forEach((field) => {
-            let s = field.split('=');
-            if (!s.length)
-                return;
-            if (s[0].trim() != target)
-                return;
-            let p = field.substring(s[0].length + 1);
-            //console.log('cookie', p);
-            this.arrows = Object.assign(Arrows.prototype, JSON.parse(p));
-            loaded = true;
-        });
-
-        return loaded;
-        */
     }
 
     parameter_load_input(event) {
@@ -1660,9 +1629,9 @@ class Parameters {
         this.get_element('range_focal_length').value = a.focal_length * 100;
         this.get_element('range_magnifier_scale').value = a.magnifier_scale * 100;
         this.get_element('checkbox_debug').checked = a.debug_mode;
-        this.update_arrow_select();
+        this.update_axis_select();
         this.update_opacity();
-        this.update_arrow_count();
+        this.update_axis_count();
         a.solve();
         this.update_info();
     }
@@ -1697,7 +1666,7 @@ class Parameters {
         e.innerHTML = '<p style="text-align: center">Info</p>';
         e.innerHTML += `<p>Width: ${c ? c.width : ''}</p>`;
         e.innerHTML += `<p>Height: ${c ? c.height : ''}</p>`;
-        e.innerHTML += `<p>Focal Length: ${this.arrows.focal_length.toFixed(3)}</p>`;
+        e.innerHTML += `<p>Focal Length: ${str_v(this.arrows.focal_length)}</p>`;
         e.innerHTML += `<p>Focal Length (35mm): ${this.arrows.get_focal_length_absolute(this.arrows.focal_length, 36).toFixed(3)}</p>`;
         e.innerHTML += `<p>Horizontal FOV: ${this.arrows.horizontal_fov.toFixed(3)}</p>`;
         
@@ -1769,9 +1738,18 @@ class Parameters {
         }
     }
 
-    update_arrow_select() {
+    update_axis_select() {
         let e = this.get_element('axis_types');
         
+        for (let i = 0; i < this.arrows.arrows.length; i++) {
+            let arrow = this.arrows.arrows[i];
+            let s = document.querySelector(`select#axis_select[name="${i}"`);
+            if (s) {
+                arrow.axis = s.value;
+                arrow.primary_axis = s.value.replace('-', '');
+            }
+        }
+
         e.innerHTML = `<p style="text-align:center">Axis</p>`;
         for (let i = 0; i < this.arrows.arrows.length; i++) {
             let arrow = this.arrows.arrows[i];
@@ -1784,17 +1762,29 @@ class Parameters {
         }
     }
 
-    update_arrow_count() {
+    update_axis_count() {
         let e = this.get_element('axis_count');
 
-        let c = 1;
-        if (this.arrows && this.arrows.arrows && this.arrows.length)
-            c = this.arrows.arrows.length / 2;
+        let c = e.value * 2;
+        let l = this.arrows.arrows.length;
 
+        console.log(c, l);
+
+        for (let i = c; i < l; i++)
+            this.arrows.arrows.pop();
+
+        for (let i = 0; i < c-l; i++) {
+            let p = this.arrows.find_free_placement(0.05);
+
+            this.arrows.arrows.push(get_arrow(p, add_v2(p, vec2(0.5, 0)), this.next_arrow_type()));
+        }
+
+        l = this.arrows.arrows.length;
+        
         e.innerHTML = "";
         for (let i = 1; i < 4; i++) {
             e.innerHTML +=
-                `<option ${i == c ? 'selected' : ''} value="${i}">${i}</option>`;
+                `<option ${i == l/2 ? 'selected' : ''} value="${i}">${i}</option>`;
         }
     }
 
@@ -1809,11 +1799,10 @@ class Parameters {
 
     init() {
         let initialize = function() {
-            this.update_arrow_count();
-            this.axis_count_input();
+            this.update_axis_count();
             this.update_opacity();
             this.update_ui_scale();
-            this.update_arrow_select();
+            this.update_axis_select();
             this.update_debug_checkbox();
         }.bind(this);
 
