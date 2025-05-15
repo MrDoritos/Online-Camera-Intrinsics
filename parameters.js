@@ -107,8 +107,8 @@ function op_v4(v1, v2, op) {
 
 function op_m2_v2(m, v, op) {
     return {
-        x:(op(m[0].x, v.x) + op(m[0].y, v.x)),
-        y:(op(m[1].x, v.y) + op(m[1].y, v.y))
+        x:(op(m[0].x, v.x) + op(m[0].y, v.y)),
+        y:(op(m[1].x, v.x) + op(m[1].y, v.y))
     };
 }
 
@@ -194,18 +194,18 @@ function mul_m2_v2(m, v) {
 
 function mul_m3_v3(m, v) {
     return vec3(
-        op_span_v3(mul_v3_f(m[0], v.x), op_add),
-        op_span_v3(mul_v3_f(m[1], v.y), op_add),
-        op_span_v3(mul_v3_f(m[2], v.z), op_add)
+        op_span_v3(mul_v3(m[0], v), op_add),
+        op_span_v3(mul_v3(m[1], v), op_add),
+        op_span_v3(mul_v3(m[2], v), op_add)
     );
 }
 
 function mul_m4_v4(m, v) {
     return vec4(
-        op_span_v4(mul_v4_f(m[0], v.x), op_add),
-        op_span_v4(mul_v4_f(m[1], v.y), op_add),
-        op_span_v4(mul_v4_f(m[2], v.z), op_add),
-        op_span_v4(mul_v4_f(m[3], v.w), op_add)
+        op_span_v4(mul_v4(m[0], v), op_add),
+        op_span_v4(mul_v4(m[1], v), op_add),
+        op_span_v4(mul_v4(m[2], v), op_add),
+        op_span_v4(mul_v4(m[3], v), op_add)
     );
 }
 
@@ -415,6 +415,7 @@ function translate_m4(m, translation) {
     return r;
 }
 
+/*
 function translate_v3_m4(m, t) {
     let r = vec3(0,0,0);
     r.x = (t.x * m[0].x) + (t.y * m[0].y) + (t.z * m[0].z) + m[0].w;
@@ -422,6 +423,7 @@ function translate_v3_m4(m, t) {
     r.z = (t.x * m[2].x) + (t.y * m[2].y) + (t.z * m[2].z) + m[2].w;
     return r;
 }
+*/
 
 function translation_m4(translation) {
     return [
@@ -924,15 +926,19 @@ class Arrows {
         //let unproj_matrix = inverse
         let o = this.axis_view_origin;
         let ss = -1;
-        let off = vec4(ss * o.x, ss * o.y, ss, 1.0);
+        let off = vec4(ss * o.x, ss * o.y, .5 * ss, 1.0);
         this.view_transform_matrix = translate_m4(matrix4_m3(cam), vec4(0,0,0,0));
-        this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
-        let off_world = translate_v3_m4(this.view_transform_matrix, off);
-        let off_world_proj = translate_v3_m4(this.projection_matrix, off_world);
+        //let inverse_projection = inverse_m4(this.projection_matrix);
+        this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
+        this.inverse_matrix = inverse_m4(this.matrix);
+        //let off_world = translate_v3_m4(this.view_transform_matrix, off);
+        //let off_world_proj = translate_v3_m4(this.projection_matrix, off_world);
+        //let off_world = mul_m4_v4(this.view_transform_matrix, off);
+        let off_world_proj = mul_m4_v4(this.inverse_matrix, off);
 
-        console.log('off:', off);
-        console.log('off_world:', off_world);
-        console.log('off_world_proj:', off_world_proj);
+        //console.log('off:', off);
+        //console.log('off_world:', off_world);
+        //console.log('off_world_proj:', off_world_proj);
 
         let points = [];
         for (let i = 0; i < 3; i++) {
@@ -940,9 +946,12 @@ class Arrows {
             //ax = add_v4(off_world, ax);
             //let v = translate_v3_m4(this.matrix, av[i]);
             //v = mul_m4_v4(this.projection_matrix, v);
-            let v = translate_v3_m4(this.view_transform_matrix, ax);
-            v = add_v3(v, off_world);
-            v = translate_v3_m4(this.projection_matrix, v);
+            //let v = translate_v3_m4(this.view_transform_matrix, ax);
+            //let v = mul_m4_v4(this.view_transform_matrix, ax);
+            let v = ax;
+            v = add_v4(v, off_world_proj);
+            //v = translate_v3_m4(this.projection_matrix, v);
+            v = mul_m4_v4(this.matrix, v);
             //v = add_v4(v, off_world);
             //let v = translate_v3_m4(this.pro)
             //let p = this.project_v3(v);
@@ -1907,6 +1916,9 @@ class Parameters {
 
             if (this.arrows.matrix && this.arrows.debug_mode)
                 str += `<p>Final Matrix\n${str_m4(this.arrows.matrix)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.inverse_matrix && this.arrows.debug_mode)
+                str += `<p>Inverse\n${str_m4(this.arrows.inverse_matrix)}</p>`.replaceAll('\n', '<br/>');
 
             //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
 
