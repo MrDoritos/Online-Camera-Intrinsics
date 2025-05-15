@@ -200,13 +200,21 @@ function mul_m3_v3(m, v) {
     );
 }
 
-function mul_m4_v4(m, v) {
-    return vec4(
+function mul_m4_v4(m, v, perspective_divide = false) {
+    let r = vec4(
         op_span_v4(mul_v4(m[0], v), op_add),
         op_span_v4(mul_v4(m[1], v), op_add),
         op_span_v4(mul_v4(m[2], v), op_add),
         op_span_v4(mul_v4(m[3], v), op_add)
     );
+
+    if (perspective_divide) {
+        r.x /= r.w;
+        r.y /= r.w;
+        r.z /= r.w;
+    }
+
+    return r;
 }
 
 function xy_m3(m, row, col) {
@@ -385,8 +393,22 @@ function matrix2(v1, v2) {
     ];
 }
 
-function vec4_v3(v) {
-    return vec4(v.x, v.y, v.z, 0);
+//s as values in diagonal 4x4 matrix
+function matrix4(s) {
+    return [
+        vec4(s, 0, 0, 0),
+        vec4(0, s, 0, 0),
+        vec4(0, 0, s, 0),
+        vec4(0, 0, 0, s)
+    ];
+}
+
+function vec4_v3(v, w=0) {
+    return vec4(v.x, v.y, v.z, w);
+}
+
+function vec4_v2(v, z=0, w=0) {
+    return vec4(v.x, v.y, z, w);
 }
 
 function matrix4_m3(m) {
@@ -409,9 +431,21 @@ function rotation_m2(radians) {
 
 function translate_m4(m, translation) {
     let r = dupe_m4(m), t = translation;
-    r[0].w += (t.x * m[0].x) + (t.y * m[0].y) + (t.z * m[0].z);
-    r[1].w += (t.x * m[1].x) + (t.y * m[1].y) + (t.z * m[1].z);
-    r[2].w += (t.x * m[2].x) + (t.y * m[2].y) + (t.z * m[2].z);
+    let v = mul_m4_v4(m, translation);
+    //r[0].w += (t.x * m[0].x) + (t.y * m[0].y) + (t.z * m[0].z);
+    //r[1].w += (t.x * m[1].x) + (t.y * m[1].y) + (t.z * m[1].z);
+    //r[2].w += (t.x * m[2].x) + (t.y * m[2].y) + (t.z * m[2].z);
+    r[0].w = v.x;
+    r[1].w = v.y;
+    r[2].w = v.z;
+    return r;
+}
+
+function set_translate_m4(m, translation) {
+    let r = dupe_m4(m), t = translation;
+    r[0].w = t.x;
+    r[1].w = t.y;
+    r[2].w = t.z;
     return r;
 }
 
@@ -917,24 +951,55 @@ class Arrows {
 
         let ii = 0;
         let as = 1;
-        let av = [vec4(as,0,0,0),vec4(0,as,0,0),vec4(0,0,as,0)];
+        let av = [vec4(as,0,0,1),vec4(0,as,0,1),vec4(0,0,as,1)];
         let cam = this.camera_rotation_matrix;
         let inv = this.view_transform_matrix;
+        let mat = this.camera_transform_matrix;
 
         if (cam && inv && cam.length && inv.length) {
 
         //let unproj_matrix = inverse
-        let o = this.axis_view_origin;
+        //let o = this.get_3d_origin(this.axis_view_origin, this.principal_point, this.focal_length, -1);
+        let o = vec4_v2(this.axis_view_origin, -1, 1);
         let ss = -1;
-        let off = vec4(ss * o.x, ss * o.y, .5 * ss, 1.0);
-        this.view_transform_matrix = translate_m4(matrix4_m3(cam), vec4(0,0,0,0));
+        let off = vec4(ss * -o.x, ss * -o.y, 1 * ss, 1.0);
+        //this.inverse_matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        this.inverse_matrix = inverse_m4(this.projection_matrix);
+        //this.inverse_matrix = set_translate_m4(this.inverse_matrix, this.get_3d_origin(o, this.principal_point, this.focal_length));
+        //let mat = this.inverse_matrix = mul_m4(this.inverse_matrix, this.camera_transform_matrix);
+        //o = mul_v4_f(o, 4);
+        //o = mul_m4_v4(this.camera_transform_matrix, o);
+        //this.view_transform_matrix = translate_m4(this.view_transform_matrix, o);
+        //this.camera_transform_matrix = set_translate_m4(this.camera_transform_matrix, o);
+        //this.view_transform_matrix = inverse_m4(this.camera_transform_matrix);
+        this.view_transform_matrix = set_translate_m4(this.view_transform_matrix, o);
+        //this.view_transform_matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        //this.view_transform_matrix = set_translate_m4(this.view_transform_matrix, o);
+        //this.view_transform_matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
+        this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        //this.matrix = mul_m4(this.projection_matrix, this.camera_transform_matrix);
+        //this.matrix = this.view_transform_matrix;
+        //this.matrix = inverse_m4(this.view_transform_matrix);
+        //this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
+        //this.matrix = set_translate_m4(this.matrix, o);
+        //this.matrix = mul_m4(this.matrix, translation_m4(o));
+        //this.view_transform_matrix = translate_m4(matrix4_m3(cam), vec4(0,0,0,0));
         //let inverse_projection = inverse_m4(this.projection_matrix);
-        this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
-        this.inverse_matrix = inverse_m4(this.matrix);
+        //this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
+        //this.inverse_matrix = inverse_m4(this.matrix);
         //let off_world = translate_v3_m4(this.view_transform_matrix, off);
         //let off_world_proj = translate_v3_m4(this.projection_matrix, off_world);
         //let off_world = mul_m4_v4(this.view_transform_matrix, off);
-        let off_world_proj = mul_m4_v4(this.inverse_matrix, off);
+        //let off_world_proj = mul_m4_v4(this.inverse_matrix, off);
+        let project = function get_projection(point) {
+            //let t = mul_m4_v4(this.view_transform_matrix, off);
+            //return add_v4(t, point);
+            let b = mul_m4_v4(this.matrix, point);
+            return b;
+        }.bind(this);
+
+        //let off_world_proj = mul_m4_v4(mat, vec4(0, 0, 0, 1));
+        //off_world_proj = project(vec4(0,0,0,1));
 
         //console.log('off:', off);
         //console.log('off_world:', off_world);
@@ -949,9 +1014,10 @@ class Arrows {
             //let v = translate_v3_m4(this.view_transform_matrix, ax);
             //let v = mul_m4_v4(this.view_transform_matrix, ax);
             let v = ax;
-            v = add_v4(v, off_world_proj);
+            //v = add_v4(v, off_world_proj);
             //v = translate_v3_m4(this.projection_matrix, v);
-            v = mul_m4_v4(this.matrix, v);
+            //v = mul_m4_v4(mat, v);
+            v = project(v);
             //v = add_v4(v, off_world);
             //let v = translate_v3_m4(this.pro)
             //let p = this.project_v3(v);
@@ -960,7 +1026,8 @@ class Arrows {
 
             let s = screen_v(p, size);
             let c = screen_v(o, size);
-            c = screen_v(off_world_proj, size);
+            //c = screen_v(project(o), size);
+            c = screen_v(project(vec4(0,0,0,1)), size);
 
             points.push(s);
 
@@ -1140,6 +1207,32 @@ class Arrows {
         return filtered_axis;
     }
 
+    get_axis_vector(axis) {
+        switch (axis) {
+            case 'x': return vec4(1,0,0,0);
+            case 'y': return vec4(0,1,0,0);
+            case 'z': return vec4(0,0,1,0);
+        }
+        return vec4(0,0,0,0);
+    }
+
+    get_axis_vector_matrix(vanishing_points) {
+        let axis = ['x','y','z'].filter(function(x) { vanishing_points.find(v => v.axis == x) });
+
+        let vv = {
+            'x': 0,
+            'y': 1,
+            'z': 2
+        };
+
+        let m = matrix4(0);
+
+        for (let i = 0; i < vanishing_points.length; i++) {
+            let v = vanishing_points[i];
+            //m[] = v.axis_vector;
+        }
+    }
+
     solve_vanishing_points(arrow_placement) {
         let vanishing_points = [];
 
@@ -1156,7 +1249,8 @@ class Arrows {
                 int_mag_norm:normalize_v2(add_v2(a.mag_norm, b.mag_norm)),
                 a:a,
                 b:b,
-                axis:axis
+                axis:axis,
+                axis_vector:this.get_axis_vector(axis),
             };
 
             vanishing_point.angle = Math.acos(vanishing_point.dot) / Math.PI * 180;
@@ -1223,7 +1317,7 @@ class Arrows {
         return [
             vec4(1/f   , 0     , p.x   , 0     ),
             vec4(0     , 1/f*ar, p.y   , 0     ),
-            vec4(0     , 0     ,-1     ,-0.02  ),
+            vec4(0     , 0     , -1     , 0     ),
             vec4(0     , 0     , 0     , 1     ),
         ];
     }
@@ -1239,9 +1333,24 @@ class Arrows {
         return point;
     }
 
-    get_view_transform_matrix(rotation_matrix, unit_vector_matrix) {
-        let view_transform_matrix = mul_m3(rotation_matrix, unit_vector_matrix);
-        view_transform_matrix = inverse_m3(view_transform_matrix);
+    get_3d_origin(origin_2d, principal_point, focal_length_relative, z=-1) {
+        let k = 2 / focal_length_relative;
+        return vec4(
+            k * (origin_2d.x - principal_point.x),
+            k * (origin_2d.y - principal_point.y),
+            z,
+            1
+        );
+    }
+
+    get_view_transform_matrix(rotation_matrix, unit_vector_matrix, origin_3d) {
+        let view_transform_matrix = mul_m4(unit_vector_matrix, rotation_matrix);
+        //view_transform_matrix = translate_m4(view_transform_matrix, origin_3d);
+        //view_transform_matrix[0].w = origin_3d.x;
+        //view_transform_matrix[1].w = origin_3d.y;
+        //view_transform_matrix[2].w = origin_3d.z;
+        this.camera_transform_matrix = inverse_m4(view_transform_matrix);
+        this.rotation_matrix = inverse_m3(rotation_matrix);
         return view_transform_matrix;
     }
     
@@ -1275,9 +1384,13 @@ class Arrows {
 
         //this.view_transform_matrix = mul_m3(this.camera_rotation_matrix, [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]);
         //this.view_transform_matrix = inverse_m3(this.view_transform_matrix);
+        this.origin_3d = this.get_3d_origin(this.axis_view_origin, p, f);
+
         this.view_transform_matrix = 
-            this.get_view_transform_matrix(this.camera_rotation_matrix, 
-                [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
+            this.get_view_transform_matrix(
+                matrix4_m3(this.camera_rotation_matrix), 
+                matrix4(1),
+                this.origin_3d
             );
 
         this.projection_matrix = this.get_projection_matrix(f, p, 1);
@@ -1308,9 +1421,13 @@ class Arrows {
             normalize_v3(vec3(-f / s1, -f / s2, wp.z)),
         ];
 
+        this.origin_3d = this.get_3d_origin(this.axis_view_origin, p, f);
+
         this.view_transform_matrix = 
-            this.get_view_transform_matrix(this.camera_rotation_matrix,
-                [vec3(1,0,0),vec3(0,1,0),vec3(0,0,1)]
+            this.get_view_transform_matrix(
+                matrix4_m3(this.camera_rotation_matrix),
+                matrix4(1),
+                this.origin_3d
             );
 
         this.projection_matrix = this.get_projection_matrix(f, p, 1);
@@ -1919,6 +2036,18 @@ class Parameters {
 
             if (this.arrows.inverse_matrix && this.arrows.debug_mode)
                 str += `<p>Inverse\n${str_m4(this.arrows.inverse_matrix)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.camera_transform_matrix && this.arrows.debug_mode)
+                str += `<p>Camera\n${str_m4(this.arrows.camera_transform_matrix)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.rotation_matrix && this.arrows.debug_mode)
+                str += `<p>Rotation Matrix\n${str_m3(this.arrows.rotation_matrix)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.axis_view_origin && this.arrows.debug_mode)
+                str += `<p>Origin 2D\n${str_v2(this.arrows.axis_view_origin)}</p>`.replaceAll('\n', '<br/>');
+
+            if (this.arrows.origin_3d && this.arrows.debug_mode)
+                str += `<p>Origin 3D\n${str_v3(this.arrows.origin_3d)}</p>`.replaceAll('\n', '<br/>');
 
             //str += `<p>Camera Inverse\n${str_m3(inverse_m3(mtx))}</p>`.replaceAll('\n', '<br/>');
 
