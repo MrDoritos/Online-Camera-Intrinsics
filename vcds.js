@@ -61,6 +61,10 @@ class Log {
         this.parse();
     }
 
+    get_block(stub) {
+        return this.blocks.find(block => block.stub == stub);
+    }
+
     parse() {
         let rs = this.csv.rows;
         let r = rs[0];
@@ -132,8 +136,8 @@ class Log {
             if (row.marker)
                 this.markers.push({marker:row.marker,seconds:row.seconds});
 
-            let d = r.slice(2);
-            for (let i = 0, b = 0; i < d.length; i+=2, b++) {
+            let d = r;
+            for (let i = 2, b = 0; i < d.length; i+=2, b++) {
                 let block = this.blocks[b];
                 let db = row.columns[stubs[b]] = {};
                 db.value = Number(d[i]);
@@ -200,6 +204,10 @@ class Parameters {
         if (!this.is_bound_absolute(pos))
             return;
         this.context.moveTo(pos.x, pos.y);
+    }
+
+    clear() {
+        this.context.clearRect(0,0,this.element.width,this.element.height);
     }
 
     lineTo(relative) {
@@ -386,7 +394,7 @@ class VCDS {
             //let x2 = p.get_shifted_relative({x:rel.x2+p.x_end,y:0}).x;
             x_start = x_diff * rel.x1 + x_start;
             x_end = x_diff * x_src_diff + x_start;
-            console.log(rel, p, x_start, x_end, x_diff, p.x_start, p.x_end);
+            //console.log(rel, p, x_start, x_end, x_diff, p.x_start, p.x_end);
             p.x_start = x_start;
             p.x_end = x_end;
             this.render_log(cl.parameters);
@@ -420,7 +428,8 @@ class VCDS {
     render_log(p) {
         let ctx = p.context, border_radius = p.border_radius, height = p.height, width = p.width, delta_time = p.delta_time, log=p.log, element=p.element;
 
-        ctx.clearRect(0, 0, p.width, p.height);
+        //ctx.clearRect(0, 0, p.width, p.height);
+        p.clear();
         this.render_markers(p);
         //console.log(element, ctx, rect, line_width);
 
@@ -495,7 +504,7 @@ class VCDS {
         {
             log.blocks.forEach(function(block) {
                 canvas_div += `<div>`;
-                canvas_div += `<input class="${block.stub}" name="${log.name}" type="checkbox" checked />`;
+                canvas_div += `<input class="${block.stub}" name="${log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked />`;
                 canvas_div += `<p style="background-color:${block.color}">${block.name}</p>`;
                 canvas_div += `</div>`;
             }.bind(this));
@@ -596,6 +605,26 @@ class VCDS {
             this.set_css_style('.log_view_height_limit', 'max-height', 'fit-content');
             event.innerText = '-';
         }
+    }
+
+    get_log(event) {
+        if (!event.name)
+            return;
+        return this.logs.find(log => event.name == log.log.name);
+    }
+
+    get_block_stub(event) {
+        return event.target.class;
+    }
+
+    log_block_toggle_click(event) {
+        let log = this.get_log(event);
+        console.log(log);
+        let block = log.log.get_block(event.className);
+        if (!block)
+            return;
+        block.visible = !block.visible;
+        this.render_log(log.parameters);
     }
 
     log_load_input(event) {
