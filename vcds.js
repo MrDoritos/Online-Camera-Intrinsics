@@ -32,9 +32,11 @@ class Log {
     blocks = undefined;
     rows = undefined;
     csv = undefined;
+    markers = undefined;
 
     seconds_min = 0;
     seconds_max = 0;
+    seconds_range = 0;
 
     colors = [ 
         "orange",
@@ -118,6 +120,7 @@ class Log {
         }
 
         this.rows = [];
+        this.markers = [];
 
         rs.slice(7).forEach(function(r) {
             let row = {};
@@ -125,6 +128,9 @@ class Log {
             row.marker = Number(r[0]);
             row.seconds = Number(r[1]);
             row.columns = {};
+
+            if (row.marker)
+                this.markers.push({marker:row.marker,seconds:row.seconds});
 
             let d = r.slice(2);
             for (let i = 0, b = 0; i < d.length; i+=2, b++) {
@@ -137,11 +143,76 @@ class Log {
                     block.min = db.value;
                 if (db.value > block.max)
                     block.max = db.value;
+                block.range = block.max - block.min;
             }
 
             this.seconds_max = row.seconds;
+            this.seconds_range = this.seconds_max - this.seconds_min;
+
             this.rows.push(row);
         }.bind(this));
+    }
+};
+
+class Parameters {
+    constructor(log, element) {
+        this.context = element.getContext('2d');
+        this.size = element.getBoundingClientRect();
+
+        element.width = log.rows.length * 2;
+
+        if (element.width > 6000) element.width = 6000;
+        if (element.width < 800) element.width = 800;
+
+        this.aspect_ratio = this.size.height / this.size.width;
+
+        element.height = this.aspect_ratio * element.width;
+
+        this.line_width = element.height / 100;
+        this.border_radius = this.line_width;
+
+        this.context.lineWidth = this.line_width;
+
+        this.width = element.width - this.border_radius * 2;
+        this.height = element.height - this.border_radius * 2;
+
+        this.log = log;
+        this.element = element;
+
+        this.delta_time = log.seconds_max - log.seconds_min;
+    }
+
+    moveTo(relative) {
+        let pos = this.get_position_absolute(relative);
+        this.context.moveTo(pos.x, pos.y);
+    }
+
+    lineTo(relative) {
+        let pos = this.get_position_absolute(relative);
+        this.context.lineTo(pos.x, pos.y);
+    }
+
+    get_column_relative(block, column) {
+        return {
+            x: (column.seconds - this.log.seconds_min) / this.log.seconds_range,
+            y: (column.value - block.min) / block.range,
+        };
+    }
+
+    get_position_relative(pos) {
+
+    }
+
+    get_position_absolute(pos) {
+        return {
+            x: pos.x * this.width + this.border_radius,
+            y: this.height - (pos.y * this.height - this.border_radius),
+        };
+    }
+
+    get_position(block, column, x_offset=0, y_offset=0) {
+        let rel = this.get_column_relative(block, column);
+        return this.get_position_absolute(rel);
     }
 };
 
@@ -163,42 +234,28 @@ class VCDS {
         this.log_load_input();
     }
 
+    render_markers(p) {
+        let ctx = p.context;
+        ctx.strokeStyle = "black";
+        p.log.markers.forEach(function(marker) {
+            ctx.beginPath();
+            p.moveTo({x:marker.seconds/p.delta_time,y:1});
+            p.lineTo({x:marker.seconds/p.delta_time,y:0});
+            ctx.stroke();
+        }.bind(this));
+    }
+
     render_log(log, element) {
-        let ctx = element.getContext('2d');
-        let rect = element.getBoundingClientRect();
+        let p = new Parameters(log, element);
 
-        let delta_time = log.seconds_max - log.seconds_min;
-    
-        element.width = log.rows.length * 2;
-
-        if (element.width > 6000) element.width = 6000;
-        if (element.width < 800) element.width = 800;
-
-        let ar = rect.height / rect.width;
-
-        //if (ar > 0.3)
-        //    ar = 0.3;
-
-        element.height = ar * element.width;
-
-        //if (element.height < 200) element.height = 200;
-        //if (element.height > 1000) element.height = 1000;
-
-        //let line_width = (element.width / rect.width) * 5 + 2;
-        let line_width = element.height / 100;
-
-        ctx.lineWidth = line_width;
-
-        let border_radius = line_width;
-
-        let width = element.width - border_radius * 2;
-        let height = element.height - border_radius * 2;
-
+        this.render_markers(p);
         //console.log(element, ctx, rect, line_width);
 
         let layers = log.blocks.toSorted(function(a,b){return a.depth < b.depth});
 
         //console.log(layers);
+
+        let ctx = p.context, border_radius = p.border_radius, height = p.height, width = p.width, delta_time = p.delta_time;
 
         for (let i = 0; i < layers.length; i++) {
             let block = layers[i];
