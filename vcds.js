@@ -180,6 +180,11 @@ class Parameters {
         this.element = element;
 
         this.delta_time = log.seconds_max - log.seconds_min;
+
+        this.x_start = 0;
+        this.x_end = 1;
+        this.y_start = 0;
+        this.y_end = 1;
     }
 
     moveTo(relative) {
@@ -203,7 +208,17 @@ class Parameters {
 
     }
 
-    get_position_absolute(pos) {
+    get_shifted_relative(pos) {
+        let sx = this.x_end - this.x_start;
+        let sy = this.y_end - this.y_start;
+        return {
+            x:(pos.x - this.x_start) / sx,
+            y:(pos.y - this.y_start) / sy,
+        };
+    }
+
+    get_position_absolute(position) {
+        let pos = this.get_shifted_relative(position);
         return {
             x: pos.x * this.width + this.border_radius,
             y: this.height - (pos.y * this.height - this.border_radius),
@@ -216,6 +231,55 @@ class Parameters {
     }
 };
 
+function get_element_position(element) {
+    let rect = element.getBoundingClientRect();
+    return {
+        x: rect.left + window.scrollX,
+        y: rect.top + window.scrollY,
+        width: rect.width,
+        height: rect.height,
+        size:rect,
+    };
+}
+
+function is_bound(position, size={x:0,y:0,width:1,height:1}) {
+    return (
+        position.x >= size.x && position.x <= (size.x + size.width) &&
+        position.y >= size.y && position.y <= (size.y + size.height)
+    );
+}
+
+function is_position_of_element(position, element) {
+    let e_pos = get_element_position(element);
+    return is_bound(position, e_pos);
+}
+
+function get_position_relative_to_element(position, element) {
+    let e_pos = get_element_position(element);
+    let x = position.x - e_pos.x;
+    let y = position.y - e_pos.y;
+    return {x:x/e_pos.width,y:y/e_pos.height};
+}
+
+function get_element_relative_to_element(inner, outer) {
+    let inner_pos = get_element_position(inner);
+    let outer_pos = get_element_position(outer);
+    let ir = inner_pos.x + inner_pos.width;
+    let ib = inner_pos.y + inner_pos.height;
+    let or = outer_pos.x + outer_pos.width;
+    let ob = outer_pos.y + outer_pos.height;
+    return {
+        x1:(inner_pos.x - outer_pos.x) / outer_pos.width,
+        y1:(inner_pos.y - outer_pos.y) / outer_pos.height,
+        x2:ir/or,
+        y2:ib/ob,
+        inner,
+        outer,
+        inner_pos,
+        outer_pos,
+    };
+}
+
 class VCDS {
     get_element(name) {
         return document.getElementById(name);
@@ -223,15 +287,79 @@ class VCDS {
 
     events = [
         ['log_load', 'input', this.log_load_input],
+        ['log_body', 'mousemove', this.mouse_input],
+        ['log_body', 'mousedown', this.mouse_input],
+        ['log_body', 'mouseup', this.mouse_input],
     ];
 
-    logs = {};
+    logs = [];
 
     constructor() {
         this.events.forEach(function(event) {
             this.get_element(event[0]).addEventListener(event[1], event[2].bind(this));
         }.bind(this));
         this.log_load_input();
+    }
+
+    held = false;
+    current_canvas = undefined;
+    current_log = undefined;
+    canvas_overlay = undefined;
+    mouse_start = undefined;
+
+    mouse_input(event) {
+        if (event.type == "mousedown") {
+            let e = this.logs.find(log => is_position_of_element(event, log.parameters.element));
+            if (!e)
+                return;
+            this.current_log = e;
+            let cc = this.current_canvas = e.parameters.element;
+            this.mouse_start = get_position_relative_to_element(event, this.current_canvas);
+            let size = get_element_position(cc);
+            let co = this.canvas_overlay = document.createElement('div');
+            document.body.insertAdjacentElement('beforeend', this.canvas_overlay);
+            co.id = "canvas_overlay"
+            co.style.minWidth = "0px";
+            co.style.minHeight = `${size.height}px`;
+            co.style.top = `${size.y}px`;
+            co.style.left = `${event.clientX}px`;
+
+            this.held = true;
+            return;
+        }
+        //console.log(this.current_canvas, this.canvas_overlay, this.mouse_start);
+        if (!this.current_canvas || !this.canvas_overlay) {
+            this.held = false;
+            return;
+        }
+        let co = this.canvas_overlay, cc = this.current_canvas, ms = this.mouse_start, cl = this.current_log;
+        let mp = get_position_relative_to_element(event, cc);
+        if (event.type == "mouseup") {
+            let rel = get_element_relative_to_element(co, cc);
+            cl.x_start = rel.x1;
+            cl.x_end = rel.x2;
+            console.log(rel, cl);
+            this.render_log(cl.parameters);
+            this.held = false;
+            document.body.removeChild(co);
+            this.canvas_overlay = undefined;
+            this.mouse_start = undefined;
+            this.current_canvas = undefined;
+            this.current_log = undefined;
+        }
+        if (!this.held)
+            return;
+        if (event.type == "mousemove") {
+            let x = ms.x;
+            let ml = ms, mr = mp;
+            if (ml.x > mr.x)
+                [ml, mr] = [mr, ml];
+            let l = ml.x * cc.clientWidth + cc.clientLeft;
+            let w = (mr.x - ml.x) * cc.clientWidth;
+            co.style.left = `${l}px`;
+            co.style.minWidth = `${w}px`;
+            //console.log(l, w, ml, mr, co);
+        }
     }
 
     render_markers(p) {
@@ -245,9 +373,10 @@ class VCDS {
         }.bind(this));
     }
 
-    render_log(log, element) {
-        let p = new Parameters(log, element);
+    render_log(p) {
+        let ctx = p.context, border_radius = p.border_radius, height = p.height, width = p.width, delta_time = p.delta_time, log=p.log, element=p.element;
 
+        ctx.clearRect(0, 0, ctx.width, ctx.height);
         this.render_markers(p);
         //console.log(element, ctx, rect, line_width);
 
@@ -255,7 +384,6 @@ class VCDS {
 
         //console.log(layers);
 
-        let ctx = p.context, border_radius = p.border_radius, height = p.height, width = p.width, delta_time = p.delta_time;
 
         for (let i = 0; i < layers.length; i++) {
             let block = layers[i];
@@ -297,7 +425,8 @@ class VCDS {
     }
 
     add_log(log) {
-        this.logs[log.name] = log;
+        let log_entry = {log};
+        this.logs.push(log_entry);
 
         let body = this.get_element('log_body');
 
@@ -353,7 +482,11 @@ class VCDS {
         e.innerHTML += table;
 
         body.insertBefore(e, this.get_element('log_load_div'));
-        this.render_log(log, document.querySelector(`div#log_view_div[name='${log.name}'] canvas`));
+        
+        let canvas_element = document.querySelector(`div#log_view_div[name='${log.name}'] canvas`);
+        log_entry.parameters = new Parameters(log, canvas_element);
+
+        this.render_log(log_entry.parameters);
     }
 
     log_close_click(event) {

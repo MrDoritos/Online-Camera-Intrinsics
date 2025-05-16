@@ -87,6 +87,11 @@
     max-height: fit-content;
 }
 
+#canvas_overlay {
+    background-color: rgba(64,64,255,0.1);
+    position: absolute;
+}
+
 #log_view_canvas {
     height: 100%;
     width: 100%;
