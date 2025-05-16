@@ -144,6 +144,7 @@ class Log {
                 if (db.value > block.max)
                     block.max = db.value;
                 block.range = block.max - block.min;
+                block.range_inv = 1.0 / block.range;
             }
 
             this.seconds_max = row.seconds;
@@ -180,6 +181,7 @@ class Parameters {
         this.element = element;
 
         this.delta_time = log.seconds_max - log.seconds_min;
+        this.delta_time_inv = 1.0 / this.delta_time;
 
         this.x_start = 0;
         this.x_end = 1;
@@ -187,20 +189,30 @@ class Parameters {
         this.y_end = 1;
     }
 
+    is_bound_absolute(pos) {
+        //return (pos.x > -1 && pos.y > -1 && pos.x < this.width && pos.y < this.height);
+        //return (pos.x > -1 && pos.x < this.width);
+        return true;
+    }
+
     moveTo(relative) {
         let pos = this.get_position_absolute(relative);
+        if (!this.is_bound_absolute(pos))
+            return;
         this.context.moveTo(pos.x, pos.y);
     }
 
     lineTo(relative) {
         let pos = this.get_position_absolute(relative);
+        if (!this.is_bound_absolute(pos))
+            return;
         this.context.lineTo(pos.x, pos.y);
     }
 
     get_column_relative(block, column) {
         return {
-            x: (column.seconds - this.log.seconds_min) / this.log.seconds_range,
-            y: (column.value - block.min) / block.range,
+            x: (column.seconds - this.log.seconds_min) * this.delta_time_inv,
+            y: (column.value - block.min) * block.range_inv,
         };
     }
 
@@ -290,6 +302,7 @@ class VCDS {
         ['log_body', 'mousemove', this.mouse_input],
         ['log_body', 'mousedown', this.mouse_input],
         ['log_body', 'mouseup', this.mouse_input],
+        ['log_body', 'dblclick', this.mouse_input],
     ];
 
     logs = [];
@@ -307,9 +320,38 @@ class VCDS {
     canvas_overlay = undefined;
     mouse_start = undefined;
 
+    clear_overlay() {
+        this.held = false;
+        let e = document.getElementById('canvas_overlay');
+        if (e)
+            document.body.removeChild(e);
+        this.current_canvas = undefined;
+        this.current_log = undefined;
+        this.canvas_overlay = undefined;
+        this.mouse_start = undefined;
+    }
+
+    get_hovering_log(event) {
+        return this.logs.find(log => is_position_of_element(event, log.parameters.element));
+    }
+
     mouse_input(event) {
+        if (event.type == "dblclick") {
+            let e = this.get_hovering_log(event);
+            if (e) {
+                let cl = e.parameters;
+                cl.x_start = 0;
+                cl.y_start = 0;
+                cl.x_end = 1;
+                cl.y_end = 1;
+                this.held = false;
+                this.render_log(cl);
+                this.clear_overlay();
+            }
+            return;
+        }
         if (event.type == "mousedown") {
-            let e = this.logs.find(log => is_position_of_element(event, log.parameters.element));
+            let e = this.get_hovering_log(event);
             if (!e)
                 return;
             this.current_log = e;
@@ -327,7 +369,6 @@ class VCDS {
             this.held = true;
             return;
         }
-        //console.log(this.current_canvas, this.canvas_overlay, this.mouse_start);
         if (!this.current_canvas || !this.canvas_overlay) {
             this.held = false;
             return;
@@ -336,16 +377,20 @@ class VCDS {
         let mp = get_position_relative_to_element(event, cc);
         if (event.type == "mouseup") {
             let rel = get_element_relative_to_element(co, cc);
-            cl.x_start = rel.x1;
-            cl.x_end = rel.x2;
-            console.log(rel, cl);
+            let p = cl.parameters;
+            let x_src_diff = rel.x2 - rel.x1;
+            let x_start = p.x_start;
+            let x_end = p.x_end;
+            let x_diff = x_end - x_start;
+            //let x1 = p.get_shifted_relative({x:rel.x1+p.x_end,y:0}).x;
+            //let x2 = p.get_shifted_relative({x:rel.x2+p.x_end,y:0}).x;
+            x_start = x_diff * rel.x1 + x_start;
+            x_end = x_diff * x_src_diff + x_start;
+            console.log(rel, p, x_start, x_end, x_diff, p.x_start, p.x_end);
+            p.x_start = x_start;
+            p.x_end = x_end;
             this.render_log(cl.parameters);
-            this.held = false;
-            document.body.removeChild(co);
-            this.canvas_overlay = undefined;
-            this.mouse_start = undefined;
-            this.current_canvas = undefined;
-            this.current_log = undefined;
+            this.clear_overlay();
         }
         if (!this.held)
             return;
@@ -358,7 +403,6 @@ class VCDS {
             let w = (mr.x - ml.x) * cc.clientWidth;
             co.style.left = `${l}px`;
             co.style.minWidth = `${w}px`;
-            //console.log(l, w, ml, mr, co);
         }
     }
 
@@ -376,7 +420,7 @@ class VCDS {
     render_log(p) {
         let ctx = p.context, border_radius = p.border_radius, height = p.height, width = p.width, delta_time = p.delta_time, log=p.log, element=p.element;
 
-        ctx.clearRect(0, 0, ctx.width, ctx.height);
+        ctx.clearRect(0, 0, p.width, p.height);
         this.render_markers(p);
         //console.log(element, ctx, rect, line_width);
 
@@ -399,20 +443,29 @@ class VCDS {
 
             ctx.beginPath();
 
-            ctx.moveTo(x - border_radius, height - (((log.rows[0].columns[block.stub].value - block.min) / delta_value) * height - border_radius));
+            //ctx.moveTo(x - border_radius, height - (((log.rows[0].columns[block.stub].value - block.min) / delta_value) * height - border_radius));
+
+            let rel = p.get_column_relative(block, p.log.rows[0].columns[block.stub]);
+            rel.x = -0.01;
+            p.moveTo(rel);
 
             log.rows.forEach(function(row) {
                 let column = row.columns[block.stub];
 
-                x = (column.seconds - log.seconds_min) / delta_time;
-                y = (column.value - block.min) / delta_value;
+                //x = (column.seconds - log.seconds_min) / delta_time;
+                //y = (column.value - block.min) / delta_value;
 
-                ctx.lineTo(x * width + border_radius, height - (y * height - border_radius));
+                //ctx.lineTo(x * width + border_radius, height - (y * height - border_radius));
+
+                p.lineTo(p.get_column_relative(block, column));
 
                 //ctx.closePath();
             }.bind(this));
 
-            ctx.lineTo(width + border_radius * 2, height - (y * height - border_radius));
+            rel = p.get_column_relative(block, p.log.rows.at(-1).columns[block.stub]);
+            rel.x = 1.01;
+            p.lineTo(rel);
+            //ctx.lineTo(width + border_radius * 2, height - (y * height - border_radius));
 
             ctx.stroke();
         }
