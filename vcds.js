@@ -1,5 +1,5 @@
 function uuidv4() {
-    return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+    return "10000000100040008000100000000000".replace(/[018]/g, c =>
       (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
     );
 }  
@@ -117,6 +117,8 @@ class Log {
 
             block.min = 0;
             block.max = 0;
+            block.min_time = 0;
+            block.max_time = 0;
             block.color = this.colors[j];
 
             stubs.push(block.stub);
@@ -143,10 +145,14 @@ class Log {
                 db.value = Number(d[i]);
                 db.seconds = Number(d[i-1]);
 
-                if (db.value < block.min)
+                if (db.value < block.min) {
                     block.min = db.value;
-                if (db.value > block.max)
+                    block.min_time = db.seconds;
+                }
+                if (db.value > block.max) {
                     block.max = db.value;
+                    block.max_time = db.seconds;
+                }
                 block.range = block.max - block.min;
                 block.range_inv = 1.0 / block.range;
             }
@@ -387,16 +393,15 @@ class VCDS {
             let rel = get_element_relative_to_element(co, cc);
             let p = cl.parameters;
             let x_src_diff = rel.x2 - rel.x1;
-            let x_start = p.x_start;
-            let x_end = p.x_end;
-            let x_diff = x_end - x_start;
-            //let x1 = p.get_shifted_relative({x:rel.x1+p.x_end,y:0}).x;
-            //let x2 = p.get_shifted_relative({x:rel.x2+p.x_end,y:0}).x;
-            x_start = x_diff * rel.x1 + x_start;
-            x_end = x_diff * x_src_diff + x_start;
-            //console.log(rel, p, x_start, x_end, x_diff, p.x_start, p.x_end);
-            p.x_start = x_start;
-            p.x_end = x_end;
+            if (Math.abs(x_src_diff) > 0.01) {
+                let x_start = p.x_start;
+                let x_end = p.x_end;
+                let x_diff = x_end - x_start;
+                x_start = x_diff * rel.x1 + x_start;
+                x_end = x_diff * x_src_diff + x_start;
+                p.x_start = x_start;
+                p.x_end = x_end;
+            }
             this.render_log(cl.parameters);
             this.clear_overlay();
         }
@@ -409,8 +414,11 @@ class VCDS {
                 [ml, mr] = [mr, ml];
             let l = ml.x * cc.clientWidth + cc.clientLeft;
             let w = (mr.x - ml.x) * cc.clientWidth;
-            co.style.left = `${l}px`;
-            co.style.minWidth = `${w}px`;
+            //console.log(l+w, cc.clientLeft+cc.clientWidth, l, cc.clientLeft);
+            if (l + w < cc.clientLeft+cc.clientWidth && l > cc.clientLeft) {
+                co.style.left = `${l}px`;
+                co.style.minWidth = `${w}px`;
+            }
         }
     }
 
@@ -486,6 +494,34 @@ class VCDS {
         }.bind(this));
     }
 
+    get_log_block_identifier(p, block) {
+        return `B${p.log.name}${block.stub}`;
+    }
+
+    get_log_button_html(p) {
+        let str = "";
+
+        let get_style = function(block) {
+            return `style="background-color:${block.color}"`;
+        }.bind(this);
+
+        str += "<div id='log_view_buttons_div'>";
+        {
+            p.log.blocks.forEach(function(block) {
+                let iden = this.get_log_block_identifier(p, block);
+                this.set_css_style(`.${iden}`, 'background-color', block.color);
+                str += `<div class="${iden}">`;
+                str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked />`;
+                str += `<p id="inline">${block.name}</p>`;
+                str += `<p>${block.min} - ${block.max} (${block.range}) ${block.min_time} - ${block.max_time}</p>`;
+                str += `</div>`;
+            }.bind(this));
+        }
+        str += "</div>";
+
+        return str;
+    }
+
     add_log(log) {
         let log_entry = {log};
         this.logs.push(log_entry);
@@ -500,16 +536,7 @@ class VCDS {
 
         let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
         canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
-        canvas_div += "<div id='log_view_buttons_div'>";
-        {
-            log.blocks.forEach(function(block) {
-                canvas_div += `<div>`;
-                canvas_div += `<input class="${block.stub}" name="${log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked />`;
-                canvas_div += `<p style="background-color:${block.color}">${block.name}</p>`;
-                canvas_div += `</div>`;
-            }.bind(this));
-        }
-        canvas_div += "</div>";
+        canvas_div += this.get_log_button_html(log_entry);
         canvas_div += "</div>";
 
         let table = canvas_div + "<div id='log_view_container_div'><table>";
@@ -575,11 +602,16 @@ class VCDS {
         return css_rule.style[field];
     }
 
+    add_css_rule(rule) {
+        let sheet = document.styleSheets[0];
+        return sheet.cssRules[sheet.insertRule(`${rule}{}`)].style;
+    }
+
     set_css_style(rule, field, value) {
         let style = this.get_css_rule(rule);
 
         if (!style)
-            return;
+            style = this.add_css_rule(rule);
 
         style[field] = value;
     }

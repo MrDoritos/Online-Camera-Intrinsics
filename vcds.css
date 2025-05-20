@@ -98,8 +98,16 @@
     image-rendering: pixelated;
 }
 
+#log_view_buttons_div {
+    overflow-x:hidden;
+}
+
 #log_view_buttons_div div {
-    display:flex;
+    text-wrap: nowrap;
+}
+
+#log_view_buttons_div #inline {
+    display:inline-block;
 }
 
 #log_view_buttons_div div > * {
