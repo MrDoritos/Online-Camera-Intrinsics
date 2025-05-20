@@ -256,12 +256,20 @@ class Parameters {
         return this.get_position_absolute(rel);
     }
 
+    get_log_view_selector() {
+        return `div#log_view_div[name='${this.log.name}']`;
+    }
+
     get_log_view_div() {
-        return document.querySelector(`div#log_view_div[name='${this.log.name}']`);
+        return document.querySelector(this.get_log_view_selector());
+    }
+
+    get_log_engine_div() {
+        return document.querySelector(this.get_log_view_selector() + " #log_view_engine");
     }
 
     get_log_canvas() {
-        return document.querySelector(`div#log_view_div[name='${this.log.name}'] canvas`);
+        return document.querySelector(this.get_log_view_selector() + " canvas");
     }
 };
 
@@ -337,6 +345,10 @@ class Engine {
         }[prop];
     }
 
+    get_cylinder_volume() {
+        return this.stroke * Math.PI * Math.pow(this.bore / 2, 2) * 0.001;
+    }
+
     get_engine_string() {
         let strs = [];
         if (this.family)
@@ -400,7 +412,7 @@ class VCDS {
         }
 
         define_engine.style.display = "none";
-        engine_info.style.display = "flex";
+        engine_info.style.display = "block";
         engine_data_opts.style.display = "flex";
 
         let str = "";
@@ -412,7 +424,16 @@ class VCDS {
             str += div;
         }
 
-        engine_info.innerHTML = str;
+        engine_input.innerHTML = str;
+
+        this.set_engine_calculations(engine_calc, engine);
+    }
+
+    async set_engine_calculations(engine_calc_div, engine) {
+        let str = "<div id='engine_calc'>";
+        str += `<p>Cylinder Volume (ml): ${engine.get_cylinder_volume()}</p>`;
+        str += "</div>";
+        engine_calc_div.innerHTML = str;
     }
 
     set_ui() {
@@ -431,16 +452,20 @@ class VCDS {
         this.set_ui();
     }
 
+    async engine_info_modified() {
+        this.logs.forEach(p => this.set_log_engine_html(p));
+        this.set_engine_calculations(engine_calc, this.engine);
+    }
+
     async engine_info_input(event) {
-        console.log(event);
         if (!this.engine)
             return;
-        let elems = document.querySelectorAll('#engine_info input');
+        let elems = document.querySelectorAll('#engine_input input');
         elems.forEach(function (elem) {
             this.engine[elem.getAttribute('key')] = elem.value;
         }.bind(this));
-        console.log(elems);
         this.save_engine_local();
+        this.engine_info_modified();
     }
 
     async save_file(filename, data, dialog=false, mime_type="application/json") {
@@ -527,14 +552,14 @@ class VCDS {
     }
 
     get_hovering_log(event) {
-        return this.logs.find(log => is_position_of_element(event, log.parameters.element));
+        return this.logs.find(log => is_position_of_element(event, log.element));
     }
 
     mouse_input(event) {
         if (event.type == "dblclick") {
             let e = this.get_hovering_log(event);
             if (e) {
-                let cl = e.parameters;
+                let cl = e;
                 cl.x_start = 0;
                 cl.y_start = 0;
                 cl.x_end = 1;
@@ -550,7 +575,7 @@ class VCDS {
             if (!e)
                 return;
             this.current_log = e;
-            let cc = this.current_canvas = e.parameters.element;
+            let cc = this.current_canvas = e.element;
             this.mouse_start = get_position_relative_to_element(event, this.current_canvas);
             let size = get_element_position(cc);
             let co = this.canvas_overlay = document.createElement('div');
@@ -572,7 +597,7 @@ class VCDS {
         let mp = get_position_relative_to_element(event, cc);
         if (event.type == "mouseup") {
             let rel = get_element_relative_to_element(co, cc);
-            let p = cl.parameters;
+            let p = cl;
             let x_src_diff = rel.x2 - rel.x1;
             if (Math.abs(x_src_diff) > 0.01) {
                 let x_start = p.x_start;
@@ -583,7 +608,7 @@ class VCDS {
                 p.x_start = x_start;
                 p.x_end = x_end;
             }
-            this.render_log(cl.parameters);
+            this.render_log(cl);
             this.clear_overlay();
         }
         if (!this.held)
@@ -682,10 +707,6 @@ class VCDS {
     get_log_buttons_html(p) {
         let str = "";
 
-        let get_style = function(block) {
-            return `style="background-color:${block.color}"`;
-        }.bind(this);
-
         str += "<div id='log_view_buttons_div'>";
         {
             p.log.blocks.forEach(function(block) {
@@ -740,17 +761,39 @@ class VCDS {
         return str;
     }
 
+    get_log_engine_html(p, engine) {
+        if (!engine)
+            return '';
+        let str = '';
+        str += `<p>${engine.name}</p>`;
+        return str;
+    }
+
+    get_log_engine_div_html(p, engine) {
+        let str = `<div id='log_view_engine'>`;
+        str += this.get_log_engine_html(p, engine);
+        str += '</div>';
+        return str;
+    }
+
+    async set_log_engine_html(p, engine) {
+        let e = p.get_log_engine_div();
+
+        e.innerHTML = this.get_log_engine_html(p, engine);
+        e.style.display = this.engine ? '' : 'display:none';
+    }
+
     set_log(p) {
         let div = p.get_log_view_div();
+
+        this.set_log_engine_html(p);
     }
 
     add_log(log) {
-        let log_entry = {log};
-        this.logs.push(log_entry);
-
         let body = this.get_element('log_body');
-
         let e = document.createElement('div');
+        let p = {log};
+
         e.setAttribute('id', 'log_view_div');
         e.setAttribute('name', log.name);
 
@@ -758,21 +801,24 @@ class VCDS {
 
         let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
         canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
-        canvas_div += this.get_log_buttons_html(log_entry);
+        canvas_div += this.get_log_buttons_html(p);
         canvas_div += "</div>";
 
-        e.innerHTML += this.get_log_header_html(log_entry);
+        e.innerHTML += this.get_log_header_html(p);
         e.innerHTML += canvas_div;
-        e.innerHTML += this.get_log_table_html(log_entry);
+        e.innerHTML += this.get_log_table_html(p);
+        e.innerHTML += this.get_log_engine_div_html(p);
 
         body.insertBefore(e, this.get_element('log_load_div'));
         
         let canvas_element = document.querySelector(`div#log_view_div[name='${log.name}'] canvas`);
-        log_entry = new Parameters(log, canvas_element);
 
-        this.set_log(log_entry);
+        let params = new Parameters(log, canvas_element);
+        this.logs.push(params);
 
-        this.render_log(log_entry.parameters);
+        this.set_log(params);
+
+        this.render_log(params);
     }
 
     log_close_click(event) {
@@ -836,10 +882,16 @@ class VCDS {
         }
     }
 
-    get_log(event) {
+    get_parameters(event) {
         if (!event.name)
             return;
         return this.logs.find(log => event.name == log.log.name);
+    }
+
+    get_log(event) {
+        if (!event.name)
+            return;
+        return this.get_parameters(event).log;
     }
 
     get_block_stub(event) {
@@ -847,13 +899,13 @@ class VCDS {
     }
 
     log_block_toggle_click(event) {
-        let log = this.get_log(event);
+        let log = this.get_parameters(event);
         console.log(log);
         let block = log.log.get_block(event.className);
         if (!block)
             return;
         block.visible = !block.visible;
-        this.render_log(log.parameters);
+        this.render_log(log);
     }
 
     log_load_input(event) {
