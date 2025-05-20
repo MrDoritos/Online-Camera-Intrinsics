@@ -110,6 +110,19 @@
     display:inline-block;
 }
 
+.input_bypass {
+    display: none;
+}
+
+#engine_opts {
+    display: flex;
+}
+
+#engine_info {
+    flex-wrap:wrap;
+    max-width:100%;
+}
+
 #log_view_buttons_div div > * {
     margin: 0;
 }

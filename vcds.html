@@ -5,8 +5,18 @@
     </head>
     <body id="log_body">
         <div id="log_load_div">
-            <p>Load Log</p>
-            <input id="log_load" type="file" accept="text/csv, *" />
+            <input class="input_bypass" id="log_load" type="file" accept="text/csv, *" />
+            <button onclick="log_load.click()">Load Log</button>
+            <div id="engine_opts">
+                <button id="define_engine">Define Engine</button>
+                <button onclick="load_engine.click()">Load Engine</button>
+                <input class="input_bypass" id="load_engine" type="file" accept="application/json, *" />
+                <div id="engine_data_opts">
+                    <button id="save_engine">Save Engine</button>
+                    <button id="clear_engine">Clear Engine</button>
+                </div>
+            </div>
+            <div id="engine_info"></div>
         </div>
     </body>
     <script src="vcds.js"></script>

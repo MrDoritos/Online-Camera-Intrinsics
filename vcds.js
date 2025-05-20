@@ -255,6 +255,14 @@ class Parameters {
         let rel = this.get_column_relative(block, column);
         return this.get_position_absolute(rel);
     }
+
+    get_log_view_div() {
+        return document.querySelector(`div#log_view_div[name='${this.log.name}']`);
+    }
+
+    get_log_canvas() {
+        return document.querySelector(`div#log_view_div[name='${this.log.name}'] canvas`);
+    }
 };
 
 function get_element_position(element) {
@@ -306,6 +314,43 @@ function get_element_relative_to_element(inner, outer) {
     };
 }
 
+class Engine {
+    name="2.0T FSI";
+    code="BPY";
+    family="EA113";
+    cylinder_count=4;
+    displacement=1984;
+    bore=82.5;
+    stroke=92.8;
+    compression_ratio=10.5;
+
+    get_property_string(prop) {
+        return {
+            name:"Name",
+            code:"Code",
+            family:"Family",
+            cylinder_count:"Cylinder Count",
+            displacement:"Displacement (ml)",
+            bore:"Bore (mm)",
+            stroke:"Stroke (mm)",
+            compression_ratio:"Compression Ratio",
+        }[prop];
+    }
+
+    get_engine_string() {
+        let strs = [];
+        if (this.family)
+            strs.push(this.family);
+        if (this.code)
+            strs.push(this.code);
+        if (this.name)
+            strs.push(this.name);
+        if (!strs.length)
+            return "Untitled Engine";
+        return strs.join(' ');
+    }
+};
+
 class VCDS {
     get_element(name) {
         return document.getElementById(name);
@@ -313,6 +358,11 @@ class VCDS {
 
     events = [
         ['log_load', 'input', this.log_load_input],
+        ['define_engine', 'click', this.define_engine_input],
+        ['clear_engine', 'click', this.clear_engine_input],
+        ['save_engine', 'click', this.save_engine_input],
+        ['load_engine', 'input', this.load_engine_input],
+        ['engine_info', 'input', this.engine_info_input],
         ['log_body', 'mousemove', this.mouse_input],
         ['log_body', 'mousedown', this.mouse_input],
         ['log_body', 'mouseup', this.mouse_input],
@@ -320,12 +370,15 @@ class VCDS {
     ];
 
     logs = [];
+    engine = undefined;
 
     constructor() {
         this.events.forEach(function(event) {
             this.get_element(event[0]).addEventListener(event[1], event[2].bind(this));
         }.bind(this));
         this.log_load_input();
+        this.load_engine_local();
+        this.set_ui();
     }
 
     held = false;
@@ -333,6 +386,134 @@ class VCDS {
     current_log = undefined;
     canvas_overlay = undefined;
     mouse_start = undefined;
+
+    set_engine_info(engine) {
+        //let de = document.getElementById('define_engine');
+        //let ei = document.getElementById('engine_info');
+        if (!engine) {
+            //document.getElementById('define_engine').style.display = "block";
+            //doc
+            define_engine.style.display = "block";
+            engine_info.style.display = "none";
+            engine_data_opts.style.display = "none";
+            return;
+        }
+
+        define_engine.style.display = "none";
+        engine_info.style.display = "flex";
+        engine_data_opts.style.display = "flex";
+
+        let str = "";
+
+        for (const [key, value] of Object.entries(engine)) {
+            let div = "<div>";
+            div += `<p>${engine.get_property_string(key)}</p><input type="text" key="${key}" value="${value}" />`;
+            div += "</div>";
+            str += div;
+        }
+
+        engine_info.innerHTML = str;
+    }
+
+    set_ui() {
+        this.set_engine_info(this.engine);
+    }
+
+    async define_engine_input(event) {
+        this.engine = new Engine();
+        this.save_engine_local();
+        this.set_ui();
+    }
+
+    async clear_engine_input(event) {
+        this.engine = undefined;
+        this.save_engine_local();
+        this.set_ui();
+    }
+
+    async engine_info_input(event) {
+        console.log(event);
+        if (!this.engine)
+            return;
+        let elems = document.querySelectorAll('#engine_info input');
+        elems.forEach(function (elem) {
+            this.engine[elem.getAttribute('key')] = elem.value;
+        }.bind(this));
+        console.log(elems);
+        this.save_engine_local();
+    }
+
+    async save_file(filename, data, dialog=false, mime_type="application/json") {
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:mime_type});
+        const elem = window.document.createElement('a');
+        elem.href = window.URL.createObjectURL(blob);
+        elem.download = filename;
+        if (dialog) {
+            window.open(elem.href);
+        } else {
+            document.body.appendChild(elem);
+            elem.click();
+            document.body.removeChild(elem);
+        }
+
+    }
+
+    async load_object(event, proto) {
+        let e = event.target;
+
+        if (!e || !e.files || !e.files.length)
+            return;
+
+        let form = e.files[0];
+        let reader = new FileReader();
+        let obj = undefined;
+
+        reader.onload = function(e) {
+            obj = Object.assign(proto, JSON.parse(reader.result));
+        };
+
+        reader.readAsText(form);
+
+        return obj;
+    }
+
+    async save_local(prop, obj) {
+        if (obj)
+            localStorage.setItem(prop, JSON.stringify(obj));
+        else
+            localStorage.setItem(prop, null);
+    }
+
+    load_local(prop, proto) {
+        const data = localStorage.getItem(prop);
+
+        if (!data)
+            return new proto.constructor();
+
+        let obj = Object.assign(proto, JSON.parse(data));
+
+        return obj;
+    }
+
+    async save_engine_input(event) {
+        if (!this.engine)
+            return;
+        this.save_file(`${this.engine.get_engine_string()}.json`, this.engine);
+    }
+
+    async load_engine_input(event) {
+        this.engine = await this.load_object(event, Engine.prototype);
+        this.save_engine_local();
+        this.set_ui();
+    }
+
+    load_engine_local() {
+        this.engine = this.load_local('engine', Engine.prototype);
+    }
+
+    async save_engine_local() {
+        this.save_local('engine', this.engine);
+    }
 
     clear_overlay() {
         this.held = false;
@@ -498,7 +679,7 @@ class VCDS {
         return `B${p.log.name}${block.stub}`;
     }
 
-    get_log_button_html(p) {
+    get_log_buttons_html(p) {
         let str = "";
 
         let get_style = function(block) {
@@ -522,24 +703,9 @@ class VCDS {
         return str;
     }
 
-    add_log(log) {
-        let log_entry = {log};
-        this.logs.push(log_entry);
-
-        let body = this.get_element('log_body');
-
-        let e = document.createElement('div');
-        e.setAttribute('id', 'log_view_div');
-        e.setAttribute('name', log.name);
-
-        e.innerHTML = "";
-
-        let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
-        canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
-        canvas_div += this.get_log_button_html(log_entry);
-        canvas_div += "</div>";
-
-        let table = canvas_div + "<div id='log_view_container_div'><table>";
+    get_log_table_html(p) {
+        let log = p.log;
+        let table = "<div id='log_view_container_div'><table>";
         {
             table += "<tr><th><div id='vertical'><p>Seconds</p></div></th>";
             log.blocks.forEach(function(block) {
@@ -561,19 +727,50 @@ class VCDS {
         }
         table += "</table></div>";
 
+        return table;
+    }
+
+    get_log_header_html(p) {
+        let log = p.log;
         let str = `<div id='log_view_header_div'>`;
         str += `<a id='log_toggle' name='${log.name}' onclick='vcds.log_toggle_click(this)'>-</a>`;
         str += `<p>${log.filename}</p>`;
         str += `<a id='log_close' name='${log.name}' onclick='vcds.log_close_click(this)'>X</a>`;
         str += `</div>`;
+        return str;
+    }
 
-        e.innerHTML += str;
-        e.innerHTML += table;
+    set_log(p) {
+        let div = p.get_log_view_div();
+    }
+
+    add_log(log) {
+        let log_entry = {log};
+        this.logs.push(log_entry);
+
+        let body = this.get_element('log_body');
+
+        let e = document.createElement('div');
+        e.setAttribute('id', 'log_view_div');
+        e.setAttribute('name', log.name);
+
+        e.innerHTML = "";
+
+        let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
+        canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
+        canvas_div += this.get_log_buttons_html(log_entry);
+        canvas_div += "</div>";
+
+        e.innerHTML += this.get_log_header_html(log_entry);
+        e.innerHTML += canvas_div;
+        e.innerHTML += this.get_log_table_html(log_entry);
 
         body.insertBefore(e, this.get_element('log_load_div'));
         
         let canvas_element = document.querySelector(`div#log_view_div[name='${log.name}'] canvas`);
-        log_entry.parameters = new Parameters(log, canvas_element);
+        log_entry = new Parameters(log, canvas_element);
+
+        this.set_log(log_entry);
 
         this.render_log(log_entry.parameters);
     }
