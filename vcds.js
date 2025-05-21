@@ -65,6 +65,11 @@ class Log {
         return this.blocks.find(block => block.stub == stub);
     }
 
+    get_blocks_by_depth() {
+        return this.blocks.toSorted((a,b) => a.depth < b.depth);
+    }
+
+
     parse() {
         let rs = this.csv.rows;
         let r = rs[0];
@@ -197,12 +202,28 @@ class Parameters {
         this.x_end = 1;
         this.y_start = 0;
         this.y_end = 1;
+
+        this.modified = true;
     }
 
     is_bound_absolute(pos) {
         //return (pos.x > -1 && pos.y > -1 && pos.x < this.width && pos.y < this.height);
         //return (pos.x > -1 && pos.x < this.width);
         return true;
+    }
+
+    get_view_boundary() {
+        return {x1:this.x_start,x2:this.x_end,y1:this.y_start,y2:this.y_end};
+    }
+
+    set_view_boundary(size) {
+        let vb = this.get_view_boundary();
+        this.modified |= (
+            vb.x1 != size.x1 || 
+            vb.x2 != size.x2 || 
+            vb.y1 != size.y1 ||
+            vb.y2 != size.y2
+        );
     }
 
     moveTo(relative) {
@@ -270,6 +291,54 @@ class Parameters {
 
     get_log_canvas() {
         return document.querySelector(this.get_log_view_selector() + " canvas");
+    }
+
+    get_log_table() {
+        return document.querySelector(this.get_log_view_selector() + " table");
+    }
+
+    render_canvas() {
+        let layers = this.log.get_blocks_by_depth();
+
+        layers.forEach(function(block) {
+            if (!block.visible)
+                return;
+
+            this.context.strokeStyle = block.color;
+
+            let rel = this.get_column_relative(block, this.log.rows[0].columns[block.stub]);
+            rel.x = -0.01;
+            this.moveTo(rel);
+
+            this.log.rows.forEach(function(row) {
+                this.lineTo(this.get_column_relative(block, row.columns[block.stub]));
+            }.bind(this));
+
+            rel = this.get_column_relative(block, this.log.rows.at(-1).columns[block.stub]);
+            rel.x = 1.01;
+            this.lineTo(rel);
+
+            this.context.stroke();
+        }.bind(this));
+    }
+
+    render_markers() {
+        this.context.strokeStyle = "black";
+        this.log.markers.forEach(function(marker) {
+            this.context.beginPath();
+            this.moveTo({x:marker.seconds/this.delta_time,y:1});
+            this.lineTo({x:marker.seconds/this.delta_time,y:0});
+            this.context.stroke();
+        }.bind(this));
+    }
+
+    render() {
+        if (!this.modified)
+            return;
+
+        this.clear();
+        this.render_markers();
+        this.render_canvas();
     }
 };
 
@@ -605,8 +674,7 @@ class VCDS {
                 let x_diff = x_end - x_start;
                 x_start = x_diff * rel.x1 + x_start;
                 x_end = x_diff * x_src_diff + x_start;
-                p.x_start = x_start;
-                p.x_end = x_end;
+                p.set_view_boundary({x1:x_start,x2:x_end,y1:p.y_start,y2:p.y_end});
             }
             this.render_log(cl);
             this.clear_overlay();
@@ -628,76 +696,8 @@ class VCDS {
         }
     }
 
-    render_markers(p) {
-        let ctx = p.context;
-        ctx.strokeStyle = "black";
-        p.log.markers.forEach(function(marker) {
-            ctx.beginPath();
-            p.moveTo({x:marker.seconds/p.delta_time,y:1});
-            p.lineTo({x:marker.seconds/p.delta_time,y:0});
-            ctx.stroke();
-        }.bind(this));
-    }
-
     render_log(p) {
-        let ctx = p.context, border_radius = p.border_radius, height = p.height, width = p.width, delta_time = p.delta_time, log=p.log, element=p.element;
-
-        //ctx.clearRect(0, 0, p.width, p.height);
-        p.clear();
-        this.render_markers(p);
-        //console.log(element, ctx, rect, line_width);
-
-        let layers = log.blocks.toSorted(function(a,b){return a.depth < b.depth});
-
-        //console.log(layers);
-
-
-        for (let i = 0; i < layers.length; i++) {
-            let block = layers[i];
-
-            if (!block.visible)
-                continue;
-
-            let delta_value = block.max - block.min;
-            let x = 0;
-            let y = 0;
-
-            ctx.strokeStyle = block.color;
-
-            ctx.beginPath();
-
-            //ctx.moveTo(x - border_radius, height - (((log.rows[0].columns[block.stub].value - block.min) / delta_value) * height - border_radius));
-
-            let rel = p.get_column_relative(block, p.log.rows[0].columns[block.stub]);
-            rel.x = -0.01;
-            p.moveTo(rel);
-
-            log.rows.forEach(function(row) {
-                let column = row.columns[block.stub];
-
-                //x = (column.seconds - log.seconds_min) / delta_time;
-                //y = (column.value - block.min) / delta_value;
-
-                //ctx.lineTo(x * width + border_radius, height - (y * height - border_radius));
-
-                p.lineTo(p.get_column_relative(block, column));
-
-                //ctx.closePath();
-            }.bind(this));
-
-            rel = p.get_column_relative(block, p.log.rows.at(-1).columns[block.stub]);
-            rel.x = 1.01;
-            p.lineTo(rel);
-            //ctx.lineTo(width + border_radius * 2, height - (y * height - border_radius));
-
-            ctx.stroke();
-        }
-
-        log.rows.forEach(function(row) {
-            for (const [k, v] of Object.entries(row.columns)) {
-
-            }
-        }.bind(this));
+        p.render();
     }
 
     get_log_block_identifier(p, block) {
