@@ -181,6 +181,89 @@ class Log {
     }
 };
 
+function get_css_rule(rule) {
+    let styles = document.styleSheets[0].cssRules;
+
+    if (!styles)
+        return;
+
+    for (let i = 0; i < styles.length; i++)
+        if (styles[i].selectorText == rule)
+            return styles[i];
+}
+
+function get_css_field(rule, field) {
+    let css_rule = get_css_rule(rule);
+
+    if (!css_rule)
+        return;
+
+    return css_rule.style[field];
+}
+
+function add_css_rule(rule) {
+    let sheet = document.styleSheets[0];
+    return sheet.cssRules[sheet.insertRule(`${rule}{}`)];
+}
+
+function set_css_style(rule, field, value) {
+    let style = get_css_rule(rule);
+
+    if (!style)
+        style = add_css_rule(rule);
+
+    style.style[field] = value;
+}
+
+function get_element_position(element) {
+    let rect = element.getBoundingClientRect();
+    return {
+        x: rect.left + window.scrollX,
+        y: rect.top + window.scrollY,
+        width: rect.width,
+        height: rect.height,
+        size:rect,
+    };
+}
+
+function is_bound(position, size={x:0,y:0,width:1,height:1}) {
+    return (
+        position.x >= size.x && position.x <= (size.x + size.width) &&
+        position.y >= size.y && position.y <= (size.y + size.height)
+    );
+}
+
+function is_position_of_element(position, element) {
+    let e_pos = get_element_position(element);
+    return is_bound(position, e_pos);
+}
+
+function get_position_relative_to_element(position, element) {
+    let e_pos = get_element_position(element);
+    let x = position.x - e_pos.x;
+    let y = position.y - e_pos.y;
+    return {x:x/e_pos.width,y:y/e_pos.height};
+}
+
+function get_element_relative_to_element(inner, outer) {
+    let inner_pos = get_element_position(inner);
+    let outer_pos = get_element_position(outer);
+    let ir = inner_pos.x + inner_pos.width;
+    let ib = inner_pos.y + inner_pos.height;
+    let or = outer_pos.x + outer_pos.width;
+    let ob = outer_pos.y + outer_pos.height;
+    return {
+        x1:(inner_pos.x - outer_pos.x) / outer_pos.width,
+        y1:(inner_pos.y - outer_pos.y) / outer_pos.height,
+        x2:ir/or,
+        y2:ib/ob,
+        inner,
+        outer,
+        inner_pos,
+        outer_pos,
+    };
+}
+
 class Parameters {
     constructor(log, element) {
         this.context = element.getContext('2d');
@@ -247,15 +330,22 @@ class Parameters {
 
     get_view_seconds_range() {
         let b = this.get_view_boundary();
-        return {start:this.get_view_seconds(b.x1),end:this.get_view_seconds(b.x2)};
+        let r = {
+            start:this.get_view_seconds(b.x1),
+            end:this.get_view_seconds(b.x2),
+        };
+        r.range = Math.abs(r.start - r.end);
+        return r;
     }
 
     get_view_row_range() {
         let sr = this.get_view_seconds_range();
-        return {
+        let r = {
             start:this.log.get_row_index_by_seconds(sr.start),
-            end:this.log.get_row_index_by_seconds(sr.end)
+            end:this.log.get_row_index_by_seconds(sr.end),
         };
+        r.range = Math.abs(r.start - r.end);
+        return r;
     }
 
     get_view_rows() {
@@ -266,7 +356,6 @@ class Parameters {
     foreach_view_row(callback) {
         let rr = this.get_view_row_range();
 
-        console.log(rr);
         for (let i = rr.start; i < rr.end; i += 1) {
             callback(this.log.rows[i]);
         }
@@ -274,7 +363,36 @@ class Parameters {
 
     get_view_rows_count() {
         let rr = this.get_view_row_range();
-        return Math.abs(rr.start - rr.end);
+        return rr.range;
+    }
+
+    //TO-DO 2D search pattern, not row first
+    get_view_nearest_block(position, tolerance=1) {
+        let vr = this.get_view_seconds_range();
+        let vb = this.get_view_boundary();
+        let time = position.x * vr.range + vr.start;
+        let row_index = this.log.get_row_index_by_seconds(time);
+        let row = this.log.rows[row_index];
+
+        let nearest_column = undefined;
+        let nearest_block = undefined;
+        let nearest_value = tolerance;//(vb.x2 - vb.x1) * tolerance;
+        for (const [key, column] of Object.entries(row.columns)) {
+            let block = this.log.get_block(key);
+            let y = (column.value - block.min) * block.range_inv;
+            y = this.get_shifted_relative({x:0,y}).y;
+            let diff_y = Math.abs((1-position.y) - y);
+            if (diff_y < nearest_value) {
+                nearest_block = block;
+                nearest_column = column;
+                nearest_value = diff_y;
+            }
+        }
+
+        if (!row || !nearest_block || !nearest_column)
+            return undefined;
+
+        return {row,block:nearest_block,column:nearest_column};
     }
 
     moveTo(relative) {
@@ -360,8 +478,13 @@ class Parameters {
         return document.querySelector(this.get_log_view_selector() + " #canvas_info");
     }
 
+    get_log_canvas_all() {
+        return document.querySelector(this.get_log_view_selector() + " #log_view_canvas_all_div");
+    }
+
     render_canvas() {
         let layers = this.log.get_blocks_by_depth();
+        let rr = this.get_view_row_range();
 
         layers.forEach(function(block) {
             if (!block.visible)
@@ -370,15 +493,15 @@ class Parameters {
             this.context.strokeStyle = block.color;
 
             this.context.beginPath();
-            let rel = this.get_column_relative(block, this.log.rows[0].columns[block.stub]);
+            let rel = this.get_column_relative(block, this.log.rows[rr.start].columns[block.stub]);
             rel.x = -0.01;
             this.moveTo(rel);
 
-            this.log.rows.forEach(function(row) {
+            this.foreach_view_row(function(row) {
                 this.lineTo(this.get_column_relative(block, row.columns[block.stub]));
             }.bind(this));
 
-            rel = this.get_column_relative(block, this.log.rows.at(-1).columns[block.stub]);
+            rel = this.get_column_relative(block, this.log.rows[rr.end].columns[block.stub]);
             rel.x = 1.01;
             this.lineTo(rel);
 
@@ -390,8 +513,8 @@ class Parameters {
         this.context.strokeStyle = "black";
         this.log.markers.forEach(function(marker) {
             this.context.beginPath();
-            this.moveTo({x:marker.seconds/this.delta_time,y:1});
-            this.lineTo({x:marker.seconds/this.delta_time,y:0});
+            this.moveTo({x:marker.seconds/this.delta_time,y:1.1});
+            this.lineTo({x:marker.seconds/this.delta_time,y:-0.1});
             this.context.stroke();
         }.bind(this));
     }
@@ -415,25 +538,27 @@ class Parameters {
     }
 
     render_bars() {
-        this.context.strokeStyle = "#BBBBBB";
         let st = this.get_view_seconds_range();
 
         let ss = this.get_second_step(st);
 
-        if (!ss) { //render per sample time
+        if (ss < 60) { //render per sample time
+            this.context.strokeStyle = "#CCCCCC";
             this.foreach_view_row(function(row) {
                 this.context.beginPath();
                 let x = row.seconds / this.delta_time;
-                this.moveTo({x,y:1});
-                this.lineTo({x,y:0});
+                this.moveTo({x,y:1.1});
+                this.lineTo({x,y:-0.1});
                 this.context.stroke();
             }.bind(this));
-        } else { //render per time
+        }
+        if (ss) {
+            this.context.strokeStyle = "#BBBBBB";
             for (let t = st.start; t < st.end; t+=ss) {
                 this.context.beginPath();
                 let x = t / this.delta_time;
-                this.moveTo({x,y:1});
-                this.lineTo({x,y:0});
+                this.moveTo({x,y:1.1});
+                this.lineTo({x,y:-0.1});
                 this.context.stroke();
             }
         }
@@ -479,16 +604,31 @@ class Parameters {
         e.innerHTML = this.get_table_entries_html();
     }
 
+    set_block_color(block, color) {
+        block.color = color;
+        let iden = this.get_block_identifier(block);
+        set_css_style(`.${iden}`, 'background-color', color);
+        this.modified = true;
+    }
+
+    set_styles() {
+        this.log.blocks.forEach(function(block) {
+            this.set_block_color(block, block.color);
+        }.bind(this));
+    }
+
     set_canvas_info() {
         let e = this.get_canvas_info_div();
         
         let sr = this.get_view_seconds_range();
         let ss = this.get_second_step(sr);
+        let rc = this.get_view_rows_count();
 
         let str = '';
         str += `<p>x_div: ${ss ? ss + 's' : 'marker'}</p>`;
-        str += `<p>${sr.start.toFixed(2)}s to ${sr.end.toFixed(2)}s</p>`;
-        str += `<p>${this.get_view_rows_count()} samples</p>`;
+        str += `<p>${sr.start.toFixed(2)}s to ${sr.end.toFixed(2)}s (${sr.range.toFixed(2)}s)</p>`;
+        str += `<p>${rc} samples</p>`;
+        str += `<p>${(rc / sr.range).toFixed(1)} samples/s</p>`;
         str += `<button name="${this.log.name}" onclick="vcds.log_export_range_input(this)">Export Range</button>`;
 
         e.innerHTML = str;
@@ -515,56 +655,52 @@ class Parameters {
     export_view_range() {
         return this.export_range(this.get_view_row_range());
     }
+
+    remove_tooltip() {
+        let b = this.get_log_view_div();
+        document.querySelectorAll(this.get_log_view_selector() + " #tooltip")
+            .forEach(x=>b.removeChild(x));
+        this.tooltip_element=undefined;
+    }
+
+    create_tooltip() {
+        let b = this.get_log_view_div();
+        let tooltip = document.createElement('div');
+        b.insertAdjacentElement('beforeend', tooltip);
+        tooltip.id = "tooltip";
+        this.tooltip_element = tooltip;
+        return tooltip;
+    }
+
+    tooltip_element=undefined;
+
+    mouse_input(event) {
+        let tt = this.tooltip_element;
+
+        if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
+            if (tt) {
+                this.remove_tooltip();
+            }
+            return;
+        }
+
+        if (!tt)
+            tt = this.create_tooltip();
+
+        if (tt) {
+            let rel = get_position_relative_to_element(event, this.element);
+            tt.style.left = (event.x + 10) + "px";
+            tt.style.top = event.y + "px";
+            let block = this.get_view_nearest_block(rel, 0.05);
+            if (!block) {
+                this.remove_tooltip();
+                return;
+            }
+            tt.style.backgroundColor = block.block.color;
+            tt.innerHTML = `<p>${block.column.value}</p><p>${block.column.seconds}s</p><p>${block.block.name}</p>`;
+        }        
+    }
 };
-
-function get_element_position(element) {
-    let rect = element.getBoundingClientRect();
-    return {
-        x: rect.left + window.scrollX,
-        y: rect.top + window.scrollY,
-        width: rect.width,
-        height: rect.height,
-        size:rect,
-    };
-}
-
-function is_bound(position, size={x:0,y:0,width:1,height:1}) {
-    return (
-        position.x >= size.x && position.x <= (size.x + size.width) &&
-        position.y >= size.y && position.y <= (size.y + size.height)
-    );
-}
-
-function is_position_of_element(position, element) {
-    let e_pos = get_element_position(element);
-    return is_bound(position, e_pos);
-}
-
-function get_position_relative_to_element(position, element) {
-    let e_pos = get_element_position(element);
-    let x = position.x - e_pos.x;
-    let y = position.y - e_pos.y;
-    return {x:x/e_pos.width,y:y/e_pos.height};
-}
-
-function get_element_relative_to_element(inner, outer) {
-    let inner_pos = get_element_position(inner);
-    let outer_pos = get_element_position(outer);
-    let ir = inner_pos.x + inner_pos.width;
-    let ib = inner_pos.y + inner_pos.height;
-    let or = outer_pos.x + outer_pos.width;
-    let ob = outer_pos.y + outer_pos.height;
-    return {
-        x1:(inner_pos.x - outer_pos.x) / outer_pos.width,
-        y1:(inner_pos.y - outer_pos.y) / outer_pos.height,
-        x2:ir/or,
-        y2:ib/ob,
-        inner,
-        outer,
-        inner_pos,
-        outer_pos,
-    };
-}
 
 class Engine {
     name="2.0T FSI";
@@ -790,9 +926,10 @@ class VCDS {
 
     clear_overlay() {
         this.held = false;
-        let e = document.getElementById('canvas_overlay');
-        if (e)
-            document.body.removeChild(e);
+        //let e = document.getElementById('canvas_overlay');
+        //if (e)
+        //    document.body.removeChild(e);
+        document.querySelectorAll('#canvas_overlay').forEach(x=>document.body.removeChild(x));
         this.current_canvas = undefined;
         this.current_log = undefined;
         this.canvas_overlay = undefined;
@@ -889,7 +1026,7 @@ class VCDS {
         {
             p.log.blocks.forEach(function(block) {
                 let iden = this.get_log_block_identifier(p, block);
-                this.set_css_style(`.${iden}`, 'background-color', block.color);
+                //this.set_css_style(`.${iden}`, 'background-color', block.color);
                 str += `<div class="${iden}">`;
                 str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked />`;
                 str += `<p id="inline">${block.name}</p>`;
@@ -987,6 +1124,13 @@ class VCDS {
         params.get_log_view_container_div().innerHTML = this.get_log_table_html(params);
         //params.get_log_table_body().innerHTML = 
 
+        let lce = params.get_log_view_div();
+
+        lce.addEventListener('mouseenter', params.mouse_input.bind(params));
+        lce.addEventListener('mouseleave', params.mouse_input.bind(params));
+        lce.addEventListener('mousemove', params.mouse_input.bind(params));
+
+        params.set_styles();
         this.set_log(params);
 
         this.render_log(params);
@@ -994,40 +1138,6 @@ class VCDS {
 
     log_close_click(event) {
         this.get_element('log_body').removeChild(event.parentElement.parentElement);
-    }
-
-    get_css_rule(rule) {
-        let styles = document.styleSheets[0].cssRules;
-
-        if (!styles)
-            return;
-
-        for (let i = 0; i < styles.length; i++)
-            if (styles[i].selectorText == rule)
-                return styles[i];
-    }
-
-    get_css_field(rule, field) {
-        let css_rule = this.get_css_rule(rule);
-
-        if (!css_rule)
-            return;
-
-        return css_rule.style[field];
-    }
-
-    add_css_rule(rule) {
-        let sheet = document.styleSheets[0];
-        return sheet.cssRules[sheet.insertRule(`${rule}{}`)].style;
-    }
-
-    set_css_style(rule, field, value) {
-        let style = this.get_css_rule(rule);
-
-        if (!style)
-            style = this.add_css_rule(rule);
-
-        style[field] = value;
     }
 
     log_toggle_click(event) {
@@ -1071,16 +1181,17 @@ class VCDS {
 
     log_block_toggle_click(event) {
         let log = this.get_parameters(event);
-        console.log(log);
+        //console.log(event, log);
         let block = log.log.get_block(event.className);
         if (!block)
             return;
         block.visible = !block.visible;
+        log.modified = true;
         this.render_log(log);
     }
 
     log_load_input(event) {
-        console.log('log_load_input', this, event);
+        //console.log('log_load_input', this, event);
 
         let e = this.get_element('log_load');
 

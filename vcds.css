@@ -94,9 +94,20 @@
     background-color:gray;
 }
 
+#tooltip {
+    position:absolute;
+    border: 1px solid black;
+}
+
+#tooltip > * {
+    font-family: monospace;
+    font-size:1.3em;
+    margin:0;
+}
+
 #canvas_info > * {
-    margin:auto 0 auto 0.2em;
-    flex-grow:0.03;
+    margin:auto auto auto 0.2em;
+    #flex-grow:0.03;
     font-family: monospace;
     font-size:1.3em;
     height:fit-content;
