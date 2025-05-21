@@ -387,11 +387,51 @@ class Parameters {
         }.bind(this));
     }
 
+    get_second_step(range) {
+        let diff = Math.abs(range.start - range.end);
+
+        if (diff <= 1)
+            return 0;
+        if (diff <= 5)
+            return 1;
+        if (diff <= 60)
+            return 5;
+        if (diff <= 3600)
+            return 60;
+        return 300;
+    }
+
+    render_bars() {
+        this.context.strokeStyle = "#BBBBBB";
+        let st = this.get_view_seconds_range();
+
+        let ss = this.get_second_step(st);
+
+        if (!ss) { //render per sample time
+            this.foreach_view_row(function(row) {
+                this.context.beginPath();
+                let x = row.seconds / this.delta_time;
+                this.moveTo({x,y:1});
+                this.lineTo({x,y:0});
+                this.context.stroke();
+            }.bind(this));
+        } else { //render per time
+            for (let t = st.start; t < st.end; t+=ss) {
+                this.context.beginPath();
+                let x = t / this.delta_time;
+                this.moveTo({x,y:1});
+                this.lineTo({x,y:0});
+                this.context.stroke();
+            }
+        }
+    }
+
     render() {
         if (!this.modified)
             return;
 
         this.clear();
+        this.render_bars();
         this.render_markers();
         this.render_canvas();
         this.set_ui();
@@ -881,7 +921,7 @@ class VCDS {
         let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
         canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
         canvas_div += this.get_log_buttons_html(p);
-        canvas_div += "</div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
+        canvas_div += "</div><div id='canvas_info'></div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
 
         e.innerHTML += this.get_log_header_html(p);
         e.innerHTML += canvas_div;
