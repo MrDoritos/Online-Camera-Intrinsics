@@ -83,6 +83,30 @@
     width: 100%;
 }
 
+#log_view_canvas_all_div {
+    #width: 100%;
+    flex-grow:1;
+}
+
+#canvas_info {
+    text-wrap: none;
+    display:flex;
+    background-color:gray;
+}
+
+#canvas_info > * {
+    margin:auto 0 auto 0.2em;
+    flex-grow:0.03;
+    font-family: monospace;
+    font-size:1.3em;
+    height:fit-content;
+}
+
+#canvas_info button {
+    margin: auto 0 auto auto;
+    line-height: 0.8em;
+}
+
 .log_view_height_limit {
     max-height: fit-content;
 }

@@ -272,6 +272,11 @@ class Parameters {
         }
     }
 
+    get_view_rows_count() {
+        let rr = this.get_view_row_range();
+        return Math.abs(rr.start - rr.end);
+    }
+
     moveTo(relative) {
         let pos = this.get_position_absolute(relative);
         if (!this.is_bound_absolute(pos))
@@ -350,6 +355,10 @@ class Parameters {
     get_log_table_body() {
         return document.querySelector(this.get_log_view_selector() + " tbody");
     }
+    
+    get_canvas_info_div() {
+        return document.querySelector(this.get_log_view_selector() + " #canvas_info");
+    }
 
     render_canvas() {
         let layers = this.log.get_blocks_by_depth();
@@ -399,6 +408,10 @@ class Parameters {
         if (diff <= 3600)
             return 60;
         return 300;
+    }
+
+    get_view_second_step() {
+        return this.get_second_step(this.get_view_seconds_range());
     }
 
     render_bars() {
@@ -466,8 +479,41 @@ class Parameters {
         e.innerHTML = this.get_table_entries_html();
     }
 
+    set_canvas_info() {
+        let e = this.get_canvas_info_div();
+        
+        let sr = this.get_view_seconds_range();
+        let ss = this.get_second_step(sr);
+
+        let str = '';
+        str += `<p>x_div: ${ss ? ss + 's' : 'marker'}</p>`;
+        str += `<p>${sr.start.toFixed(2)}s to ${sr.end.toFixed(2)}s</p>`;
+        str += `<p>${this.get_view_rows_count()} samples</p>`;
+        str += `<button name="${this.log.name}" onclick="vcds.log_export_range_input(this)">Export Range</button>`;
+
+        e.innerHTML = str;
+    }
+
     set_ui() {
         this.set_table();
+        this.set_canvas_info();
+    }
+
+    export_range(range) {
+        let str = '';
+
+        str += 'Seconds,' + this.log.blocks.map(x => x.name).join(',');
+
+        for (let i = range.start; i < range.end; i+=1) {
+            let row = this.log.rows[i];
+            str += `\n${row.seconds},${Object.entries(row.columns).map(x=>x[1].value).join(',')}`;
+        }
+
+        return str;
+    }
+
+    export_view_range() {
+        return this.export_range(this.get_view_row_range());
     }
 };
 
@@ -667,7 +713,11 @@ class VCDS {
     }
 
     async save_file(filename, data, dialog=false, mime_type="application/json") {
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type:mime_type});
+        let blob = undefined;
+        if (mime_type == "application/json")
+            blob = new Blob([JSON.stringify(data, null, 2)], {type:mime_type});
+        else
+            blob = new Blob([data], {type:mime_type});
         const elem = window.document.createElement('a');
         elem.href = window.URL.createObjectURL(blob);
         elem.download = filename;
@@ -919,9 +969,9 @@ class VCDS {
         e.innerHTML = "";
 
         let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
-        canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
+        canvas_div += `<div id='log_view_canvas_all_div'><div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div><div id='canvas_info'></div></div>`;
         canvas_div += this.get_log_buttons_html(p);
-        canvas_div += "</div><div id='canvas_info'></div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
+        canvas_div += "</div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
 
         e.innerHTML += this.get_log_header_html(p);
         e.innerHTML += canvas_div;
@@ -1046,6 +1096,13 @@ class VCDS {
         }.bind(this);
 
         reader.readAsText(form);
+    }
+
+    async log_export_range_input(event) {
+        let p = this.get_parameters(event);
+        let r = p.get_view_row_range();
+
+        this.save_file(`${p.log.filename} range ${r.start} to ${r.end}.csv`, p.export_view_range(), false, 'text/csv');
     }
 };
 
