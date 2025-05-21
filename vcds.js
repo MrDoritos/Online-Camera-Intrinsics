@@ -69,6 +69,17 @@ class Log {
         return this.blocks.toSorted((a,b) => a.depth < b.depth);
     }
 
+    get_row_index_by_seconds(time) {
+        let min_time=Math.abs(time - this.rows[0].seconds);
+        let min_index=0;
+        for (let i = 0; i < this.rows.length; i++) {
+            if (Math.abs(time - this.rows[i].seconds) < min_time) {
+                min_time = Math.abs(time - this.rows[i].seconds);
+                min_index = i;
+            }
+        }
+        return min_index;
+    }
 
     parse() {
         let rs = this.csv.rows;
@@ -224,6 +235,41 @@ class Parameters {
             vb.y1 != size.y1 ||
             vb.y2 != size.y2
         );
+        this.x_start = size.x1;
+        this.x_end = size.x2;
+        this.y_start = size.y1;
+        this.y_end = size.y2;
+    }
+
+    get_view_seconds(x) {
+        return x * this.log.seconds_range + this.log.seconds_min;
+    }
+
+    get_view_seconds_range() {
+        let b = this.get_view_boundary();
+        return {start:this.get_view_seconds(b.x1),end:this.get_view_seconds(b.x2)};
+    }
+
+    get_view_row_range() {
+        let sr = this.get_view_seconds_range();
+        return {
+            start:this.log.get_row_index_by_seconds(sr.start),
+            end:this.log.get_row_index_by_seconds(sr.end)
+        };
+    }
+
+    get_view_rows() {
+        let rr = this.get_view_row_range();
+        return this.log.rows.slice(rr.start, rr.end);
+    }
+
+    foreach_view_row(callback) {
+        let rr = this.get_view_row_range();
+
+        console.log(rr);
+        for (let i = rr.start; i < rr.end; i += 1) {
+            callback(this.log.rows[i]);
+        }
     }
 
     moveTo(relative) {
@@ -293,8 +339,16 @@ class Parameters {
         return document.querySelector(this.get_log_view_selector() + " canvas");
     }
 
+    get_log_view_container_div() {
+        return document.querySelector(this.get_log_view_selector() + " #log_view_container_div");
+    }
+
     get_log_table() {
         return document.querySelector(this.get_log_view_selector() + " table");
+    }
+
+    get_log_table_body() {
+        return document.querySelector(this.get_log_view_selector() + " tbody");
     }
 
     render_canvas() {
@@ -306,6 +360,7 @@ class Parameters {
 
             this.context.strokeStyle = block.color;
 
+            this.context.beginPath();
             let rel = this.get_column_relative(block, this.log.rows[0].columns[block.stub]);
             rel.x = -0.01;
             this.moveTo(rel);
@@ -339,6 +394,40 @@ class Parameters {
         this.clear();
         this.render_markers();
         this.render_canvas();
+        this.set_ui();
+
+        this.modified = false;
+    }
+
+    get_block_identifier(block) {
+        return `B${this.log.name}${block.stub}`;
+    }
+
+    get_table_entries_html() {
+        let sr = this.get_view_row_range();
+        let str = '';
+        
+        this.foreach_view_row(function(row) {
+            str += "<tr>";
+            str += `<td><p>${row.seconds}</p></td>`;
+            
+            for (const [k, v] of Object.entries(row.columns)) {
+                str += `<td><p>${v.value}</p></td>`;
+            }
+            str += "</tr>";
+        }.bind(this));
+
+        return str;
+    }
+
+    set_table() {
+        let e = this.get_log_table_body();
+
+        e.innerHTML = this.get_table_entries_html();
+    }
+
+    set_ui() {
+        this.set_table();
     }
 };
 
@@ -629,11 +718,9 @@ class VCDS {
             let e = this.get_hovering_log(event);
             if (e) {
                 let cl = e;
-                cl.x_start = 0;
-                cl.y_start = 0;
-                cl.x_end = 1;
-                cl.y_end = 1;
                 this.held = false;
+                let vb = {x1:0,x2:1,y1:0,y2:1};
+                cl.set_view_boundary(vb);
                 this.render_log(cl);
                 this.clear_overlay();
             }
@@ -674,7 +761,8 @@ class VCDS {
                 let x_diff = x_end - x_start;
                 x_start = x_diff * rel.x1 + x_start;
                 x_end = x_diff * x_src_diff + x_start;
-                p.set_view_boundary({x1:x_start,x2:x_end,y1:p.y_start,y2:p.y_end});
+                let vb = {x1:x_start,x2:x_end,y1:p.y_start,y2:p.y_end};
+                p.set_view_boundary(vb);
             }
             this.render_log(cl);
             this.clear_overlay();
@@ -726,27 +814,18 @@ class VCDS {
 
     get_log_table_html(p) {
         let log = p.log;
-        let table = "<div id='log_view_container_div'><table>";
+        let table = "<table>";
         {
-            table += "<tr><th><div id='vertical'><p>Seconds</p></div></th>";
+            table += "<thead></tr><th><div id='vertical'><p>Seconds</p></div></th>";
             log.blocks.forEach(function(block) {
-                table += `<th><div id='header_flex' style="background-color:${block.color}"><div id='header'><p>${block.name}</p></div></div></th>`;
+                let iden = p.get_block_identifier(block);
+                table += `<th class="${iden}"><div id='header_flex'><div id='header'><p>${block.name}</p></div></div></th>`;
             }.bind(this));
-            table += "</tr>";
+            table += "</tr></thead><tbody>";
 
-            log.rows.forEach(function (row) {
-                table += "<tr>";
-
-                table += `<td><p>${row.seconds}</p></td>`;
-
-                for (const [k, v] of Object.entries(row.columns)) {
-                    table += `<td><p>${v.value}</p></td>`
-                }
-
-                table += "</tr>";
-            }.bind(this));
+            //table += p.get_table_entries_html();
         }
-        table += "</table></div>";
+        table += "</tbody></table>";
 
         return table;
     }
@@ -802,12 +881,10 @@ class VCDS {
         let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
         canvas_div += `<div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div>`;
         canvas_div += this.get_log_buttons_html(p);
-        canvas_div += "</div>";
+        canvas_div += "</div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
 
         e.innerHTML += this.get_log_header_html(p);
         e.innerHTML += canvas_div;
-        e.innerHTML += this.get_log_table_html(p);
-        e.innerHTML += this.get_log_engine_div_html(p);
 
         body.insertBefore(e, this.get_element('log_load_div'));
         
@@ -815,6 +892,10 @@ class VCDS {
 
         let params = new Parameters(log, canvas_element);
         this.logs.push(params);
+
+        params.get_log_engine_div().innerHTML = this.get_log_engine_html(params, this.engine);
+        params.get_log_view_container_div().innerHTML = this.get_log_table_html(params);
+        //params.get_log_table_body().innerHTML = 
 
         this.set_log(params);
 
