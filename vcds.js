@@ -466,6 +466,10 @@ class Parameters {
         return document.querySelector(this.get_log_view_selector() + " #log_view_container_div");
     }
 
+    get_log_view_canvas_container() {
+        return document.querySelector(this.get_log_view_selector() + " #log_view_canvas_container");
+    }
+
     get_log_table() {
         return document.querySelector(this.get_log_view_selector() + " table");
     }
@@ -480,6 +484,18 @@ class Parameters {
 
     get_log_canvas_all() {
         return document.querySelector(this.get_log_view_selector() + " #log_view_canvas_all_div");
+    }
+
+    get_canvas_buttons_resize_bar() {
+        return document.querySelector(this.get_log_view_selector() + " #canvas_buttons_resize_bar");
+    }
+
+    get_canvas_table_resize_bar() {
+        return document.querySelector(this.get_log_view_selector() + " #canvas_table_resize_bar");
+    }
+
+    get_resize_bars() {
+        return [this.get_canvas_buttons_resize_bar(), this.get_canvas_table_resize_bar()];
     }
 
     render_canvas() {
@@ -652,6 +668,57 @@ class Parameters {
         return str;
     }
 
+    canvas_buttons_resize_bar_drag(event, bar) {
+        let e = this.get_log_canvas_all();
+        //let div = this.get_log_view_container_div();
+        let div = this.get_log_view_div();
+        let rel = get_position_relative_to_element(event, div);
+        let pos = get_element_position(e);
+        let bw = bar.clientWidth / 2;
+        //console.log(event, e, bar, div, rel, pos, bw);
+        //e.style.width=((rel.x * div.clientWidth) - (bar.clientWidth / 2)) + "px";
+        e.style.width = (event.x - pos.x - bw) + "px";
+    }
+
+    canvas_table_resize_bar_drag(event, bar) {
+        let e = this.get_log_view_canvas_container();
+        let div = this.get_log_view_div();
+        let pos = get_element_position(e);
+        let bh = bar.clientHeight / 2;
+        //let rel = get_position_relative_to_element(event, div);
+        //console.log(event, e, bar, div, pos, bh);
+        //e.style.height=((rel.y * div.clientHeight) - (bar.clientHeight / 2)) + "px";
+        e.style.height = (event.y - pos.y - bh) + "px";
+    }
+
+    resize_bar_drag(event, bar) {
+        if (bar.id == 'canvas_buttons_resize_bar')
+            this.canvas_buttons_resize_bar_drag(event, bar);
+        if (bar.id == 'canvas_table_resize_bar')
+            this.canvas_table_resize_bar_drag(event, bar);
+    }
+
+    resize_bar_mouse_input(event) {
+        let rebars = this.get_resize_bars();
+        if (event.type == "mousedown") {
+            let cur = rebars.find(bar => is_position_of_element(event, bar));
+            if (cur)
+                cur.name = "down";
+            return !cur;
+        }
+        if (event.type == "mouseup") {
+            rebars.forEach(bar => bar.name = "up");
+            return false;
+        }
+        if (event.type == "mousemove") {
+            let cur = rebars.find(bar => bar.name && bar.name == "down");
+            if (cur)
+                this.resize_bar_drag(event, cur);
+            return cur;
+        }
+        return false;
+    }
+
     export_view_range() {
         return this.export_range(this.get_view_row_range());
     }
@@ -676,6 +743,9 @@ class Parameters {
 
     mouse_input(event) {
         let tt = this.tooltip_element;
+
+        if (this.resize_bar_mouse_input(event))
+            return;
 
         if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
             if (tt) {
@@ -1028,10 +1098,10 @@ class VCDS {
                 let iden = this.get_log_block_identifier(p, block);
                 //this.set_css_style(`.${iden}`, 'background-color', block.color);
                 str += `<div class="${iden}">`;
-                str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked />`;
+                str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked /><div>`;
                 str += `<p id="inline">${block.name}</p>`;
                 str += `<p>${block.min} - ${block.max} (${block.range}) ${block.min_time} - ${block.max_time}</p>`;
-                str += `</div>`;
+                str += `</div></div>`;
             }.bind(this));
         }
         str += "</div>";
@@ -1105,10 +1175,10 @@ class VCDS {
 
         e.innerHTML = "";
 
-        let canvas_div = "<div id='log_view_canvas_container' class='log_view_height_limit'>";
-        canvas_div += `<div id='log_view_canvas_all_div'><div id='log_view_canvas_div'><canvas id='log_view_canvas' class='log_view_height_limit' width=800 height=800></canvas></div><div id='canvas_info'></div></div>`;
+        let canvas_div = "<div id='log_view_canvas_container'>";
+        canvas_div += `<div id='log_view_canvas_all_div'><div id='log_view_canvas_div'><canvas id='log_view_canvas' width=800 height=800></canvas></div><div id='canvas_info'></div></div><div class='vertical_resize_bar resize_bar' id='canvas_buttons_resize_bar'></div>`;
         canvas_div += this.get_log_buttons_html(p);
-        canvas_div += "</div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
+        canvas_div += "</div><div class='horizontal_resize_bar resize_bar' id='canvas_table_resize_bar'></div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
 
         e.innerHTML += this.get_log_header_html(p);
         e.innerHTML += canvas_div;
@@ -1126,9 +1196,13 @@ class VCDS {
 
         let lce = params.get_log_view_div();
 
-        lce.addEventListener('mouseenter', params.mouse_input.bind(params));
-        lce.addEventListener('mouseleave', params.mouse_input.bind(params));
-        lce.addEventListener('mousemove', params.mouse_input.bind(params));
+        let add_mouse_events = function(elem, func) {
+            ['mouseenter', 'mouseleave', 'mousedown', 'mouseup', 'mousemove'].forEach(
+                event => elem.addEventListener(event, func)
+            );            
+        };
+
+        add_mouse_events(lce, params.mouse_input.bind(params));
 
         params.set_styles();
         this.set_log(params);
@@ -1147,18 +1221,23 @@ class VCDS {
         let e1 = document.querySelector(q + ' div#log_view_container_div');
         let e2 = document.querySelector(q + ' div#log_view_canvas_div');
         let e3 = document.querySelector(q + ' div#log_view_canvas_container');
+        let e4 = document.querySelector(q + ' div#log_view_canvas_all_div');
 
         if (event.innerText.includes('-')) {
             e1.style.setProperty('display', 'none');
-            e2.style.setProperty('resize', 'horizontal');
+            //e2.style.setProperty('resize', 'horizontal');
             //e3.style.setProperty('max-height', '10vh');
-            this.set_css_style('.log_view_height_limit', 'max-height', '10vh');
+            //this.set_css_style('.log_view_height_limit', 'max-height', '10vh');
+            //e3.style.maxHeight = "10vh";
+            e3.className = "log_view_height_limit";
             event.innerText = '+';
         } else {
             e1.style.setProperty('display', "");
-            e2.style.setProperty('resize', 'both');
+            //e2.style.setProperty('resize', 'both');
             //e3.style.setProperty('max-height', "");
-            this.set_css_style('.log_view_height_limit', 'max-height', 'fit-content');
+            //this.set_css_style('.log_view_height_limit', 'max-height', 'fit-content');
+            //e3.style.maxHeight = "fit-content";
+            e3.className = "";
             event.innerText = '-';
         }
     }
