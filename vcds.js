@@ -22,6 +22,10 @@ class CSV {
     }
 };
 
+function lerp(v1, v2, factor) {
+    return v1 * (1 - factor) + v2 * factor;
+}
+
 class Log {
     filename = undefined;
     text = undefined;
@@ -79,6 +83,66 @@ class Log {
             }
         }
         return min_index;
+    }
+
+    get_row_by_seconds(time) {
+        return this.rows[this.get_row_index_by_seconds(time)];
+    }
+
+    get_two_rows_indicies_by_seconds(time) {
+        let a = this.get_row_index_by_seconds(time);
+        if (a < 1)
+            return [0, 1];
+        if (a > this.rows.length - 2)
+            return [this.rows.length-2, this.rows.length-1];
+
+        let a1 = this.rows[a];
+        let t1 = this.rows[a+1], t2 = this.rows[a-1];
+        if (Math.abs(t1.seconds - a.seconds) < Math.abs(t2.seconds - a.seconds))
+            return [a, a+1];
+        return [a-1, a];
+    }
+
+    get_two_rows_by_seconds(time) {
+        let ix = this.get_two_rows_indicies_by_seconds(time);
+        return [this.rows[ix[0]], this.rows[ix[1]]];
+    }
+
+    get_linear_interpolated_block(block1, block2, factor=0.5) {
+        return {
+            value: lerp(block1.value, block2.value, factor),
+            seconds: lerp(block1.seconds, block2.seconds, factor),
+        };
+    }
+
+    get_linear_interpolated_block_by_seconds(time, block) {
+        let ix = this.get_two_rows_indicies_by_seconds(time);
+        return this.get_linear_interpolated_block(
+            this.rows[ix[0]].columns[block.stub],
+            this.rows[ix[1]].columns[block.stub]
+        );
+    }
+
+    get_linear_interpolated_row_by_seconds(time) {
+        let ix = this.get_two_rows_indicies_by_seconds(time);
+        let r1 = this.rows[ix[0]];
+        let r2 = this.rows[ix[1]];
+
+        let row_factor = (time - r1.seconds) / (r2.seconds - r1.seconds);
+
+        let columns = {};
+        for (let i = 0; i < this.blocks.length; i+=1) {
+            let stub = this.blocks[i].stub;
+            let b1 = r1.columns[stub], b2 = r2.columns[stub];
+            let block_factor = (time - b1.seconds) / (b2.seconds - b1.seconds);
+            columns[this.blocks[i].stub] = this.get_linear_interpolated_block(b1, b2, block_factor);
+        }
+
+        return {
+            columns,
+            marker:0,
+            seconds:lerp(r1.seconds, r2.seconds, row_factor),
+        };
     }
 
     get_column(row_index, block) {
@@ -390,33 +454,38 @@ class Parameters {
         return rr.range;
     }
 
-    //TO-DO 2D search pattern, not row first
-    get_view_nearest_block(position, tolerance=1) {
+    get_view_nearest_block(position, tolerance=1, interpolate=false) {
         let vr = this.get_view_seconds_range();
         let vb = this.get_view_boundary();
         let time = position.x * vr.range + vr.start;
-        let row_index = this.log.get_row_index_by_seconds(time);
-        let row = this.log.rows[row_index];
+        //let row_index = this.log.get_row_index_by_seconds(time);
+        //let row = this.log.rows[row_index];
+        console.log(time);
+        let row = undefined;
+        if (interpolate)
+            row = this.log.get_linear_interpolated_row_by_seconds(time);
+        else
+            row = this.log.get_row_by_seconds(time);
 
-        let nearest_column = undefined;
-        let nearest_block = undefined;
-        let nearest_value = tolerance;//(vb.x2 - vb.x1) * tolerance;
+        console.log(row);
+
+        let n = {value:tolerance,row};
         for (const [key, column] of Object.entries(row.columns)) {
             let block = this.log.get_block(key);
             let y = (column.value - block.min) * block.range_inv;
             y = this.get_shifted_relative({x:0,y}).y;
             let diff_y = Math.abs((1-position.y) - y);
-            if (diff_y < nearest_value) {
-                nearest_block = block;
-                nearest_column = column;
-                nearest_value = diff_y;
+            if (diff_y < n.value) {
+                n.block = block;
+                n.column = column;
+                n.value = diff_y;
             }
         }
 
-        if (!row || !nearest_block || !nearest_column)
+        if (!n.row || !n.block || !n.column)
             return undefined;
 
-        return {row,block:nearest_block,column:nearest_column};
+        return n;
     }
 
     moveTo(relative) {
@@ -773,7 +842,7 @@ class Parameters {
 
         if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
             if (tt) {
-                this.remove_tooltip();
+                //this.remove_tooltip();
             }
             return;
         }
@@ -783,15 +852,22 @@ class Parameters {
 
         if (tt) {
             let rel = get_position_relative_to_element(event, this.element);
-            tt.style.left = (event.x + 10) + "px";
-            tt.style.top = event.y + "px";
-            let block = this.get_view_nearest_block(rel, 0.05);
+            //tt.style.left = (event.x + 10) + "px";
+            //tt.style.top = event.y + "px";
+            //tt.style.top = this.element.top;
+            let off_h = this.get_shifted_relative({x:0,y:0}).y * this.element.clientHeight;
+            let tt_w = 4;
+            tt.style.height = (this.element.clientHeight - (off_h * 2)) + "px";
+            tt.style.width = tt_w + "px";
+            tt.style.left = (event.x - (tt_w*0.5)) + "px";
+            tt.style.top = (this.element.clientTop + this.element.offsetTop + off_h) + "px";
+            let block = this.get_view_nearest_block(rel, 0.05, true);
             if (!block) {
                 this.remove_tooltip();
                 return;
             }
             tt.style.backgroundColor = block.block.color;
-            tt.innerHTML = `<p>${block.column.value}</p><p>${block.column.seconds}s</p><p>${block.block.name}</p>`;
+            tt.innerHTML = `<div style="top: ${event.y}px; left: ${event.x + 10}px; background-color: ${block.block.color}"><p>${block.column.value}</p><p>${block.column.seconds}s</p><p>${block.block.name}</p></div>`;
         }        
     }
 

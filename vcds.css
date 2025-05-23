@@ -106,11 +106,16 @@
 }
 
 #tooltip {
-    position:absolute;
-    border: 1px solid black;
+    position:fixed;
 }
 
-#tooltip > * {
+#tooltip div {
+    position:fixed;
+    border: 1px solid black;
+    #transform: translate(0, -50%);
+}
+
+#tooltip p {
     font-family: monospace;
     font-size:1.3em;
     margin:0;
