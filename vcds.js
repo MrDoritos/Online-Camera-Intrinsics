@@ -81,6 +81,22 @@ class Log {
         return min_index;
     }
 
+    get_column(row_index, block) {
+        return this.rows[row_index].columns[block.stub];
+    }
+
+    get_columns(block, indicies) {
+        return indicies.map(index=>this.get_column(index, block));
+    }
+
+    get_sum(block, indicies) {
+        return this.get_columns(block, indicies).reduce((sum, a) => sum + a.value, 0);
+    }
+
+    get_mean(block, indicies) {
+        return this.get_sum(block, indicies) / indicies.length;
+    }
+
     parse() {
         let rs = this.csv.rows;
         let r = rs[0];
@@ -264,27 +280,14 @@ function get_element_relative_to_element(inner, outer) {
     };
 }
 
+function create_matrix(rows, columns) {
+    return Array(rows).fill(0).map(x => Array(columns).fill(0));
+}
+
 class Parameters {
     constructor(log, element) {
         this.context = element.getContext('2d');
         this.size = element.getBoundingClientRect();
-
-        element.width = log.rows.length * 2;
-
-        if (element.width > 6000) element.width = 6000;
-        if (element.width < 800) element.width = 800;
-
-        this.aspect_ratio = this.size.height / this.size.width;
-
-        element.height = this.aspect_ratio * element.width;
-
-        this.line_width = element.height / 100;
-        this.border_radius = this.line_width;
-
-        this.context.lineWidth = this.line_width;
-
-        this.width = element.width - this.border_radius * 2;
-        this.height = element.height - this.border_radius * 2;
 
         this.log = log;
         this.element = element;
@@ -296,6 +299,27 @@ class Parameters {
         this.x_end = 1;
         this.y_start = 0;
         this.y_end = 1;
+
+        this.update_canvas_size();
+    }
+
+    update_canvas_size() {
+        this.element.width = this.log.rows.length * 2;
+
+        if (this.element.width > 6000) this.element.width = 6000;
+        if (this.element.width < 800) this.element.width = 800;
+
+        this.aspect_ratio = this.size.height / this.size.width;
+
+        this.element.height = this.aspect_ratio * this.element.width;
+
+        this.line_width = this.element.height / 100;
+        this.border_radius = this.line_width;
+
+        this.context.lineWidth = this.line_width;
+
+        this.width = this.element.width - this.border_radius * 2;
+        this.height = this.element.height - this.border_radius * 2;
 
         this.modified = true;
     }
@@ -769,6 +793,86 @@ class Parameters {
             tt.style.backgroundColor = block.block.color;
             tt.innerHTML = `<p>${block.column.value}</p><p>${block.column.seconds}s</p><p>${block.block.name}</p>`;
         }        
+    }
+
+    get_linear_regression(block, indicies) {
+        return this.log.get_mean(block, indicies);
+    }
+
+    get_quadratic_regression(block, indicies, coeff_count) {
+        //let coeff_count = indicies.length;
+        let point_count = indicies.length;
+        let degree_count = coeff_count - 1;
+        let matrix_a = create_matrix(point_count, coeff_count);
+        let columns = this.log.get_columns(block, indicies);
+
+        function index_matrix(matrix, r, c) {
+            let index = r * matrix.length + c;
+            let r_index = Math.floor(index / matrix.length);
+            let c_index = Math.floor(index % matrix[0].length);
+            return {r:r_index,c:c_index};
+        }
+
+        function set_matrix(matrix, r, c, value) {
+            let index = index_matrix(matrix, r, c);
+            matrix[index.r][index.c] = value;
+        }
+
+        function get_matrix(matrix, r, c) {
+            let index = index_matrix(matrix, r, c);
+            return matrix[index.r][index.c];
+        }
+
+        console.log(columns, matrix_a);
+
+        for (let j = 0; j < point_count; j+=1) {
+            for (let k = 0; k < coeff_count; k+=1) {
+                matrix_a[j][k] = 0;
+                for (let i = 0; i < point_count; i+=1) {
+                    matrix_a[j][k]+=Math.pow(columns[i].seconds,j+k);
+                }
+            }
+        }
+
+        console.log(matrix_a);
+
+        for (let j = 0; j < point_count; j+=1) {
+            set_matrix(matrix_a, j, point_count - 1, 0);
+            for (let i = 0; i < point_count; i+=1) {
+                let r = Math.pow(columns[i].seconds,j-1);
+                let index = index_matrix(matrix_a, j, point_count);
+                console.log(index);
+                let v = matrix_a[index.r][index.c];
+                matrix_a[index.r][index.c] = v + columns[i].value * r;
+            }
+        }
+
+        console.log(matrix_a);
+
+        for (let k = 0; k < point_count; k+=1) {
+            for (let i = 0; i < point_count; i+=1) {
+                if (i != k) {
+                    let u = get_matrix(matrix_a, i, k)/get_matrix(matrix_a, k, k);
+                    for (let j = k; j < point_count; j+=1) {
+                        let v = get_matrix(matrix_a, i, j);
+                        v = v - u * get_matrix(matrix_a, k, j);
+                        set_matrix(matrix_a, i, j, v);
+                    }
+                }
+            }
+        }
+
+        console.log(matrix_a);
+        
+        let a = Array(point_count).fill(0);
+
+        for (let i = 0; i < point_count; i+=1) {
+            let v1 = get_matrix(matrix_a, i, point_count);
+            let v2 = get_matrix(matrix_a, i, i);
+            a[i] = v1/v2;
+        }
+
+        return a;
     }
 };
 
