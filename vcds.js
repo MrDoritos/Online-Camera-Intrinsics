@@ -394,6 +394,10 @@ class Parameters {
         return true;
     }
 
+    reset_view_boundary() {
+        this.set_view_boundary({x1:0,x2:1,y1:0,y2:1});
+    }
+
     get_view_boundary() {
         return {x1:this.x_start,x2:this.x_end,y1:this.y_start,y2:this.y_end};
     }
@@ -414,6 +418,12 @@ class Parameters {
 
     get_view_seconds(x) {
         return x * this.log.seconds_range + this.log.seconds_min;
+    }
+
+    get_view_seconds_relative(position) {
+        return this.get_view_seconds(
+            position.x * (this.x_end - this.x_start) + this.x_start
+        );
     }
 
     get_view_seconds_range() {
@@ -454,20 +464,16 @@ class Parameters {
         return rr.range;
     }
 
-    get_view_nearest_block(position, tolerance=1, interpolate=false) {
-        let vr = this.get_view_seconds_range();
-        let vb = this.get_view_boundary();
-        let time = position.x * vr.range + vr.start;
-        //let row_index = this.log.get_row_index_by_seconds(time);
-        //let row = this.log.rows[row_index];
-        console.log(time);
-        let row = undefined;
-        if (interpolate)
-            row = this.log.get_linear_interpolated_row_by_seconds(time);
-        else
-            row = this.log.get_row_by_seconds(time);
+    get_view_nearest_row(position, tolerance=1, interpolate=false) {
+        let time = this.get_view_seconds_relative(position);
 
-        console.log(row);
+        if (interpolate)
+            return this.log.get_linear_interpolated_row_by_seconds(time);
+        return this.log.get_row_by_seconds(time);
+    }
+
+    get_view_nearest_block(position, tolerance=1, interpolate=false) {
+        let row = this.get_view_nearest_row(position, tolerance, interpolate);
 
         let n = {value:tolerance,row};
         for (const [key, column] of Object.entries(row.columns)) {
@@ -589,6 +595,14 @@ class Parameters {
 
     get_resize_bars() {
         return [this.get_canvas_buttons_resize_bar(), this.get_canvas_table_resize_bar()];
+    }
+
+    get_overlay() {
+        return document.querySelector(this.get_log_view_selector() + " #overlay");
+    }
+
+    get_cursor_info_element() {
+        return document.querySelector(this.get_log_view_selector() + " #cursor_info");
     }
 
     render_canvas() {
@@ -726,6 +740,17 @@ class Parameters {
         }.bind(this));
     }
 
+    async set_cursor_info(rel) {
+        let time = this.get_view_seconds_relative(rel);
+        let row_index = this.log.get_row_index_by_seconds(time);
+        let row = this.log.rows[row_index];
+        this.cursor_info_element.innerText = `${row.seconds.toFixed(2)}s [${row_index}]`;
+    }
+
+    async remove_cursor_info() {
+        this.cursor_info_element.innerText = `--.--s [---]`;
+    }
+
     set_canvas_info() {
         let e = this.get_canvas_info_div();
         
@@ -738,9 +763,12 @@ class Parameters {
         str += `<p>${sr.start.toFixed(2)}s to ${sr.end.toFixed(2)}s (${sr.range.toFixed(2)}s)</p>`;
         str += `<p>${rc} samples</p>`;
         str += `<p>${(rc / sr.range).toFixed(1)} samples/s</p>`;
+        str += `<p id='cursor_info'></p>`;
         str += `<button name="${this.log.name}" onclick="vcds.log_export_range_input(this)">Export Range</button>`;
 
         e.innerHTML = str;
+
+        this.cursor_info_element = this.get_cursor_info_element();
     }
 
     set_ui() {
@@ -812,6 +840,51 @@ class Parameters {
         return false;
     }
 
+    overlay_mouse_input(event) {
+        let overlay = this.overlay_element;
+        let inside = is_position_of_element(event, this.element);
+
+        if (event.type == "dblclick") {
+            if (!inside)
+                return false;
+
+            this.reset_view_boundary();
+            this.remove_overlay();
+            this.render();
+            return true;
+        }
+
+        if (event.type == "mousedown") {
+            if (!inside)
+                return false;
+
+            this.remove_tooltip();
+            this.create_overlay();
+            this.set_overlay_position(event, this.overlay_element, this.element);
+            return true;
+        }
+
+        if (event.type == "mouseup") {
+            if (!overlay)
+                return false;
+
+            this.set_view_from_overlay(this.overlay_element, this.element);
+            this.remove_overlay();
+            this.render();
+            return true;
+        }
+
+        if (event.type == "mousemove") {
+            if (!overlay)
+                return false;
+
+            this.set_overlay_position(event, this.overlay_element, this.element);
+            return true;
+        }
+
+        return this.overlay_element;
+    }
+
     export_view_range() {
         return this.export_range(this.get_view_row_range());
     }
@@ -832,17 +905,80 @@ class Parameters {
         return tooltip;
     }
 
-    tooltip_element=undefined;
+    remove_overlay() {
+        let b = this.get_log_view_div();
+        document.querySelectorAll(this.get_log_view_selector() + " #overlay")
+            .forEach(x=>b.removeChild(x));
+        this.overlay_element = undefined;
+    }
+
+    create_overlay() {
+        let b = this.get_log_view_div();
+        let overlay = document.createElement('div');
+        b.insertAdjacentElement('beforeend', overlay);
+        overlay.id = "overlay";
+        this.overlay_element = overlay;
+        return overlay;
+    }
+
+    set_view_from_overlay(overlay, elem) {
+        let rel = get_element_relative_to_element(overlay, elem);
+        let x_src_diff = rel.x2 - rel.x1;
+        if (Math.abs(x_src_diff) > 0.01) {
+            let x_diff = this.x_end - this.x_start;
+            let x_start = x_diff * rel.x1 + this.x_start;
+            let x_end = x_diff * x_src_diff + x_start;
+            let vb = {x1:x_start,x2:x_end,y1:this.y_start,y2:this.y_end};
+            this.set_view_boundary(vb);
+        }
+    }
+
+    set_overlay_position(event, overlay, elem) {
+        let rel = get_position_relative_to_element(event, elem);
+        let start = overlay.mouse_start;
+        if (!start) {
+            let size = get_element_position(elem);
+            overlay.mouse_start = rel;
+            overlay.style.width = "0px";
+            overlay.style.height = elem.clientHeight + "px";
+            overlay.style.top = size.y + "px";
+            overlay.style.left = event.clientX + "px";
+            return;
+        }
+
+        let ml = start, mr = rel;
+        if (ml.x > mr.x)
+            [ml, mr] = [mr, ml];
+        let l = ml.x * elem.clientWidth + elem.clientLeft;
+        let w = (mr.x - ml.x) * elem.clientWidth;
+
+        if (l + w < elem.clientLeft + elem.clientWidth && l > elem.clientLeft) {
+            overlay.style.left = l + "px";
+            overlay.style.width = w + "px";
+        }
+    }
+
+    async cursor_info_mouse_input(event) {
+        if (is_position_of_element(event, this.element))
+            this.set_cursor_info(get_position_relative_to_element(event, this.element));
+        else
+            this.remove_cursor_info();
+    }
 
     mouse_input(event) {
         let tt = this.tooltip_element;
+
+        this.cursor_info_mouse_input(event);
+
+        if (this.overlay_mouse_input(event))
+            return;
 
         if (this.resize_bar_mouse_input(event))
             return;
 
         if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
             if (tt) {
-                //this.remove_tooltip();
+                this.remove_tooltip();
             }
             return;
         }
@@ -867,7 +1003,7 @@ class Parameters {
                 return;
             }
             tt.style.backgroundColor = block.block.color;
-            tt.innerHTML = `<div style="top: ${event.y}px; left: ${event.x + 10}px; background-color: ${block.block.color}"><p>${block.column.value}</p><p>${block.column.seconds}s</p><p>${block.block.name}</p></div>`;
+            tt.innerHTML = `<div style="top: ${event.y}px; left: ${event.x + 10}px; background-color: ${block.block.color}"><p>${block.column.value.toFixed(2)}</p><p>${block.column.seconds.toFixed(2)}s</p><p>${block.block.name}</p></div>`;
         }        
     }
 
@@ -1005,10 +1141,10 @@ class VCDS {
         ['save_engine', 'click', this.save_engine_input],
         ['load_engine', 'input', this.load_engine_input],
         ['engine_info', 'input', this.engine_info_input],
-        ['log_body', 'mousemove', this.mouse_input],
-        ['log_body', 'mousedown', this.mouse_input],
-        ['log_body', 'mouseup', this.mouse_input],
-        ['log_body', 'dblclick', this.mouse_input],
+        //['log_body', 'mousemove', this.mouse_input],
+        //['log_body', 'mousedown', this.mouse_input],
+        //['log_body', 'mouseup', this.mouse_input],
+        //['log_body', 'dblclick', this.mouse_input],
     ];
 
     logs = [];
@@ -1280,7 +1416,7 @@ class VCDS {
                 str += `<div class="${iden}">`;
                 str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked /><div>`;
                 str += `<p id="inline">${block.name}</p>`;
-                str += `<p>${block.min} - ${block.max} (${block.range}) ${block.min_time} - ${block.max_time}</p>`;
+                str += `<p>${block.min} - ${block.max} (${block.range.toFixed(2)}) ${block.min_time} - ${block.max_time}</p>`;
                 str += `</div></div>`;
             }.bind(this));
         }
@@ -1377,7 +1513,7 @@ class VCDS {
         let lce = params.get_log_view_div();
 
         let add_mouse_events = function(elem, func) {
-            ['mouseenter', 'mouseleave', 'mousedown', 'mouseup', 'mousemove'].forEach(
+            ['mouseenter', 'mouseleave', 'mousedown', 'mouseup', 'mousemove', 'dblclick'].forEach(
                 event => elem.addEventListener(event, func)
             );            
         };

@@ -162,9 +162,9 @@
     user-select: none;
 }
 
-#canvas_overlay {
+#canvas_overlay, #log_view_div #overlay {
     background-color: rgba(64,64,255,0.3);
-    position: absolute;
+    position: fixed;
 }
 
 #log_view_canvas {
