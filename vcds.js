@@ -492,7 +492,7 @@ class Parameters {
         let sr = this.get_view_seconds_range();
         let r = {
             start:this.log.get_row_index_by_seconds(sr.start),
-            end:this.log.get_row_index_by_seconds(sr.end),
+            end:this.log.get_row_index_by_seconds(sr.end)+1,
         };
         r.range = Math.abs(r.start - r.end);
         return r;
@@ -681,7 +681,7 @@ class Parameters {
                 this.lineTo(this.get_column_relative(block, row.columns[block.stub]));
             }.bind(this));
 
-            rel = this.get_column_relative(block, this.log.rows[rr.end].columns[block.stub]);
+            rel = this.get_column_relative(block, this.log.rows[rr.end-1].columns[block.stub]);
             rel.x = 1.01;
             this.lineTo(rel);
 
