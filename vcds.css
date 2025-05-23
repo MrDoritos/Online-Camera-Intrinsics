@@ -109,10 +109,26 @@
     position:fixed;
 }
 
-#tooltip div {
+#tooltip #main {
     position:fixed;
     border: 1px solid black;
     #transform: translate(0, -50%);
+}
+
+#tooltip #extra {
+    #transform: translate(-10px, 0);
+    position: absolute;
+    float:right;
+    border: 1px solid black;
+    right:10vw;
+    text-wrap:nowrap;
+    display:flex;
+    flex-direction: row;
+    flex-wrap:nowrap;
+}
+
+#tooltip #extra:first {
+    margin-right: 2em;
 }
 
 #tooltip p {

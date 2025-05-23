@@ -567,9 +567,6 @@ class Parameters {
             }
         }
 
-        if (!n.row || !n.block || !n.column)
-            return undefined;
-
         return n;
     }
 
@@ -1067,26 +1064,51 @@ class Parameters {
 
     async set_tooltip_info(event, tooltip, elem) {
         let rel = get_position_relative_to_element(event, elem);
-        let block = this.get_view_nearest_block(rel, 0.05, true);
+        let n = this.get_view_nearest_block(rel, 0.05, true);
 
         tooltip.style.backgroundColor = "";
 
-        if (!block) {
+        let str = "";
+
+        if (!n.block) {
             tooltip.style.backgroundColor = "black";
             tooltip.className = "";
             tooltip.innerHTML = "";
-            return;
+        } else {
+            let iden = this.get_block_identifier(n.block);
+
+            tooltip.className = iden;
+            str += `<div class="${iden}" id="main" style="top: ${event.y}px; left: ${event.x + 10}px">`;
+            str += `<p>${n.column.value.toFixed(2)}${n.block.unit}</p>`;
+            str += `<p>${n.column.seconds.toFixed(2)}</p>`;
+            str += `<p>${n.block.name}</p>`;
+            str += `<p>${n.block.group} - ${n.block.field}</p>`;
+            str += "</div>";
         }
 
-        let iden = this.get_block_identifier(block.block);
+        for (const [key, column] of Object.entries(n.row.columns)) {
+            let block = this.log.get_block(key);
+            if (!block.visible)
+                continue;
+            let iden = this.get_block_identifier(block);
 
-        tooltip.className = iden;
-        let str = `<div class="${iden}" style="top: ${event.y}px; left: ${event.x + 10}px">`;
-        str += `<p>${block.column.value.toFixed(2)}${block.block.unit}</p>`;
-        str += `<p>${block.column.seconds.toFixed(2)}</p>`;
-        str += `<p>${block.block.name}</p>`;
-        str += `<p>${block.block.group} - ${block.block.field}</p>`;
-        str += "</div>";
+            let abs = this.get_column_relative(block, column);
+            let rel = this.get_shifted_relative(abs);
+            let element_height = elem.clientHeight;
+            let offset_height = (1-rel.y) * element_height;
+            let element_y = elem.clientTop + elem.offsetTop;
+            let tooltip_y = element_y + offset_height;
+            //let tooltip_r = event.x - 10;
+            let tooltip_r = 30;
+            let style_r = tooltip_r.toFixed(2) + "px";
+            let style_t = ((1-rel.y) * 100).toFixed(2) + "%";
+
+            str += `<div class="${iden}" id="extra" style="top: ${style_t}">`;
+            str += `<p>${block.name}</p>`;
+            str += `<p>${column.value.toFixed(2)}${block.unit}</p>`;
+            str += "</div>";
+        }
+
         tooltip.innerHTML = str;
     }
 
