@@ -94,8 +94,8 @@ class Log {
     }
 
     get_row_index_by_seconds(time) {
-        let min_time=Math.abs(time - this.rows[0].seconds);
-        let min_index=0;
+        let min_time = time - this.rows[0].seconds;
+        let min_index = 0;
         for (let i = 0; i < this.rows.length; i++) {
             //let t = Math.abs(time - this.rows[i].seconds);
             let t = time - this.rows[i].seconds;
@@ -108,11 +108,11 @@ class Log {
     }
 
     get_row_index_by_block_seconds(time, block) {
-        let min_time = Math.abs(time - this.rows[0].columns[block.stub].seconds);
+        let min_time = time - this.rows[0].columns[block.stub].seconds;
         let min_index = 0;
         for (let i = 0; i < this.rows.length; i++) {
-            let t = Math.abs(time - this.rows[i].columns[block.stub].seconds);
-            if (t < min_time) {
+            let t = time - this.rows[i].columns[block.stub].seconds;
+            if (t < min_time && t >= 0) {
                 min_time = t;
                 min_index = i;
             }
@@ -132,8 +132,9 @@ class Log {
             return [this.rows.length-2, this.rows.length-1];
 
         let a1 = this.rows[a];
-        let t1 = this.rows[a+1], t2 = this.rows[a-1];
-        if (Math.abs(t1.seconds - a1.seconds) < Math.abs(t2.seconds - a1.seconds))
+        //let t1 = this.rows[a+1], t2 = this.rows[a-1];
+        //if (Math.abs(t1.seconds - a1.seconds) < Math.abs(t2.seconds - a1.seconds))
+        if (time - a1.seconds >= 0)
             return [a, a+1];
         return [a-1, a];
     }
@@ -168,10 +169,14 @@ class Log {
     }
 
     get_linear_interpolated_block_by_seconds(time, block) {
-        let ix = this.get_two_rows_indicies_by_seconds(time);
+        let ix = this.get_two_rows_indicies_by_block_seconds(time, block);
+        let b1 = this.rows[ix[0]].columns[block.stub];
+        let b2 = this.rows[ix[1]].columns[block.stub];
+        let factor = (time - b1.seconds) / (b2.seconds - b1.seconds);
         return this.get_linear_interpolated_block(
-            this.rows[ix[0]].columns[block.stub],
-            this.rows[ix[1]].columns[block.stub]
+            b1,
+            b2,
+            factor
         );
     }
 
@@ -181,19 +186,22 @@ class Log {
         let r2 = this.rows[ix[1]];
 
         let row_factor = (time - r1.seconds) / (r2.seconds - r1.seconds);
+        let seconds = lerp(r1.seconds, r2.seconds, row_factor);
 
         let columns = {};
         for (let i = 0; i < this.blocks.length; i+=1) {
-            let stub = this.blocks[i].stub;
-            let b1 = r1.columns[stub], b2 = r2.columns[stub];
-            let block_factor = (time - b1.seconds) / (b2.seconds - b1.seconds);
-            columns[this.blocks[i].stub] = this.get_linear_interpolated_block(b1, b2, block_factor);
+            columns[this.blocks[i].stub] =
+                this.get_linear_interpolated_block_by_seconds(seconds, this.blocks[i]);
+            //let stub = this.blocks[i].stub;
+            //let b1 = r1.columns[stub], b2 = r2.columns[stub];
+            //let block_factor = (time - b1.seconds) / (b2.seconds - b1.seconds);
+            //columns[this.blocks[i].stub] = this.get_linear_interpolated_block(b1, b2, block_factor);
         }
 
         return {
             columns,
             marker:0,
-            seconds:lerp(r1.seconds, r2.seconds, row_factor),
+            seconds,
         };
     }
 
@@ -211,6 +219,21 @@ class Log {
 
     get_mean(block, indicies) {
         return this.get_sum(block, indicies) / indicies.length;
+    }
+
+    fix_unit(block, unit) {
+        if (unit.includes("BTDC"))
+            return "\u00B0BTDC";
+        if (unit.includes("KW"))
+            return "\u00B0KW";
+
+        return unit;
+    }
+
+    fix_block(block) {
+        block.unit = this.fix_unit(block, block.unit);
+
+        return block;
     }
 
     parse() {
@@ -270,6 +293,7 @@ class Log {
             block.color = this.colors[j];
 
             stubs.push(block.stub);
+            this.fix_block(block);
             this.blocks.push(block);
         }
 
@@ -530,6 +554,8 @@ class Parameters {
         let n = {value:tolerance,row};
         for (const [key, column] of Object.entries(row.columns)) {
             let block = this.log.get_block(key);
+            if (!block.visible)
+                continue;
             let y = (column.value - block.min) * block.range_inv;
             y = this.get_shifted_relative({x:0,y}).y;
             let diff_y = Math.abs((1-position.y) - y);
@@ -1032,7 +1058,7 @@ class Parameters {
 
     async set_tooltip_info(event, tooltip, elem) {
         let rel = get_position_relative_to_element(event, elem);
-        let block = this.get_view_nearest_block(rel, 0.05, false);
+        let block = this.get_view_nearest_block(rel, 0.05, true);
 
         tooltip.style.backgroundColor = "";
 
@@ -1047,9 +1073,10 @@ class Parameters {
 
         tooltip.className = iden;
         let str = `<div class="${iden}" style="top: ${event.y}px; left: ${event.x + 10}px">`;
-        str += `<p>${block.column.value.toFixed(2)}</p>`;
+        str += `<p>${block.column.value.toFixed(2)}${block.block.unit}</p>`;
         str += `<p>${block.column.seconds.toFixed(2)}</p>`;
         str += `<p>${block.block.name}</p>`;
+        str += `<p>${block.block.group} - ${block.block.field}</p>`;
         str += "</div>";
         tooltip.innerHTML = str;
     }
