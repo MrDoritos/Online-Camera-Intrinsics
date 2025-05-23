@@ -187,6 +187,7 @@
     #text-wrap: nowrap;
     display:flex;
     #flex-wrap:wrap;
+    cursor:default;
 }
 
 #log_view_buttons_div div div {

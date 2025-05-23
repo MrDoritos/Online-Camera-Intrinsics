@@ -145,8 +145,9 @@ class Log {
         if (a > this.rows.length - 2) return [this.rows.length-2,this.rows.length-1];
 
         let a1 = this.rows[a];
-        let t1 = this.rows[a+1], t2 = this.rows[a-1];
-        if (Math.abs(t1.columns[block.stub].seconds - a1.columns[block.stub].seconds) < Math.abs(t2.columns[block.stub].seconds - a1.seconds))
+        //let t1 = this.rows[a+1], t2 = this.rows[a-1];
+        //if (Math.abs(t1.columns[block.stub].seconds - a1.columns[block.stub].seconds) < Math.abs(t2.columns[block.stub].seconds - a1.seconds))
+        if (time - a1.columns[block.stub].seconds >= 0)
             return [a, a+1];
         return [a-1, a];
     }
@@ -688,6 +689,14 @@ class Parameters {
         return document.querySelector(this.get_log_view_selector() + " #cursor_info");
     }
 
+    get_button_elements() {
+        return Object.values(document.querySelectorAll(this.get_log_view_selector() + " #log_view_buttons_div > div"));
+    }
+
+    get_button_div() {
+        return document.querySelector(this.get_log_view_selector() + " #log_view_buttons_div");
+    }
+
     render_canvas() {
         let layers = this.log.get_blocks_by_depth();
         let rr = this.get_view_row_range();
@@ -1120,6 +1129,52 @@ class Parameters {
             return;
 
         this.tooltip_mouse_input(event);
+    }
+
+    async clear_user_selection() {
+        if (document.selection && document.selection.empty) {
+            document.selection.empty();
+        } else if (window.getSelection) {
+            window.getSelection().removeAllRanges();
+        }
+    }
+
+    async button_div_mouse_input(event) {
+        let bd = this.get_button_div();
+        if (!is_position_of_element(event, bd))
+            return;
+
+        let buttons = this.get_button_elements();
+        let hb = buttons.find(btn => is_position_of_element(event, btn));
+
+        if (!hb)
+            return;
+
+        let check_element = hb.querySelector('input');
+        let block = this.log.get_block(check_element.className);
+        let checked = check_element.checked;
+
+        if (!block)
+            return;
+
+        if (is_position_of_element(event, check_element) && event.detail == 1) {
+            block.visible = checked;
+        }
+        else if (event.detail == 1) {
+            check_element.checked = !checked;
+            block.visible = !checked;
+        } else {
+            this.clear_user_selection();
+            let check_elements = buttons.map(button => button.querySelector('input'));
+            let blocks = check_elements.map(check => this.log.get_block(check.className));
+            check_elements.forEach(check => check.checked = !checked);
+            blocks.forEach(block => block.visible = !checked);
+            check_element.checked = checked;
+            block.visible = checked;
+        }
+        
+        this.modified = true;
+        this.render();
     }
 
     get_linear_regression(block, indicies) {
@@ -1633,7 +1688,12 @@ class VCDS {
             );            
         };
 
+        let add_events = function(elem, func, events) {
+            events.forEach(event => elem.addEventListener(event, func));
+        };
+
         add_mouse_events(lce, params.mouse_input.bind(params));
+        add_events(params.get_button_div(), params.button_div_mouse_input.bind(params), ['click']);
 
         params.set_styles();
         this.set_log(params);
