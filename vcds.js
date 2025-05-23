@@ -812,7 +812,7 @@ class Parameters {
         e.style.height = (event.y - pos.y - bh) + "px";
     }
 
-    resize_bar_drag(event, bar) {
+    async resize_bar_drag(event, bar) {
         if (bar.id == 'canvas_buttons_resize_bar')
             this.canvas_buttons_resize_bar_drag(event, bar);
         if (bar.id == 'canvas_table_resize_bar')
@@ -889,7 +889,7 @@ class Parameters {
         return this.export_range(this.get_view_row_range());
     }
 
-    remove_tooltip() {
+    async remove_tooltip() {
         let b = this.get_log_view_div();
         document.querySelectorAll(this.get_log_view_selector() + " #tooltip")
             .forEach(x=>b.removeChild(x));
@@ -905,7 +905,7 @@ class Parameters {
         return tooltip;
     }
 
-    remove_overlay() {
+    async remove_overlay() {
         let b = this.get_log_view_div();
         document.querySelectorAll(this.get_log_view_selector() + " #overlay")
             .forEach(x=>b.removeChild(x));
@@ -933,7 +933,7 @@ class Parameters {
         }
     }
 
-    set_overlay_position(event, overlay, elem) {
+    async set_overlay_position(event, overlay, elem) {
         let rel = get_position_relative_to_element(event, elem);
         let start = overlay.mouse_start;
         if (!start) {
@@ -965,9 +965,60 @@ class Parameters {
             this.remove_cursor_info();
     }
 
-    mouse_input(event) {
-        let tt = this.tooltip_element;
+    async set_tooltip_info(event, tooltip, elem) {
+        let rel = get_position_relative_to_element(event, elem);
+        let block = this.get_view_nearest_block(rel, 0.05, true);
 
+        tooltip.style.backgroundColor = "";
+
+        if (!block) {
+            tooltip.style.backgroundColor = "black";
+            tooltip.className = "";
+            tooltip.innerHTML = "";
+            return;
+        }
+
+        let iden = this.get_block_identifier(block.block);
+
+        tooltip.className = iden;
+        let str = `<div class="${iden}" style="top: ${event.y}px; left: ${event.x + 10}px">`;
+        str += `<p>${block.column.value.toFixed(2)}</p>`;
+        str += `<p>${block.column.seconds.toFixed(2)}</p>`;
+        str += `<p>${block.block.name}</p>`;
+        str += "</div>";
+        tooltip.innerHTML = str;
+    }
+
+    async set_tooltip_position(event, tooltip, elem) {
+        let tooltip_width = 3;
+        let element_height = elem.clientHeight;
+        let offset_height = this.get_shifted_relative({x:0,y:0}).y * element_height;
+        let element_y = elem.clientTop + elem.offsetTop;
+        let tooltip_y = element_y + offset_height;
+        let tooltip_height = (element_height - offset_height * 2);
+        let tooltip_x = event.x - tooltip_width * 0.5;
+        
+        tooltip.style.height = tooltip_height + "px";
+        tooltip.style.width = tooltip_width + "px";
+        tooltip.style.left = tooltip_x + "px";
+        tooltip.style.top = tooltip_y + "px";
+    }
+
+    async tooltip_mouse_input(event) {
+        if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
+            if (this.tooltip_element)
+                this.remove_tooltip();
+            return;
+        }
+
+        if (!this.tooltip_element)
+            this.create_tooltip();
+
+        this.set_tooltip_position(event, this.tooltip_element, this.element);
+        this.set_tooltip_info(event, this.tooltip_element, this.element);
+    }
+
+    async mouse_input(event) {
         this.cursor_info_mouse_input(event);
 
         if (this.overlay_mouse_input(event))
@@ -976,35 +1027,7 @@ class Parameters {
         if (this.resize_bar_mouse_input(event))
             return;
 
-        if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
-            if (tt) {
-                this.remove_tooltip();
-            }
-            return;
-        }
-
-        if (!tt)
-            tt = this.create_tooltip();
-
-        if (tt) {
-            let rel = get_position_relative_to_element(event, this.element);
-            //tt.style.left = (event.x + 10) + "px";
-            //tt.style.top = event.y + "px";
-            //tt.style.top = this.element.top;
-            let off_h = this.get_shifted_relative({x:0,y:0}).y * this.element.clientHeight;
-            let tt_w = 4;
-            tt.style.height = (this.element.clientHeight - (off_h * 2)) + "px";
-            tt.style.width = tt_w + "px";
-            tt.style.left = (event.x - (tt_w*0.5)) + "px";
-            tt.style.top = (this.element.clientTop + this.element.offsetTop + off_h) + "px";
-            let block = this.get_view_nearest_block(rel, 0.05, true);
-            if (!block) {
-                this.remove_tooltip();
-                return;
-            }
-            tt.style.backgroundColor = block.block.color;
-            tt.innerHTML = `<div style="top: ${event.y}px; left: ${event.x + 10}px; background-color: ${block.block.color}"><p>${block.column.value.toFixed(2)}</p><p>${block.column.seconds.toFixed(2)}s</p><p>${block.block.name}</p></div>`;
-        }        
+        this.tooltip_mouse_input(event);
     }
 
     get_linear_regression(block, indicies) {
