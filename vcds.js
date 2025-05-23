@@ -73,12 +73,47 @@ class Log {
         return this.blocks.toSorted((a,b) => a.depth < b.depth);
     }
 
+    get_row_index_by_seconds_via_approximation(time) {
+        let ss = this.rows.length / this.seconds_range;
+        let ai = (time - this.seconds_min) * ss;
+        let ss2 = ss * 0.5;
+    
+        let min_time = Math.abs(time - this.rows[0].seconds);
+        let min_index = 0;
+
+        for (let i = 0; i < this.rows.length; i++) {
+            let si = (i >> 1) * ((i & 1) ? 1 : -1) + ai;
+            if (Math.abs(time - this.rows[si].seconds) < min_time) {
+                min_time = Math.abs(time - this.rows[si].seconds);
+                min_index = si;
+                if (min_time < ss2)
+                    break;
+            }
+        }
+        return min_index;
+    }
+
     get_row_index_by_seconds(time) {
         let min_time=Math.abs(time - this.rows[0].seconds);
         let min_index=0;
         for (let i = 0; i < this.rows.length; i++) {
-            if (Math.abs(time - this.rows[i].seconds) < min_time) {
-                min_time = Math.abs(time - this.rows[i].seconds);
+            //let t = Math.abs(time - this.rows[i].seconds);
+            let t = time - this.rows[i].seconds;
+            if (t < min_time && t >= 0) {
+                min_time = t;
+                min_index = i;
+            }
+        }
+        return min_index;
+    }
+
+    get_row_index_by_block_seconds(time, block) {
+        let min_time = Math.abs(time - this.rows[0].columns[block.stub].seconds);
+        let min_index = 0;
+        for (let i = 0; i < this.rows.length; i++) {
+            let t = Math.abs(time - this.rows[i].columns[block.stub].seconds);
+            if (t < min_time) {
+                min_time = t;
                 min_index = i;
             }
         }
@@ -98,13 +133,30 @@ class Log {
 
         let a1 = this.rows[a];
         let t1 = this.rows[a+1], t2 = this.rows[a-1];
-        if (Math.abs(t1.seconds - a.seconds) < Math.abs(t2.seconds - a.seconds))
+        if (Math.abs(t1.seconds - a1.seconds) < Math.abs(t2.seconds - a1.seconds))
+            return [a, a+1];
+        return [a-1, a];
+    }
+
+    get_two_rows_indicies_by_block_seconds(time, block) {
+        let a = this.get_row_index_by_block_seconds(time, block);
+        if (a < 1) return [0, 1];
+        if (a > this.rows.length - 2) return [this.rows.length-2,this.rows.length-1];
+
+        let a1 = this.rows[a];
+        let t1 = this.rows[a+1], t2 = this.rows[a-1];
+        if (Math.abs(t1.columns[block.stub].seconds - a1.columns[block.stub].seconds) < Math.abs(t2.columns[block.stub].seconds - a1.seconds))
             return [a, a+1];
         return [a-1, a];
     }
 
     get_two_rows_by_seconds(time) {
         let ix = this.get_two_rows_indicies_by_seconds(time);
+        return [this.rows[ix[0]], this.rows[ix[1]]];
+    }
+
+    get_two_rows_by_block_seconds(time, block) {
+        let ix = this.get_two_rows_indicies_by_block_seconds(time, block);
         return [this.rows[ix[0]], this.rows[ix[1]]];
     }
 
@@ -512,6 +564,11 @@ class Parameters {
         this.context.lineTo(pos.x, pos.y);
     }
 
+    arc(relative, radius, startAngle, endAngle, counterclockwise=false) {
+        let pos = this.get_position_absolute(relative);
+        this.context.arc(pos.x, pos.y, radius, startAngle, endAngle, counterclockwise);
+    }
+
     get_column_relative(block, column) {
         return {
             x: (column.seconds - this.log.seconds_min) * this.delta_time_inv,
@@ -629,6 +686,14 @@ class Parameters {
             this.lineTo(rel);
 
             this.context.stroke();
+
+            this.context.fillStyle = block.color;
+            if (this.get_view_rows_count() <= 60)
+            this.foreach_view_row(function(row) { 
+                this.context.beginPath();
+                this.arc(this.get_column_relative(block, row.columns[block.stub]), 5, 0, 2 * Math.PI);
+                this.context.fill();
+            }.bind(this));
         }.bind(this));
     }
 
@@ -967,7 +1032,7 @@ class Parameters {
 
     async set_tooltip_info(event, tooltip, elem) {
         let rel = get_position_relative_to_element(event, elem);
-        let block = this.get_view_nearest_block(rel, 0.05, true);
+        let block = this.get_view_nearest_block(rel, 0.05, false);
 
         tooltip.style.backgroundColor = "";
 
