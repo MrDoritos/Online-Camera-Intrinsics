@@ -113,29 +113,75 @@
     position:absolute;
     border: 1px solid black;
     text-wrap: nowrap;
-    #transform:translate(-50%,0);
+    display:flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+#tooltip #extra, #tooltip #extra_flip {
+    position: absolute;
+    #right:10vw;
+    #text-wrap:nowrap;
+    display: inline-block;
+    #display:grid;
+    #grid-template-columns: 1fr 1fr;
 }
 
 #tooltip #extra {
-    #transform: translate(-10px, 0);
-    position: absolute;
-    #float:right;
-    border: 1px solid black;
     right:10vw;
-    text-wrap:nowrap;
-    display:flex;
-    flex-direction: row;
-    flex-wrap:nowrap;
+    left:auto;
 }
 
-#tooltip #extra:first {
-    margin-right: 2em;
+#tooltip #extra_flip {
+    right:auto;
+    left:10vw;
+    #direction: rtl;
+}
+
+#tooltip #extra_flip p, #tooltip #extra p {
+    #position: float;
+    #display: inline;
+    #display:block;
+    #position: float;
+}
+#tooltip #extra p:first-child {
+    #float:left;
+}
+
+#tooltip #extra p:last-child {
+    #float:right;
+    margin-left:1em;
+}
+
+#tooltip #extra_flip p:last-child {
+    #margin-right: 2em;
+    #margin-left: 0;
+    #float:left;
+    margin-right: 1em;
+}
+
+#tooltip #offset_helper {
+    display: flex;
+    border: 1px solid black;
+    position: relative;
+}
+
+#tooltip #extra_flip #offset_helper {
+    flex-direction: row-reverse;
+}
+
+#tooltip #extra_flip p:first-child {
+    #margin-right: 0;
+    #margin-left: 2em;
+    #float:right;
 }
 
 #tooltip p {
     font-family: monospace;
-    font-size:1.3em;
+    font-size:1.2em;
     margin:0;
+    #display: inline;
+    text-wrap:nowrap;
 }
 
 #canvas_info > * {

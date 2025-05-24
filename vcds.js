@@ -421,6 +421,27 @@ function get_element_relative_to_element(inner, outer) {
     };
 }
 
+function get_element_corners(elem) {
+    let pos = get_element_position(elem);
+    return {
+        x1:pos.x,
+        x2:pos.x + pos.width,
+        y1:pos.y,
+        y2:pos.y + pos.height,
+    };
+}
+
+function is_element_overlap_element(a, b) {
+    let corners_a = get_element_corners(a);
+    let corners_b = get_element_corners(b);
+    return (
+        corners_a.x2 >= corners_b.x1 &&
+        corners_a.x1 <= corners_b.x2 &&
+        corners_a.y2 >= corners_b.y1 &&
+        corners_a.y1 <= corners_b.y2
+    );
+}
+
 function create_matrix(rows, columns) {
     return Array(rows).fill(0).map(x => Array(columns).fill(0));
 }
@@ -1133,11 +1154,6 @@ class Parameters {
         }
 
         let tt_left = tooltip.offsetLeft;
-        let overflowing = false;
-
-        let rule = get_css_rule('#tooltip #extra');
-        rule.style.right = '10px';
-        rule.style.left = '';
 
         for (const [key, column] of Object.entries(n.row.columns)) {
             let block = this.log.get_block(key);
@@ -1160,34 +1176,106 @@ class Parameters {
             let style_r = tooltip_r.toFixed(2) + "px";
             let style_t = ((1-rel.y) * 100).toFixed(2) + "%";
 
-            let div = tooltip.querySelector('.' + iden);
+            let div = tooltip.querySelector('#offset_helper.' + iden);
             let create_child = !div;
+            if (!create_child)
+                div = div.parentElement;
 
             if (create_child)
                 div = document.createElement('div');
 
-            div.className = iden;
+            //div.className = iden;
             div.id = "extra";
             div.style.top = style_t;
+            div.style.left = '';
 
             let d_str = "";
 
-            d_str += `<p>${block.name}</p>`;
-            d_str += `<p>${column.value.toFixed(2)}${block.unit}</p>`;
+            //d_str += `<div class='${iden}'>`;
+            //d_str += `<p>${block.name}</p>`;
+            //d_str += `<p>${column.value.toFixed(2)}${block.unit}</p>`;
+            //d_str += `</div>`;
+            //d_str += `<div class='${iden}'><p>${column.value.toFixed(2)}${block.unit}</p><p>${block.name}</p></div>`;
+            div.childNodes.forEach(x => div.removeChild(x));
+            let value_e = document.createElement('p');
+            let name_e = document.createElement('p');
+            value_e.innerText = `${column.value.toFixed(2)}${block.unit}`;
+            name_e.innerText = `${block.name}`;
+            let ee = document.createElement('div');
+            ee.className = iden;
 
-            div.innerHTML = d_str;
+            //div.innerHTML = d_str;
 
             if (create_child)
                 tooltip.appendChild(div);
 
-            if (div.getBoundingClientRect().left < 0)
-                overflowing |= true;
+            ee.appendChild(name_e);
+            ee.appendChild(value_e);
+            ee.id = "offset_helper";
+            div.appendChild(ee);
+            ee.style.right = "-" + value_e.clientWidth + "px";
+
+            //let div_size = div.getBoundingClientRect();
+
+            //console.log(div_size, window.innerWidth);
+
+            if (div.getBoundingClientRect().left < 0) {
+                div.id = "extra_flip";
+                ee.style.left = ee.style.right;
+                ee.style.right = '';
+            }
         }
 
-        if (overflowing) {
-            rule.style.right = '';
-            rule.style.left = '10px';
+        let compare_elems = function(a, b) {
+            return a.offsetTop - b.offsetTop;
+        };
+
+        let sorted = Object.values(tooltip.querySelectorAll('#extra'))
+            .toSorted(compare_elems);
+
+        let height = undefined;
+        if (sorted.length)
+            height = sorted[0].clientHeight;
+
+        for (let i = 1; i < sorted.length; i++) {
+            let e = sorted[i];
+            if (e.offsetTop < sorted[i-1].offsetTop + height) {
+                e.id = "extra_flip";
+                if (e.getBoundingClientRect().right > window.innerWidth) {
+                    e.id = "extra";
+                    continue;
+                }
+                let aa = e.childNodes[0];
+                aa.style.left = aa.style.right;
+                aa.style.right = '';
+                sorted = sorted.filter(x => x !== e);
+            }
         }
+
+        let a_sorted = Object.values(tooltip.querySelectorAll('#extra'))
+            .toSorted(compare_elems);
+
+        let b_sorted = Object.values(tooltip.querySelectorAll('#extra_flip'))
+            .toSorted(compare_elems);
+
+        let modify_positions = async function(elems) {
+            for (let i = 1; i < elems.length; i++) {
+                let e = elems[i];
+                let b = elems[i-1];
+                let height = b.clientHeight;
+                let bottom = b.offsetTop + height;
+                let n_top = e.offsetTop - height;
+                if (n_top > bottom) {
+                    e.style.top = n_top + "px";
+                } else
+                if (e.offsetTop < bottom) {
+                    e.style.top = bottom + "px";
+                }
+            }
+        };
+
+        modify_positions(a_sorted);
+        modify_positions(b_sorted);
 
         if (main_tooltip && main_tooltip.getBoundingClientRect().left < 0) {
             //main_tooltip.style.left = "5px";
@@ -1214,7 +1302,7 @@ class Parameters {
     async tooltip_mouse_input(event) {
         if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
             if (this.tooltip_element)
-                ;//this.remove_tooltip();
+                this.remove_tooltip();
             return;
         }
 
@@ -1683,7 +1771,7 @@ class VCDS {
                 let iden = this.get_log_block_identifier(p, block);
                 //this.set_css_style(`.${iden}`, 'background-color', block.color);
                 str += `<div class="${iden}">`;
-                str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" onclick="vcds.log_block_toggle_click(this)" checked /><div>`;
+                str += `<input id="inline" class="${block.stub}" name="${p.log.name}" type="checkbox" checked /><div>`;
                 str += `<p id="inline">${block.name}</p>`;
                 str += `<p>${block.min} - ${block.max} (${block.range.toFixed(2)}) ${block.min_time} - ${block.max_time}</p>`;
                 str += `</div></div>`;
