@@ -428,7 +428,6 @@ function create_matrix(rows, columns) {
 class Parameters {
     constructor(log, element) {
         this.context = element.getContext('2d');
-        this.size = element.getBoundingClientRect();
 
         this.log = log;
         this.element = element;
@@ -445,16 +444,28 @@ class Parameters {
     }
 
     update_canvas_size() {
-        this.element.width = this.log.rows.length * 2;
-
-        if (this.element.width > 6000) this.element.width = 6000;
-        if (this.element.width < 800) this.element.width = 800;
-
+        this.size = this.element.getBoundingClientRect();
         this.aspect_ratio = this.size.height / this.size.width;
 
-        this.element.height = this.aspect_ratio * this.element.width;
+        let default_height = 100;
+        let default_width = 500;
 
-        this.line_width = this.element.height / 100;
+        if (this.size.height < default_height) {
+            this.size.height = default_height;
+            this.size.width = this.size.height / this.aspect_ratio;
+        } else
+        if (this.size.width < default_width) {
+            this.size.width = default_width;
+            this.size.height = this.aspect_ratio * this.element.width;
+        }
+
+        this.element.width = this.size.width;
+        this.element.height = this.size.height;
+
+        this.line_width = this.element.width / 300;
+        if (this.line_width < 2)
+            this.line_width = 2;
+
         this.border_radius = this.line_width;
 
         this.context.lineWidth = this.line_width;
@@ -694,6 +705,22 @@ class Parameters {
         return document.querySelector(this.get_log_view_selector() + " #log_view_buttons_div");
     }
 
+    get_element(element_id) {
+        return document.querySelector(this.get_log_view_selector() + ` #${element_id}`);
+    }
+
+    get_log_toggle() {
+        return this.get_element('log_toggle');
+    }
+
+    get_log_remove() {
+        return this.get_element('log_close');
+    }
+
+    get_header_div() {
+        return this.get_element('log_view_header_div');
+    }
+
     render_canvas() {
         let layers = this.log.get_blocks_by_depth();
         let rr = this.get_view_row_range();
@@ -860,7 +887,7 @@ class Parameters {
         str += `<p>${sr.start.toFixed(2)}s to ${sr.end.toFixed(2)}s (${sr.range.toFixed(2)}s)</p>`;
         str += `<p>${rc} samples</p>`;
         str += `<p>${(rc / sr.range).toFixed(1)} samples/s</p>`;
-        str += `<p id='cursor_info'></p>`;
+        str += `<p id='cursor_info'>--.--s [---]</p>`;
         str += `<button name="${this.log.name}" onclick="vcds.log_export_range_input(this)">Export Range</button>`;
 
         e.innerHTML = str;
@@ -926,6 +953,8 @@ class Parameters {
         }
         if (event.type == "mouseup") {
             rebars.forEach(bar => bar.name = "up");
+            this.update_canvas_size();
+            this.render();
             return false;
         }
         if (event.type == "mousemove") {
@@ -1141,8 +1170,84 @@ class Parameters {
         this.set_tooltip_info(event, this.tooltip_element, this.element);
     }
 
+    collapse() {
+        let toggle_element = this.get_log_toggle();
+
+        let e1 = this.get_element('log_view_canvas_container');
+        let e2 = this.get_element('log_view_container_div');
+
+        e1.className = "log_view_height_limit";
+        e2.style.display = "none";
+
+        toggle_element.innerText = '+';
+        toggle_element.state = true;
+    }
+    
+    expand() {
+        let toggle_element = this.get_log_toggle();
+
+        let e1 = this.get_element('log_view_canvas_container');
+        let e2 = this.get_element('log_view_container_div');
+
+        e1.className = "";
+        e2.style.display = "";
+
+        toggle_element.innerText = '-';
+        toggle_element.state = false;
+    }
+
+    toggle() {
+        let toggle_element = this.get_log_toggle();
+
+        if (!toggle_element.state) {
+            this.collapse();
+        } else {
+            this.expand();
+        }
+    }
+
+    header_mouse_input(event) {
+        let remove_element = this.get_log_remove();
+        let toggle_element = this.get_log_toggle();
+        let header_element = this.get_header_div();
+
+        let elements = [remove_element, toggle_element, header_element];
+
+        let remove_hover = is_position_of_element(event, remove_element) && remove_element.hover;
+        let toggle_hover = is_position_of_element(event, toggle_element) && toggle_element.hover;
+        let header_hover = is_position_of_element(event, header_element) && header_element.hover;
+
+        if (event.type == 'mouseleave') {
+            elements.forEach(elem => elem.hover = false);    
+            return false;
+        }
+
+        if (event.type == 'mousedown') {
+            let is_hovering = false;
+            elements.forEach(elem => {
+                if (is_position_of_element(event, elem))
+                    is_hovering |= elem.hover = true;
+            });
+            return is_hovering;
+        }
+
+        if (event.type == 'mouseup') {
+            elements.forEach(elem => elem.hover = false);
+
+            if (remove_hover)
+                this.remove();
+            if (toggle_hover)
+                this.toggle();
+        }
+
+        return remove_hover || toggle_hover || header_hover;
+    }
+
     async mouse_input(event) {
         this.cursor_info_mouse_input(event);
+
+        if (this.header_mouse_input(event))
+            return;
 
         if (this.overlay_mouse_input(event))
             return;
@@ -1502,91 +1607,8 @@ class VCDS {
         this.save_local('engine', this.engine);
     }
 
-    clear_overlay() {
-        this.held = false;
-        //let e = document.getElementById('canvas_overlay');
-        //if (e)
-        //    document.body.removeChild(e);
-        document.querySelectorAll('#canvas_overlay').forEach(x=>document.body.removeChild(x));
-        this.current_canvas = undefined;
-        this.current_log = undefined;
-        this.canvas_overlay = undefined;
-        this.mouse_start = undefined;
-    }
-
     get_hovering_log(event) {
         return this.logs.find(log => is_position_of_element(event, log.element));
-    }
-
-    mouse_input(event) {
-        if (event.type == "dblclick") {
-            let e = this.get_hovering_log(event);
-            if (e) {
-                let cl = e;
-                this.held = false;
-                let vb = {x1:0,x2:1,y1:0,y2:1};
-                cl.set_view_boundary(vb);
-                this.render_log(cl);
-                this.clear_overlay();
-            }
-            return;
-        }
-        if (event.type == "mousedown") {
-            let e = this.get_hovering_log(event);
-            if (!e)
-                return;
-            this.current_log = e;
-            let cc = this.current_canvas = e.element;
-            this.mouse_start = get_position_relative_to_element(event, this.current_canvas);
-            let size = get_element_position(cc);
-            let co = this.canvas_overlay = document.createElement('div');
-            document.body.insertAdjacentElement('beforeend', this.canvas_overlay);
-            co.id = "canvas_overlay"
-            co.style.minWidth = "0px";
-            co.style.minHeight = `${size.height}px`;
-            co.style.top = `${size.y}px`;
-            co.style.left = `${event.clientX}px`;
-
-            this.held = true;
-            return;
-        }
-        if (!this.current_canvas || !this.canvas_overlay) {
-            this.held = false;
-            return;
-        }
-        let co = this.canvas_overlay, cc = this.current_canvas, ms = this.mouse_start, cl = this.current_log;
-        let mp = get_position_relative_to_element(event, cc);
-        if (event.type == "mouseup") {
-            let rel = get_element_relative_to_element(co, cc);
-            let p = cl;
-            let x_src_diff = rel.x2 - rel.x1;
-            if (Math.abs(x_src_diff) > 0.01) {
-                let x_start = p.x_start;
-                let x_end = p.x_end;
-                let x_diff = x_end - x_start;
-                x_start = x_diff * rel.x1 + x_start;
-                x_end = x_diff * x_src_diff + x_start;
-                let vb = {x1:x_start,x2:x_end,y1:p.y_start,y2:p.y_end};
-                p.set_view_boundary(vb);
-            }
-            this.render_log(cl);
-            this.clear_overlay();
-        }
-        if (!this.held)
-            return;
-        if (event.type == "mousemove") {
-            let x = ms.x;
-            let ml = ms, mr = mp;
-            if (ml.x > mr.x)
-                [ml, mr] = [mr, ml];
-            let l = ml.x * cc.clientWidth + cc.clientLeft;
-            let w = (mr.x - ml.x) * cc.clientWidth;
-            //console.log(l+w, cc.clientLeft+cc.clientWidth, l, cc.clientLeft);
-            if (l + w < cc.clientLeft+cc.clientWidth && l > cc.clientLeft) {
-                co.style.left = `${l}px`;
-                co.style.minWidth = `${w}px`;
-            }
-        }
     }
 
     render_log(p) {
@@ -1638,9 +1660,9 @@ class VCDS {
     get_log_header_html(p) {
         let log = p.log;
         let str = `<div id='log_view_header_div'>`;
-        str += `<a id='log_toggle' name='${log.name}' onclick='vcds.log_toggle_click(this)'>-</a>`;
+        str += `<a id='log_toggle' name='${log.name}'>-</a>`;
         str += `<p>${log.filename}</p>`;
-        str += `<a id='log_close' name='${log.name}' onclick='vcds.log_close_click(this)'>X</a>`;
+        str += `<a id='log_close' name='${log.name}'>X</a>`;
         str += `</div>`;
         return str;
     }
@@ -1716,43 +1738,15 @@ class VCDS {
 
         add_mouse_events(lce, params.mouse_input.bind(params));
         add_events(params.get_button_div(), params.button_div_mouse_input.bind(params), ['click']);
+        params.remove = function() {
+            document.getElementById('log_body').removeChild(params.get_log_view_div());
+            this.logs = this.logs.filter(v => v.log.name != params.log.name);
+        }.bind(this);
 
         params.set_styles();
         this.set_log(params);
 
         this.render_log(params);
-    }
-
-    log_close_click(event) {
-        this.get_element('log_body').removeChild(event.parentElement.parentElement);
-    }
-
-    log_toggle_click(event) {
-        //let e = event.parentElement.getElementById('log_view_container_div');
-        let name = event.getAttribute('name');
-        let q = `div#log_view_div[name='${name}']`
-        let e1 = document.querySelector(q + ' div#log_view_container_div');
-        let e2 = document.querySelector(q + ' div#log_view_canvas_div');
-        let e3 = document.querySelector(q + ' div#log_view_canvas_container');
-        let e4 = document.querySelector(q + ' div#log_view_canvas_all_div');
-
-        if (event.innerText.includes('-')) {
-            e1.style.setProperty('display', 'none');
-            //e2.style.setProperty('resize', 'horizontal');
-            //e3.style.setProperty('max-height', '10vh');
-            //this.set_css_style('.log_view_height_limit', 'max-height', '10vh');
-            //e3.style.maxHeight = "10vh";
-            e3.className = "log_view_height_limit";
-            event.innerText = '+';
-        } else {
-            e1.style.setProperty('display', "");
-            //e2.style.setProperty('resize', 'both');
-            //e3.style.setProperty('max-height', "");
-            //this.set_css_style('.log_view_height_limit', 'max-height', 'fit-content');
-            //e3.style.maxHeight = "fit-content";
-            e3.className = "";
-            event.innerText = '-';
-        }
     }
 
     get_parameters(event) {
@@ -1769,17 +1763,6 @@ class VCDS {
 
     get_block_stub(event) {
         return event.target.class;
-    }
-
-    log_block_toggle_click(event) {
-        let log = this.get_parameters(event);
-        //console.log(event, log);
-        let block = log.log.get_block(event.className);
-        if (!block)
-            return;
-        block.visible = !block.visible;
-        log.modified = true;
-        this.render_log(log);
     }
 
     log_load_input(event) {

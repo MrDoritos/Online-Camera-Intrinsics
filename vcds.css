@@ -141,8 +141,9 @@
     margin:auto auto auto 0.2em;
     #flex-grow:0.03;
     font-family: monospace;
-    font-size:1.3em;
+    #font-size:1.3em;
     height:fit-content;
+    text-wrap:nowrap;
 }
 
 #canvas_info button {
