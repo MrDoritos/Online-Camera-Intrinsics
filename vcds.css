@@ -110,15 +110,16 @@
 }
 
 #tooltip #main {
-    position:fixed;
+    position:absolute;
     border: 1px solid black;
-    #transform: translate(0, -50%);
+    text-wrap: nowrap;
+    #transform:translate(-50%,0);
 }
 
 #tooltip #extra {
     #transform: translate(-10px, 0);
     position: absolute;
-    float:right;
+    #float:right;
     border: 1px solid black;
     right:10vw;
     text-wrap:nowrap;

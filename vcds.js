@@ -1097,7 +1097,7 @@ class Parameters {
 
         tooltip.style.backgroundColor = "";
 
-        let str = "";
+        let main_tooltip = undefined;
 
         if (!n.block) {
             tooltip.style.backgroundColor = "black";
@@ -1107,13 +1107,37 @@ class Parameters {
             let iden = this.get_block_identifier(n.block);
 
             tooltip.className = iden;
-            str += `<div class="${iden}" id="main" style="top: ${event.y}px; left: ${event.x + 10}px">`;
+
+            main_tooltip = tooltip.querySelector('#main');
+            let create_child = !main_tooltip;
+
+            if (create_child)
+                main_tooltip = document.createElement('div');
+            main_tooltip.className = iden;
+            main_tooltip.id = "main";
+            //main_tooltip.style.top = event.y + "px";
+            //main_tooltip.style.top = (get_position_relative_to_element(event, tooltip).y * 100).toFixed(2) + "%";
+            main_tooltip.style.top = "110%";
+            //main_tooltip.style.left = "10px";
+            main_tooltip.style.transform = 'translate(-50%,0)';
+
+            let str = '';
             str += `<p>${n.column.value.toFixed(2)}${n.block.unit}</p>`;
             str += `<p>${n.column.seconds.toFixed(2)}</p>`;
             str += `<p>${n.block.name}</p>`;
             str += `<p>${n.block.group} - ${n.block.field}</p>`;
-            str += "</div>";
+            main_tooltip.innerHTML = str;
+
+            if (create_child)
+                tooltip.appendChild(main_tooltip);
         }
+
+        let tt_left = tooltip.offsetLeft;
+        let overflowing = false;
+
+        let rule = get_css_rule('#tooltip #extra');
+        rule.style.right = '10px';
+        rule.style.left = '';
 
         for (const [key, column] of Object.entries(n.row.columns)) {
             let block = this.log.get_block(key);
@@ -1129,16 +1153,47 @@ class Parameters {
             let tooltip_y = element_y + offset_height;
             //let tooltip_r = event.x - 10;
             let tooltip_r = 30;
+
+            let tooltip_l = tt_left - tooltip_r;
+
+
             let style_r = tooltip_r.toFixed(2) + "px";
             let style_t = ((1-rel.y) * 100).toFixed(2) + "%";
 
-            str += `<div class="${iden}" id="extra" style="top: ${style_t}">`;
-            str += `<p>${block.name}</p>`;
-            str += `<p>${column.value.toFixed(2)}${block.unit}</p>`;
-            str += "</div>";
+            let div = tooltip.querySelector('.' + iden);
+            let create_child = !div;
+
+            if (create_child)
+                div = document.createElement('div');
+
+            div.className = iden;
+            div.id = "extra";
+            div.style.top = style_t;
+
+            let d_str = "";
+
+            d_str += `<p>${block.name}</p>`;
+            d_str += `<p>${column.value.toFixed(2)}${block.unit}</p>`;
+
+            div.innerHTML = d_str;
+
+            if (create_child)
+                tooltip.appendChild(div);
+
+            if (div.getBoundingClientRect().left < 0)
+                overflowing |= true;
         }
 
-        tooltip.innerHTML = str;
+        if (overflowing) {
+            rule.style.right = '';
+            rule.style.left = '10px';
+        }
+
+        if (main_tooltip && main_tooltip.getBoundingClientRect().left < 0) {
+            //main_tooltip.style.left = "5px";
+            main_tooltip.style.transform = `translate(-${event.x - 10}px,0)`;
+        }
+
     }
 
     async set_tooltip_position(event, tooltip, elem) {
@@ -1159,7 +1214,7 @@ class Parameters {
     async tooltip_mouse_input(event) {
         if (!is_position_of_element(event, this.element) || event.type == "mouseleave") {
             if (this.tooltip_element)
-                this.remove_tooltip();
+                ;//this.remove_tooltip();
             return;
         }
 
