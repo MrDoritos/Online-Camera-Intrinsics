@@ -845,7 +845,7 @@ async function load_header(csv) {
 }
 
 async function load_preset(sensor_name) {
-	let response = await fetch('sensors/' + sensor_name + '/' + sensor_name + '.json');
+	let response = await fetch('/sensors/' + sensor_name + '/' + sensor_name + '.json');
 
 	if (!response)
 		return;
@@ -854,7 +854,7 @@ async function load_preset(sensor_name) {
 }
 
 async function load_preset_from_all(sensor_name) {
-	let csv = await load_csv('sensors/sensors_all.csv');
+	let csv = await load_csv('/sensors/sensors_all.csv');
 	let all = await load_all(csv);
 
 	let all_index = all.find(n => n['sensor-name'] === sensor_name);
@@ -914,9 +914,9 @@ async function on_load(element) {
 	let loadingElement = document.querySelector('#loading');
 	loadingElement.textContent = "Loading...";
 
-	let header = await load_header(await load_csv('sensors/sensors_header.csv'));
-	let cache = await load_cache(await load_csv('sensors/sensors_cache.csv'));
-	let formats = await load_formats(await load_csv('sensors/sensors_format.csv'));
+	let header = await load_header(await load_csv('/sensors/sensors_header.csv'));
+	let cache = await load_cache(await load_csv('/sensors/sensors_cache.csv'));
+	let formats = await load_formats(await load_csv('/sensors/sensors_format.csv'));
 
 	sensors_cache = cache.cache;
 	sensors_fields = header.fields;
