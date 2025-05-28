@@ -8,6 +8,7 @@ import html
 import time
 import argparse
 from typing import cast
+import importlib
 
 parser = argparse.ArgumentParser(
     prog="generator.py",
@@ -110,6 +111,29 @@ def check_or_terminate(file, name, target='', code=-1):
 
         print(f' (given "{file}")')
         sys.exit(code)
+
+def get_generators():
+    packages = []
+    for path, subdir, files in os.walk(site_filepath):
+        if '__init__.py' in files:
+            module_name = os.path.basename(path)
+            packages.append({
+                path, 
+                importlib.import_module(module_name)
+            })
+    return packages
+
+def generate_header():
+    pass
+
+def generate_footer():
+    pass
+
+def generate_sidebar():
+    pass
+
+def generate_landing(modules, landing_fp):
+    pass
 
 def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
     print('dissolving', sensor_path)
@@ -511,5 +535,6 @@ def init():
     if debug_mode:
         print('using cname:', cname)
 
-init()
-compile_site()
+if __name__ == "__main__":
+    init()
+    compile_site()
