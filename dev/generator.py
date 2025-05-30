@@ -3,9 +3,9 @@
 import json
 import os
 import sys
-import csv
 import html
 import time
+import csv
 import argparse
 from typing import cast
 import importlib
@@ -90,8 +90,8 @@ header_path = os.path.join(directory_path, header_filename)
 cache_path = os.path.join(directory_path, cache_filename)
 format_path = os.path.join(directory_path, format_filename)
 page_path = os.path.join(directory_path, page_filename)
+sensor_path = os.path.join(directory_filepath, sensor_filename)
 
-sensor_path = os.path.join(site_filepath, sensor_filename)
 cname_path = os.path.join(site_filepath, cname_filename)
 sitemap_path = os.path.join(site_filepath, sitemap_filename)
 robots_path = os.path.join(site_filepath, robots_filename)
@@ -291,10 +291,10 @@ def generate_allcsv(all_csv_fp, template_fp, header_fp, cache_fp):
     all_csv.writerows(header_csv)
 
     for _, dirs, _ in os.walk(directory_filepath):
-        for dir in dirs:
+        for dir in sorted(dirs):
             n_dir = directory_filepath + dir + '/'
             for _, _, files in os.walk(n_dir):
-                for file in files:
+                for file in sorted(files):
                     if not file.endswith('.json'):
                         continue
 
@@ -326,13 +326,13 @@ def generate_pages(header_fp, page_fp):
     header = [x for x in header_csv]
 
     for _, dirs, _ in os.walk(directory_filepath):
-        for dir in dirs:
+        for dir in sorted(dirs):
             n_dir = directory_filepath + dir + '/'
             for _, _, files in os.walk(n_dir):
                 json_filepath = None
                 image_filepaths = []
 
-                for file in files:
+                for file in sorted(files):
                     if file.endswith('.json'):
                         json_filepath = file
                     elif file.endswith('.html'):
@@ -401,14 +401,20 @@ def generate_sitemap(sitemap_fp):
         print('excluded paths:', realpaths)
 
     sitemap_fp.write(f'<?xml version="1.0" encoding="UTF-8"?>\n')
-    sitemap_fp.write(f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
+    sitemap_fp.write( \
+f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n\
+\txmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n')
 
     for path, _, files in os.walk(site_realpath):
-        for file in files:
+        if 'index.html' not in files:
+            continue
+
+        url_path = ('/' + os.path.relpath(path).lstrip('.')).rstrip('/') + '/'
+        images = []
+
+        for file in sorted(files):
             filepath_real = os.path.realpath(os.path.join(path, file))
             filepath_rel = os.path.relpath(os.path.join(path, file))
-
-            sitemap_entry_path = '/' + filepath_rel.lstrip('/')
 
             if sum(1 for x in wildcards if x.replace('*', '') in filepath_real):
                 continue
@@ -416,27 +422,36 @@ def generate_sitemap(sitemap_fp):
             if filepath_real in realpaths or sum(1 for x in realpaths if x in filepath_real) > 0:
                 continue
 
+            if sum(1 for x in image_filetypes if file.endswith(x)):
+                images.append('/' + filepath_rel.lstrip('.'))
+
             if debug_mode:
                 print('sitemap path:', filepath_rel)
                 print('filesystem path:', filepath_real)
 
-            last_modified = time.gmtime(os.stat(filepath_real).st_mtime)
+        last_modified = time.gmtime(os.stat(filepath_real).st_mtime)
 
-            change_frequency = 'monthly'
+        change_frequency = 'monthly'
 
-            priority = 0.5 # default value
+        priority = 0.5 # default value
 
-            sitemap_entry = \
+        sitemap_image_entries = ''
+
+        if len(images):
+            sitemap_image_entries += '\n\t\t<image:image>\n'
+            for image in images:
+                sitemap_image_entries += f'\t\t\t<image:loc>{protocol}{cname}{image}</image:loc>\n'
+            sitemap_image_entries += '\t\t</image:image>'
+
+        sitemap_entry = \
 f'''    <url>
-        <loc>{protocol}{cname}{sitemap_entry_path}</loc>
+        <loc>{protocol}{cname}{url_path}</loc>{sitemap_image_entries}
         <lastmod>{time.strftime('%Y-%m-%d', last_modified)}</lastmod>
         <changefreq>{change_frequency}</changefreq>
         <priority>{priority}</priority>
     </url>\n'''
-            sitemap_fp.write(sitemap_entry)
+        sitemap_fp.write(sitemap_entry)
 
-            if limit_generation:
-                break
         if limit_generation:
             break
     
