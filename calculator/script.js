@@ -23,7 +23,7 @@ function quick_format_html(outline, readonly) {
 	for (const [key, value] of Object.entries(outline)) {
 		let html_type = readonly || value.calc < 1 ? "text" : "number";
 		let html =
-`<div><p>${value.text}</p><input type="${html_type}" name="${key}" step="${value.step}" value="${value.value}" ${extra_text} oninput="on_change(this)" /></div>\n`;
+`<div id="${value.calc_id ? value.calc_id : ''}"><p>${value.text}</p><input type="${html_type}" name="${key}" step="${value.step}" value="${value.value}" ${extra_text} oninput="on_change(this)" /></div>\n`;
 		innerHTML += html;
 	}
 	
@@ -193,7 +193,7 @@ function get_distort_parameters(camera, direction) {
 	let senh = Number(camera['sensor-pix-y'].value);
 
 	if (aspect) {
-		if (Math.abs(Math.log10(aspect)) < 1.5) // verify aspect ratio is 1:100 or less
+		if (Math.abs(Math.log10(aspect)) <= 1) // verify aspect ratio is 1:10 or less
 		 	params.aspect = aspect;
 	}
 	if (k1)	params.k1 = k1;
@@ -532,22 +532,37 @@ function auto_pixasp(cam, a, b) {
 	return Math.sqrt(pixcnt / b);
 }
 
+function auto_mp_div(cam, a, b) {
+	return get_pixcnt(a) / b;
+}
+
+function auto_div_sqrt(cam, a, b) {
+	return Math.sqrt(a / b);
+}
+
+function auto_div_sq(cam, a, b) {
+	return a / (b*b);
+}
+
 // #endregion
 
 const solve_requirements = [
 	['sensor-aspect', 'sensor-width', 'sensor-height', auto_div, 1],
+	['sensor-area', 'sensor-width', 'sensor-height', auto_mul, 1],
+	['sensor-pix-size', 'sensor-area', 'sensor-mp', auto_div_sqrt, 1],
 	['sensor-aspect', 'sensor-pix-x', 'sensor-pix-y', auto_div, 1],
+	['sensor-mp', 'sensor-area', 'sensor-pix-size', auto_div_sq, 1],
+	['sensor-pix-y', 'sensor-mp', 'sensor-aspect', auto_pixasp, 1],
+	['sensor-pix-x', 'sensor-mp', 'sensor-pix-y', auto_mp_div, 1],
 	['sensor-mp', 'sensor-pix-x', 'sensor-pix-y', auto_mul, 0.000001],
 	['sensor-pix-x', 'sensor-width', 'sensor-pix-size', auto_div, 1000],
 	['sensor-pix-y', 'sensor-height', 'sensor-pix-size', auto_div, 1000],
-	['sensor-pix-x', 'sensor-mp', 'sensor-pix-y', auto_pix, 1],
-	['sensor-pix-y', 'sensor-mp', 'sensor-pix-x', auto_pix, 1],
-	['sensor-pix-y', 'sensor-mp', 'sensor-aspect', auto_pixasp, 1],
+	['sensor-pix-x', 'sensor-mp', 'sensor-pix-y', auto_mp_div, 1],
+	['sensor-pix-y', 'sensor-mp', 'sensor-pix-x', auto_mp_div, 1],
 	['sensor-width', 'sensor-pix-x', 'sensor-pix-size', auto_mul, 0.001],
 	['sensor-height', 'sensor-pix-y', 'sensor-pix-size', auto_mul, 0.001],
 	['sensor-width', 'sensor-height', 'sensor-aspect', auto_mul, 1],
 	['sensor-height', 'sensor-width', 'sensor-aspect', auto_div, 1],
-	['sensor-area', 'sensor-width', 'sensor-height', auto_mul, 1],
 	['sensor-diagonal', 'sensor-width', 'sensor-height', auto_pyt, 1],
 	['sensor-crop-factor', 'sensor-diagonal', 'sensor-diagonal', auto_cf, 1],
 	['effective-focal-length', 'focal-length', 'sensor-crop-factor', auto_div, 1],
@@ -560,7 +575,7 @@ const solve_requirements = [
 	['effective-focal-length', 'lens-vfov', 'sensor-height', auto_xefl, 1],
 ];
 
-function multipass_solver(cam) {
+function multipass_solver(cam, set_id) {
 	let invalid = get_missing(cam);
 	let valid = get_valid(cam);
 
@@ -574,6 +589,7 @@ function multipass_solver(cam) {
 					let a = cam[s[1]].value;
 					let b = cam[s[2]].value;
 					cam[n].value = s[3](cam, a, b) * s[4];
+					cam[n].calc_id = set_id;
 				}
 			}		
 		});
@@ -635,10 +651,10 @@ function nearest_format(camera) {
 }
 
 function calculate_intrinsics(camera) {
-	let prev_len = multipass_solver(camera);	
+	let prev_len = multipass_solver(camera, 'calc1');
 
-	for (let i = prev_len; i > -1; i--) {
-		let nlen = multipass_solver(camera);
+	for (let i = prev_len, passes = 0; i > -1; i--, passes++) {
+		let nlen = multipass_solver(camera, `calc${passes + 2}`);
 		if (nlen == prev_len)
 			break;
 		prev_len = nlen;

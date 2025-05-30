@@ -247,3 +247,33 @@ button, select, #checkbox p {
 #csv {
 	padding-bottom: 3em;
 }
+
+#constant {
+	background-color: white;
+}
+
+:root {
+	--alpha_red: rgba(255,0,0,0.2);
+	--alpha_blue: rgba(0,0,255,0.2);
+	--alpha_green: rgba(0,255,0,0.2);
+}
+
+#calc1 {
+	background-color: color-mix(in srgb, var(--alpha_blue) 0%, var(--alpha_green) 100%);
+}
+
+#calc2 {
+	background-color: color-mix(in srgb, var(--alpha_blue) 25%, var(--alpha_green) 75%);
+}
+
+#calc3 {
+	background-color: color-mix(in srgb, var(--alpha_blue) 50%, var(--alpha_green) 50%);
+}
+
+#calc4 {
+	background-color: color-mix(in srgb, var(--alpha_blue) 75%, var(--alpha_green) 25%);
+}
+
+#calc5 {
+	background-color: color-mix(in srgb, var(--alpha_blue) 100%, var(--alpha_green) 0%);
+}
