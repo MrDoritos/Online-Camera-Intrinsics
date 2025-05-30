@@ -1,40 +1,78 @@
 sensor-name,sensor-name-friendly
 135,Kodak 35mm
 1in Leica,Xiaomi 15 Ultra - Main Wide
+APS-C 1,"Nikon DX, Pentax, Sony"
+APS-C 2,Canon
+APS-C 3,Spec
+APS-H,Canon
 AR1820,Arducam 18MP
+BF314ACS,Omnivision
 Exmor_RS_CMOS_50MP,Sony Alpha 1
 IMX208,Sony
 IMX214,Sony
 IMX219,Raspberry Pi v2
 IMX230,Arducam 21MP
 IMX258,Sony
+IMX264,Sony
+IMX265,Sony
 IMX274,Sony
 IMX283,Sony
 IMX290,Sony
 IMX296,Sony
 IMX298,Arducam 16MP
+IMX316,Sony
 IMX319,Sony
 IMX327,Sony
 IMX334,Sony
 IMX335,Sony
 IMX355,Sony
+IMX363,Sony
+IMX376,Sony
 IMX412,Sony
 IMX415,Sony
+IMX455,Sony
+IMX458,Sony
 IMX462,Sony
 IMX477,Raspberry Pi High Quality
 IMX500,Raspberry Pi AI
+IMX503,Sony
 IMX519,Arducam 16MP
+IMX557,Sony
+IMX563,Sony
 IMX577,Sony
 IMX582,Samsung S20
 IMX586,Samsung S20
+IMX603,Sony
+IMX615,Sony
+IMX650-12,Sony
+IMX650-40,Sony
+IMX663,Sony
+IMX678,Sony
 IMX686,582/586 successor
+IMX703,Sony
 IMX708,Raspberry Pi v3
 IMX766,Samsung A54
 IMX772,iPhone 13 Pro
 IMX787,Arducam 64MP Hawkeye
+IMX989,Sony
+ISOCELL GN1,Samsung 
+ISOCELL JN5,Samsung - Ultra Wide
+ISOCELL S5K3T2,Samsung 
+ISOCELL S5K4H7,Samsung 
+LYT-500,Sony
+LYT-600,Sony
+LYT-700,Sony
+LYT-800,Sony
+LYT-818,Sony
+LYT-900,Sony
 None,None
+OV13850,Omnivision
 OV5647,Raspberry Pi v1
 OV64A40,Arducam 64MP OwlSight
 QV2710,Arducam
 S5KHM1,Samsung ISOCELL
+S5KHMXSP03,Samsung 
 S5KHP9,Samsung ISOCELL
+S5KJN5,Samsung 
+Super 35,Spec
+Ultra Wide,OnePlus 13R
