@@ -48,9 +48,14 @@ async function load_button() {
 }
 
 function on_load(element) {
+    let url = '/sensors/sensors.csv';
+    
     const params = new Proxy(new URLSearchParams(window.location.search), {
         get: (searchParams, prop) => searchParams.get(prop)
     });
 
-    load_file(params.csv);
+    if (params && params.csv)
+        url = params.csv;
+    
+    load_file(url);
 }

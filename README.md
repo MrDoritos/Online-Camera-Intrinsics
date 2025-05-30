@@ -19,6 +19,7 @@ Calculate and test different camera parameters to get a better understanding of 
 - [X] Finish sensor format table
 - [ ] Add more distortion functions
 - [X] Change page layout for mobile users
+- [ ] Modify sitemap to use canonical paths
 
 ### Note
 

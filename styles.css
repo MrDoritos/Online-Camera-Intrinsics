@@ -27,20 +27,28 @@ body {
     background-color:silver;
     padding: 1em 0 1em 0;
     height: fit-content;
+    width:100vw;
+    flex-wrap:wrap;
 }
 
 @media screen and not (min-width: 600px) {
     #header_container > *:first-child {
         display:block;
+        margin-inline:40%;
+        margin-bottom:0.5em;
     }
 
     #header_container {
-        display:block;
+        #display:block;
     }
 
-    #header_container > * {
+    #header_container > *, #header_container #tools > * {
         padding: 0 1em 0 1em;
         width: fit-content;
+    }
+
+    #header_container #tools {
+        padding:0;
     }
 }
 

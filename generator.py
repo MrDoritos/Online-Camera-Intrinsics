@@ -38,7 +38,7 @@ robots_filename = 'robots.txt'
 cname_filename = 'CNAME'
 
 image_filetypes = ['bmp', 'png', 'webp', 'jpg', 'jpeg', 'gif']
-sitemap_ignore = [sitemap_filename, cname_filename, './dev', './.gitignore', './.git', './README.md', '*.py']
+sitemap_ignore = [sitemap_filename, cname_filename, './dev', './.gitignore', './.git', './README.md', '*.py', '*./__pycache__']
 
 sensors_target = 'sensors'
 all_csv_target = 'all_csv'
