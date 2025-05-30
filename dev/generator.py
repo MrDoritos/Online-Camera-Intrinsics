@@ -9,6 +9,7 @@ import csv
 import argparse
 from typing import cast
 import importlib
+import shutil
 
 parser = argparse.ArgumentParser(
     prog="generator.py",
@@ -19,8 +20,9 @@ parser = argparse.ArgumentParser(
 
 dry_run = False
 limit_generation = False
-debug_mode = True
+debug_mode = False
 extra_verbosity = False
+clean_sensor_dirs = False
 
 directory_filepath = 'sensors/'
 site_filepath = '.'
@@ -45,8 +47,10 @@ all_csv_target = 'all_csv'
 pages_target = 'pages'
 sitemap_target = 'sitemap'
 robots_target = 'robots'
+clean_target = 'clean'
 
 generator_targets = [sensors_target, all_csv_target, pages_target, sitemap_target, robots_target]
+all_targets = generator_targets + [clean_target]
 generator_skips = []
 
 protocol = 'https://'
@@ -57,14 +61,15 @@ parser.add_argument('--data-path', default=directory_filepath, dest='data_filepa
 parser.add_argument('-v', '--verbose', default=debug_mode, action='store_true', dest='debug_mode', help='Debug mode')
 parser.add_argument('--extra-verbose', default=extra_verbosity, action='store_true', dest='extra_verbosity', help='Extra verbosity')
 parser.add_argument('-n', '--dry-run', default=dry_run, action='store_true', dest='dry_run', help="Don't make any changes on disk")
-parser.add_argument('--target', default=generator_targets, action='extend', nargs='+', choices=generator_targets, dest='generator_targets', help='Override list of targets in pipeline')
-parser.add_argument('--skip', default=generator_skips, action='extend', nargs='+', choices=generator_targets, dest='generator_skips', help='Skip a pipeline target')
+parser.add_argument('--target', default=generator_targets, action='extend', nargs='+', choices=all_targets, dest='generator_targets', help='Override list of targets in pipeline')
+parser.add_argument('--skip', default=generator_skips, action='extend', nargs='+', choices=all_targets, dest='generator_skips', help='Skip a pipeline target')
 parser.add_argument('--image-types', default=image_filetypes, action='extend', nargs='+', dest='image_filetypes', help='Set image extensions')
 parser.add_argument('--sitemap-ignore', default=sitemap_ignore, action='extend', nargs='+', dest='sitemap_ignore', help='Set paths to be ignored by crawlers')
 parser.add_argument('--cname-path', default=cname_filename, dest='cname_filename', help='Set cname with a file')
 parser.add_argument('--cname', dest='cname', help='Ignores cname-path to set cname directly')
 parser.add_argument('--protocol', default=protocol, dest='protocol', help='Set protocol')
 parser.add_argument('--robots', default=robots_filename, dest='robots_filename', help='Set robots filename')
+parser.add_argument('--clean', default=clean_sensor_dirs, action='store_true', dest='clean_sensor_dirs', help='Clean sensor directory of any stale sensors without altered data')
 
 args = parser.parse_args()
 
@@ -73,6 +78,7 @@ directory_filepath = args.data_filepath
 debug_mode = args.debug_mode
 extra_verbosity = args.extra_verbosity
 dry_run = args.dry_run
+clean_sensor_dirs = args.clean_sensor_dirs
 generator_targets = args.generator_targets
 generator_skips = args.generator_skips
 image_filetypes = args.image_filetypes
@@ -96,6 +102,11 @@ cname_path = os.path.join(site_filepath, cname_filename)
 sitemap_path = os.path.join(site_filepath, sitemap_filename)
 robots_path = os.path.join(site_filepath, robots_filename)
 
+wildcards = [x.replace('*', '') for x in sitemap_ignore if '*' in x]
+non_wildcards = [x for x in sitemap_ignore if '*' not in x]
+
+sensor_names = []
+
 def fmt_dry(msg):
     if dry_run:
         return msg + ' (dry):'
@@ -112,6 +123,25 @@ def check_or_terminate(file, name, target='', code=-1):
         print(f' (given "{file}")')
         sys.exit(code)
 
+def foreach(iter, func):
+    return [func(x) for x in iter]
+
+def select(iter, attr:str):
+    return [getattr(x, attr) for x in iter]
+
+def any(iter, func):
+    return sum([func(x) for x in iter])>0
+
+def where(iter, func, neg:bool=False):
+    return [x for x in iter if neg ^ func(x)]
+
+def get_pages():
+    pages = []
+    for path, dirs, files in os.walk(site_filepath):
+        if 'index.html' in files:
+            pages.append(path)
+    return pages
+
 def get_generators():
     packages = []
     for path, subdir, files in os.walk(site_filepath):
@@ -122,6 +152,49 @@ def get_generators():
                 importlib.import_module(module_name)
             })
     return packages
+
+def get_dirs(dir):
+    dirs = [x for x in os.scandir(dir) if x.is_dir()]
+    return sorted(dirs, key=lambda x: x.name)
+
+def get_files(dir):
+    files = [x for x in os.scandir(dir) if x.is_file()]
+    return sorted(files, key=lambda x: x.name)
+
+def get_sensor_dirs():
+    return select(get_dirs(directory_filepath), 'name')
+
+def get_server_path(path):
+    return ('/' + os.path.relpath(path).lstrip('.')).rstrip('/')+'/'
+
+def is_ignored_path(path):
+    return any(wildcards, path.count) or any(non_wildcards, path.count)
+
+def is_sensor_dir_altered(dir):
+    return len([x for x in os.listdir(dir) if x not in ['index.html', 'description.html'] and not x.endswith('.json')]) > 0
+
+def is_target_scheduled(target):
+    return target in generator_targets and target not in generator_skips
+
+def schedule_target(target, force:bool=False):
+    if target in generator_skips:
+        if not force:
+            return
+        generator_skips.remove(target)
+    if target not in generator_targets:
+        generator_targets.append(target)
+
+def clean_sensor_dir(sensors):
+    print('cleaning sensor dirs')
+
+    to_clean = where(get_sensor_dirs(), lambda x: x not in sensors and not is_sensor_dir_altered(x))
+
+    if to_clean:
+        print(fmt_dry('removing'), ','.join(to_clean))
+
+        if not dry_run:
+            for sensor in sensors:
+                shutil.rmtree(os.path.join(directory_filepath, sensor), ignore_errors=False)
 
 def generate_header():
     pass
@@ -136,6 +209,7 @@ def generate_landing(modules, landing_fp):
     pass
 
 def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
+    global sensor_names
     print('dissolving', sensor_path)
 
     template_json = json.load(template_fp)
@@ -254,6 +328,8 @@ def generate_sensors(sensor_fp, template_fp, header_fp, format_fp):
         sensor_name_fs_safe = sensor_json['sensor-name']
         sensor_directory = directory_filepath + sensor_name_fs_safe + '/'
         sensor_json_file = sensor_directory + sensor_name_fs_safe + '.json'
+
+        sensor_names.append(sensor_name_fs_safe)
 
         if not os.path.exists(sensor_directory):
             if debug_mode:
@@ -388,73 +464,51 @@ def generate_pages(header_fp, page_fp):
                     if limit_generation:
                         return
 
+def add_to_sitemap(dir):
+    locs = []
+    files = get_files(dir)
+    subs = get_dirs(dir)
+
+    if any(files, lambda x: x.name.endswith('index.html')):
+        loc = {
+            'loc': get_server_path(dir),
+            'images': where(select(files, 'path'), lambda x: any(image_filetypes, x.endswith)),
+            'lastmod': time.gmtime(os.stat(dir).st_mtime),
+            'changefreq': 'monthly',
+            'priority':0.5
+        }
+        locs.append(loc)
+
+    for sub in subs:
+        if is_ignored_path(sub.path):
+            continue
+
+        locs.extend(add_to_sitemap(sub.path))
+
+    return locs
+
 def generate_sitemap(sitemap_fp):
     print('generate', sitemap_filename, 'using site root')
 
-    site_realpath = os.path.realpath(site_filepath)
+    sitemap_fp.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    sitemap_fp.write('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'+
+                     '\txmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n')
 
-    wildcards = [x for x in sitemap_ignore if '*' in x]
-    realpaths = [os.path.realpath(os.path.join(site_realpath, x)) for x in sitemap_ignore if x not in wildcards]
+    locs = add_to_sitemap(site_filepath)
 
-    if debug_mode:
-        print('wildcards:', wildcards)
-        print('excluded paths:', realpaths)
+    for loc in locs:
+        sitemap_fp.write('\t<url>\n')
+        sitemap_fp.write(f'\t<loc>{protocol}{cname}{loc['loc']}</loc>\n')
+        if len(loc['images']):
+            sitemap_fp.write('\t\t<image:image>\n')
+            for image in loc['images']:
+                sitemap_fp.write(f'\t\t\t<image:loc>{protocol}{cname}{image}</image:loc>\n')
+            sitemap_fp.write('\t\t</image:image>\n')
+        sitemap_fp.write(f'\t<lastmod>{time.strftime('%Y-%m-%d', loc['lastmod'])}</lastmod>\n')
+        sitemap_fp.write(f'\t<changefreq>{loc['changefreq']}</changefreq>\n')
+        sitemap_fp.write(f'\t<priority>{loc['priority']}</priority>\n')
+        sitemap_fp.write('\t</url>\n')
 
-    sitemap_fp.write(f'<?xml version="1.0" encoding="UTF-8"?>\n')
-    sitemap_fp.write( \
-f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n\
-\txmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n')
-
-    for path, _, files in os.walk(site_realpath):
-        if 'index.html' not in files:
-            continue
-
-        url_path = ('/' + os.path.relpath(path).lstrip('.')).rstrip('/') + '/'
-        images = []
-
-        for file in sorted(files):
-            filepath_real = os.path.realpath(os.path.join(path, file))
-            filepath_rel = os.path.relpath(os.path.join(path, file))
-
-            if sum(1 for x in wildcards if x.replace('*', '') in filepath_real):
-                continue
-
-            if filepath_real in realpaths or sum(1 for x in realpaths if x in filepath_real) > 0:
-                continue
-
-            if sum(1 for x in image_filetypes if file.endswith(x)):
-                images.append('/' + filepath_rel.lstrip('.'))
-
-            if debug_mode:
-                print('sitemap path:', filepath_rel)
-                print('filesystem path:', filepath_real)
-
-        last_modified = time.gmtime(os.stat(filepath_real).st_mtime)
-
-        change_frequency = 'monthly'
-
-        priority = 0.5 # default value
-
-        sitemap_image_entries = ''
-
-        if len(images):
-            sitemap_image_entries += '\n\t\t<image:image>\n'
-            for image in images:
-                sitemap_image_entries += f'\t\t\t<image:loc>{protocol}{cname}{image}</image:loc>\n'
-            sitemap_image_entries += '\t\t</image:image>'
-
-        sitemap_entry = \
-f'''    <url>
-        <loc>{protocol}{cname}{url_path}</loc>{sitemap_image_entries}
-        <lastmod>{time.strftime('%Y-%m-%d', last_modified)}</lastmod>
-        <changefreq>{change_frequency}</changefreq>
-        <priority>{priority}</priority>
-    </url>\n'''
-        sitemap_fp.write(sitemap_entry)
-
-        if limit_generation:
-            break
-    
     sitemap_fp.write('</urlset>')
 
 def generate_robots(robots_fp):
@@ -477,6 +531,13 @@ def run_sensors():
             with open(format_path, mode='w') as format_fp:
                 with open(sensor_path, mode='r') as sensor_fp:
                     generate_sensors(sensor_fp, template_fp, header_fp, format_fp)
+
+def run_clean_sensor_dir():
+    if not is_target_scheduled(sensors_target):
+        if debug_mode:
+            print('skip target:', clean_target, f' ({sensors_target} not run)')
+        return
+    clean_sensor_dir(sensor_names)
 
 def run_allcsv():
     check_or_terminate(template_path, 'template_path', all_csv_target)
@@ -506,21 +567,20 @@ def run_robots():
 
 generator_target_items = [
     [sensors_target, run_sensors],
+    [clean_target, run_clean_sensor_dir],
     [all_csv_target, run_allcsv],
     [pages_target, run_pages],
     [sitemap_target, run_sitemap],
-    [robots_target, run_robots]
+    [robots_target, run_robots],
 ]
 
 def compile_site():
-    for x in generator_target_items:
-        target_name = x[0]
-
-        if target_name in generator_targets and target_name not in generator_skips:
-            x[1]()
+    for target,func in generator_target_items:
+        if is_target_scheduled(target):
+            func()
         else:
             if debug_mode:
-                print('skip target:', x[0])
+                print('skip target:', target)
 
 def init():
     global cname
@@ -549,6 +609,9 @@ def init():
 
     if debug_mode:
         print('using cname:', cname)
+
+    if clean_sensor_dirs:
+        schedule_target(clean_target)
 
 if __name__ == "__main__":
     init()
