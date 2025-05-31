@@ -446,6 +446,306 @@ function create_matrix(rows, columns) {
     return Array(rows).fill(0).map(x => Array(columns).fill(0));
 }
 
+class OptionAbstract {
+    create(){}
+    update(element){}
+    remove(element){}
+    set_readonly(element,readonly=true){}
+    get_value(element){}
+    set_value(element,value){}
+};
+
+class OptionElement extends OptionAbstract {
+    constructor(element_type, input_type, id, text) {
+        super();
+        this.type = element_type;
+        this.input_type = input_type;
+        this.id = id;
+        this.text = text;
+    }
+
+    type;
+    id;
+    text;
+    input_type;
+
+    is_bool() {
+        return this.input_type && this.input_type == 'checkbox';
+    }
+
+    get_number_types() {
+        return ['range', 'number'];
+    }
+
+    is_num() {
+        return this.input_type && this.input_type in this.get_number_types();
+    }
+
+    is_int() {
+        return this.is_num();
+    }
+
+    is_float() {
+        return this.is_num();
+    }
+
+    create() {
+        return document.createElement(this.type);
+    }
+
+    remove(element) {
+        if (element.parentElement)
+            element.parentElement.removeChild(element);
+        else
+            document.removeChild(element);
+    }
+
+    set_readonly(element, readonly=true) {
+        element.readOnly = readonly;
+        element.disabled = readonly;
+    }
+
+    get_value_loc() {
+        if (this.input_type == 'checkbox')
+            return 'checked';
+        return 'value';
+    }
+
+    set_value(element, value) {
+        element[this.get_value_loc()] = value;
+    }
+
+    get_raw_value(element) {
+        return element[this.get_value_loc()];
+    }
+
+    get_value(element) {
+        let raw = this.get_raw_value(element);
+
+        if (this.is_bool())
+            return raw;
+        else
+        if (this.is_num() && !isNaN(parseFloat(raw)))
+            return parseFloat(raw);
+        else
+            return raw;
+    }
+
+    update(element, set_default=false) {
+        if (this.input_type)
+            element.type = this.input_type;
+
+        if (this.id)
+            element.id = this.id;
+    }
+}
+
+class OptionSelection extends OptionElement {
+    constructor(option_id, option_text, default_selection, selection_list) {
+        super('select', null, option_id, option_text);
+        this.default_selection = default_selection;
+        this.selection_list = selection_list;
+    }
+
+    create_select_option_element(select_item) {
+        let e = document.createElement('option');
+        e.value = select_item.value;
+        e.innerText = select_item.text;
+        return e;
+    }
+
+    get_select_option(key) {
+        let text = this.selection_list[key];
+        if (!text)
+            text = key;
+        return {value:key, text};
+    }
+
+    set_readonly(element, readonly=true) {
+        element.disabled = readonly;
+    }
+
+    update(element, set_default=false) {
+        super.update(element, set_default);
+
+        let v = set_default ? this.default_selection : element.value;
+        let keys = Object.keys(this.selection_list);
+
+        element.innerHTML = "";
+
+        let str = '';
+
+        keys.forEach(function(k) {
+            let so = this.get_select_option(k);
+            str += `<option value=${so.value} ${k == v ? 'selected' : ''}>${so.text}</option>`;
+        }.bind(this));
+
+        element.innerHTML = str;
+        //element.value = v;
+    }
+}
+
+class OptionBase extends OptionElement {
+    constructor(option_element, default_value=0.5, min=0, max=1, step=0.01) {
+        super();
+        Object.assign(this, option_element)
+        this.default_value = default_value;
+        this.min = min;
+        this.max = max;
+        this.step = step;
+    }
+
+    is_int() {
+        return this.is_num() && Math.abs(Math.round(this.step) - this.step) < 0.00001;
+    }
+
+    is_float() {
+        return this.is_num() && !this.is_int();
+    }
+
+    update(element, set_default=false) {
+        super.update(element, set_default);
+
+        if (this.is_num()) {
+            element.step = this.step;
+            element.min = this.min;
+            element.max = this.max;
+            if (set_default)
+                element.value = this.default_value;
+        } else
+        if (this.is_bool()) {
+            element.checked = this.default_value;
+        } else {
+            if (set_default)
+                element.value = this.default_value;
+        }
+    }
+};
+
+class Options {
+    constructor(container_element, options_list, base_options=undefined, base_override_type='try_self_first') {
+        this.container_element = container_element;
+        this.options_list = options_list;
+        this.option_groups = {};
+        this.base_options = base_options;
+        this.base_override_type = base_override_type;
+
+        this.onchange = function(group,id,value) {
+            console.log('\ngroup:', group, '\nid:', id, '\nvalue:', value);
+        };
+
+        this.create_options_container();
+    }
+
+    option_input(event) {
+        let id = event.target?.id;
+        let group = this.get_group(id);
+        let value = this.get_value(id);
+        if (!group)
+            return;
+        this.update_group(group);
+        this.onchange(group, id, value);
+    }
+
+    is_toggle_override() {
+        return this.base_options && this.base_override_type == 'toggle';
+    }
+
+    get_toggle_option(key) {
+        return new OptionBase({type:'input',input_type:'checkbox',id:key,text:''}, false);
+    }
+
+    update_group(group, set_default=false) {
+        group.option.update(group.option_element, set_default);
+
+        if (this.is_toggle_override()) {
+            if (!group.toggle_option) {
+                group.toggle_option = this.get_toggle_option(group.option.id);
+            }
+
+            if (!group.toggle_element) {
+                group.toggle_element = group.toggle_option.create();
+                group.container_element.insertBefore(group.toggle_element, group.option_element);
+                group.toggle_option.update(group.toggle_element, true);
+                group.toggle_element.addEventListener('input', this.option_input.bind(this));
+            }
+
+            console.log(group.toggle_option, group.toggle_option.get_value(group.toggle_element), group.toggle_element);
+            group.option.set_readonly(group.option_element, !group.toggle_option.get_value(group.toggle_element));
+        } else {
+            if (group.toggle_element)
+                group.toggle_element.remove(group.container_element);
+
+            if (group.toggle_option)
+                group.toggle_option = undefined;
+
+            group.option.set_readonly(group.option_element, false);
+        }
+    }
+
+    update_groups(set_default=false) {
+        Object.values(this.option_groups).forEach(n => this.update_group(n, set_default));
+    }
+
+    get_group(key) {
+        let self_group = this.option_groups[key];
+        let base_group = this.base_options?.get_group(key);
+
+        return self_group ? self_group : base_group;
+    }
+
+    get_option(key) {
+        return this.get_group(key)?.option;
+    }
+
+    get_value(key) {
+        let group = this.get_group(key);
+        return group?.option.get_value(group?.option_element);
+    }
+
+    get_dict() {
+        let dict = {};
+
+        for (const [key, value] of Object.entries(this.option_groups)) {
+            dict[key] = this.get_value(key);
+        }
+
+        return dict;
+    }
+
+    inherit(container_element, override_type='try_self_first', additional_options=[]) {
+        let opts = Array.prototype.concat(this.options_list, additional_options);
+        return new Options(container_element, opts, this, override_type);
+    }
+
+    create_option_element(option) {
+        let element = document.createElement('div');
+        let text = element.appendChild(document.createElement('p'));
+        let opt = element.appendChild(option.create());
+        if (option.text)
+            text.innerText = option.text;
+        return {container_element:element,option_element:opt,text_element:text,option};
+    }
+
+    create_options_container() {
+        let element = document.createElement('div');
+
+        this.element = element;
+        this.container_element.appendChild(element);
+
+        this.options_list.forEach(function(option) {
+            if (this.option_groups[option.id])
+                return;
+
+            let group = this.create_option_element(option);
+            element.appendChild(group.container_element);
+            group.option_element.addEventListener('input', this.option_input.bind(this));
+            this.option_groups[option.id] = group;
+            this.update_group(group, this.base_options == undefined);
+        }.bind(this));
+    }
+};
+
 class Parameters {
     constructor(log, element) {
         this.context = element.getContext('2d');
@@ -740,6 +1040,10 @@ class Parameters {
 
     get_header_div() {
         return this.get_element('log_view_header_div');
+    }
+
+    get_log_options_div() {
+        return this.get_element('log_view_opts');
     }
 
     render_canvas() {
@@ -1589,6 +1893,7 @@ class VCDS {
 
     logs = [];
     engine = undefined;
+    global_options = undefined;
 
     constructor() {
         this.events.forEach(function(event) {
@@ -1597,6 +1902,49 @@ class VCDS {
         this.log_load_input();
         this.load_engine_local();
         this.set_ui();
+        this.global_options 
+            = new Options(document.getElementById('global_log_opts'), 
+                [
+                    new OptionBase(
+                        {
+                            type:'input',
+                            input_type:'number',
+                            id:'atmospheric_pressure',
+                            text:'Atmospheric Pressure (mbar)',
+                        }, 1000, 0, 2000, 0.1),
+                    new OptionSelection(
+                        'tooltip_style',
+                        'Tooltip Style',
+                        'fixed',
+                        {
+                            'fixed':'Fixed',
+                            'value':'Value',
+                            'value_nooverlap':'Value without overlap',
+                        },
+                    ),
+                    new OptionSelection(
+                        'tooltip_region',
+                        'Tooltip Region',
+                        'auto',
+                        {
+                            'auto':'Auto',
+                            'left':'Left',
+                            'right':'Right',
+                        },
+                    ),
+                    new OptionSelection(
+                        'tooltip_position',
+                        'Tooltip Position',
+                        'cursor',
+                        {
+                            'cursor':'Cursor',
+                            'fixed':'Fixed',
+                            'vertical':'Above or below log',
+                            'below':'Below log',
+                            'above':'Above log',
+                        },
+                    ),
+                ]);
     }
 
     held = false;
@@ -1851,7 +2199,7 @@ class VCDS {
         let canvas_div = "<div id='log_view_canvas_container'>";
         canvas_div += `<div id='log_view_canvas_all_div'><div id='log_view_canvas_div'><canvas id='log_view_canvas' width=800 height=800></canvas></div><div id='canvas_info'></div></div><div class='vertical_resize_bar resize_bar' id='canvas_buttons_resize_bar'></div>`;
         canvas_div += this.get_log_buttons_html(p);
-        canvas_div += "</div><div class='horizontal_resize_bar resize_bar' id='canvas_table_resize_bar'></div><div id='log_view_container_div'></div><div id='log_view_engine'></div>";
+        canvas_div += "</div><div class='horizontal_resize_bar resize_bar' id='canvas_table_resize_bar'></div><div id='log_view_container_div'></div><div id='log_view_engine'></div><div id='log_view_opts'></div>";
 
         e.innerHTML += this.get_log_header_html(p);
         e.innerHTML += canvas_div;
@@ -1887,6 +2235,8 @@ class VCDS {
         }.bind(this);
 
         params.set_styles();
+        params.options = this.global_options.inherit(params.get_log_options_div(), 'toggle');
+
         this.set_log(params);
 
         this.render_log(params);

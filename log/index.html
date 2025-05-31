@@ -7,7 +7,10 @@
         <div id="log_load_div">
             <input class="input_bypass" id="log_load" type="file" accept="text/csv, *" />
             <button onclick="log_load.click()">Load Log</button>
-            <div id="engine_opts">
+        </div>
+        <div id="engine_opts">
+            <p>Engine Configuration</p>
+            <div id="engine_btn">
                 <button id="define_engine">Define Engine</button>
                 <button onclick="load_engine.click()">Load Engine</button>
                 <input class="input_bypass" id="load_engine" type="file" accept="application/json, *" />
@@ -20,6 +23,9 @@
                 <div id="engine_input"></div>
                 <div id="engine_calc"></div>
             </div>
+        </div>
+        <div id="global_log_opts">
+            <p>Global Options</p>
         </div>
     </body>
     <script src="vcds.js"></script>
