@@ -7,7 +7,16 @@ function get_file_count(input_element) {
     return input_element.files.length;
 }
 
-async function load_json_file(input_element, object_prototype) {
+function load_file_stream(input_element) {
+    if (!get_file_count(input_element))
+        return undefined;
+
+    let file = input_element.files[0];
+    
+    return file.stream();
+}
+
+function load_json_file(input_element, object_prototype) {
     if (!get_file_count(input_element))
         return undefined;
 
@@ -24,7 +33,17 @@ async function load_json_file(input_element, object_prototype) {
     return obj;
 }
 
-async function save_file(filename, blob, dialog=false) {
+function open_file() {
+    const elem = window.document.createElement('input');
+    elem.type = "file";
+    elem.accept = "*";
+    elem.click();
+    if (!get_file_count(elem))
+        return undefined;
+    return elem.files[0];
+}
+
+function save_file(filename, blob, dialog=false) {
     const elem = window.document.createElement('a');
     elem.href = window.URL.createObjectURL(blob);
     elem.download = filename;
@@ -37,12 +56,12 @@ async function save_file(filename, blob, dialog=false) {
     }
 }
 
-async function save_json_file(filename, json_object, dialog=false) {
+function save_json_file(filename, json_object, dialog=false) {
     const blob = new Blob([JSON.stringify(json_object, null, 2)], {type:'application/json'});
     save_file(filename, blob, dialog);
 }
 
-async function save_local_json(key, object) {
+function save_local_json(key, object) {
     localStorage.setItem(key, object ? JSON.stringify(object) : null);
 }
 
@@ -64,6 +83,7 @@ function get_text_stream(text) {
     });
 }
 
+/*
 export { 
     get_file_count,
     load_json_file,
@@ -73,3 +93,4 @@ export {
     load_local_json,
     get_text_stream,
 };
+*/

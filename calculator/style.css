@@ -19,6 +19,94 @@ body {
 	border-bottom: 0.1em solid black;
 }
 
+#input_screen {
+	top:0;
+	left:0;
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	align-content: center;
+}
+
+#input_screen #placement {
+	margin: auto auto;
+	width:max-content;
+	height: min-content;
+	background-color: lightgray;
+	border: 1px solid black;
+	max-width: 90%;
+}
+
+#input_screen #placement > div:first-child {
+	margin: 1em;
+}
+
+#input_matrix_container, #display_matrix_container {
+	display:grid;
+	gap:1px;
+	border:1px solid black;
+}
+
+#cam_mtx #display_matrix_container {
+	margin: 0 auto;
+}
+
+#dist > * {
+	margin-bottom: 1em;
+}
+
+#cam_mtx > * {
+	margin-right: 1em;
+}
+
+#input_matrix_container {
+	#background-color: black;
+}
+
+#input_matrix input, #display_matrix div {
+	-moz-appearance: textfield;
+	margin:0;
+	padding:0;
+	width:100%;
+	height: 100%;
+	box-sizing: border-box;
+	text-align: center;
+}
+
+#display_matrix, #input_matrix {
+	width: 4em;
+	overflow-x:hidden;
+	box-sizing: border-box;
+}
+
+#display_matrix > * {
+	background-color: silver;
+}
+
+#input_screen #input_buttons {
+	display:flex;
+	justify-content: end;
+}
+
+#input_screen #input_buttons > * {
+	margin: 0.25em;
+}
+
+#input_screen #cam_mtx {
+	display:flex;
+}
+
+#input_screen #cam_mtx, #input_screen #dist {
+	#margin: 0 10%;
+	justify-content: start;
+}
+
+#input_screen #dist {
+	#display: flex;
+	display: inline-block;
+	flex-wrap: wrap;
+}
+
 .container {
 	min-width:20%;
 	max-width:50%;

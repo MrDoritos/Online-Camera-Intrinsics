@@ -926,6 +926,75 @@ async function on_preset(element) {
 	set_preset(element.value);
 }
 
+async function do_calib_input_dialog() {
+	function matrix_input(rows, cols) {
+		let str = '';
+		for (let r = 0; r < rows; r++)
+			for (let c = 0; c < cols; c++)
+				str += `<div id="input_matrix" style="grid-area:${r+1}/${c+1}" row="${r}" col="${r}"><input type="number"></input></div>`;
+		return str;
+	};
+
+	function do_grid(rows, cols, data) {
+		let str = '';
+		for (let r = 0; r < rows; r++) {
+			for (let c = 0; c < cols; c++) {
+				let txt = '';
+				if (data[r] && data[r][c] && data[r][c].length)
+					txt = data[r][c];
+				str += `<div id="display_matrix" style="grid-area:${r+1}/${c+1}"><div>${txt}</div></div>`;
+			}
+		}
+		return str;
+	};
+
+	let cm_info = [
+		['cx','','fx'],
+		['','cy','fy'],
+		['','','1'],
+	];
+
+	let dist_info = [
+		['k1','k2','k3','t1','t2'],
+	];
+
+	let html = 
+'<div id="input_screen">' +
+'<div id="placement">' +
+'<div>' +
+`<p>Camera Matrix</p><div id="cam_mtx"><div id="input_matrix_container">${matrix_input(3,3)}</div><div id="display_matrix_container">${do_grid(3,3,cm_info)}</div></div>` +
+`<p>Distortion Parameters</p><div id="dist"><div id="input_matrix_container">${matrix_input(1,5)}</div><div id="display_matrix_container">${do_grid(1,5,dist_info)}</div></div>` +
+'</div>' + 
+'<div id="input_buttons">' +
+'<button id="close">Cancel</button>' +
+'<button id="submit">Apply</button>' +
+'</div>' +
+'</div></div>';
+
+	let e = document.createElement('div');
+
+	e.innerHTML = html;
+
+	document.querySelector('body').appendChild(e);
+	
+}
+
+async function do_save_custom_dialog() {
+
+}
+
+async function do_delete_custom() {
+
+}
+
+async function on_calib_input(event) {
+	switch (event.target.id) {
+		case 'save_custom': do_save_custom_dialog(); break;
+		case 'delete_custom': do_delete_custom(); break;
+		case 'enter_calib': do_calib_input_dialog(); break;
+	}
+}
+
 async function on_load(element) {
 	let loadingElement = document.querySelector('#loading');
 	loadingElement.textContent = "Loading...";
@@ -945,6 +1014,9 @@ async function on_load(element) {
 	set_preset('IMX766');
 
 	load_image();
+
+	document.querySelectorAll('#save_custom,#delete_custom,#enter_calib')
+		.forEach(x => x.addEventListener('click', on_calib_input));
 
 	loadingElement.remove();
 }
