@@ -176,7 +176,7 @@ function get_offset(x, y, w) {
 }
 
 function get_distort_parameters(camera, direction) {
-	let params = {k1:0.0,k2:0.0,k3:0.0,aspect:1.0,ppx:0,ppy:0,senw:1,senh:1,direction:direction};
+	let params = {k1:0.0,k2:0.0,k3:0.0,aspect:1.0,ppx:0,ppy:0,senw:1,senh:1,direction:direction,fx:0.0,fy:0.0};
 
 	if (!camera) return params;
 
@@ -191,6 +191,13 @@ function get_distort_parameters(camera, direction) {
 
 	let senw = Number(camera['sensor-pix-x'].value);
 	let senh = Number(camera['sensor-pix-y'].value);
+
+	let f = Number(camera['focal-length'].value);
+
+	if (f) {
+		params.fx = 1 / f;
+		params.fy = 1 / f;
+	}
 
 	if (aspect) {
 		if (Math.abs(Math.log10(aspect)) <= 1) // verify aspect ratio is 1:10 or less
@@ -238,27 +245,33 @@ function sample_pixel_bound(data, x, y, width, height) {
 }
 
 function distort_pixel(parameters, x, y, width, height) {
-	let center_x = 1 / 2 + parameters.ppx;
-	let center_y = 1 / 2 + parameters.ppy;
+	let center_x = parameters.ppx + 0.5; //.5
+	let center_y = parameters.ppy + 0.5;
 
-	let rel_u = x / width;
+	let d = parameters.direction;
+
+	let rel_u = x / width; //0 - 1
 	let rel_v = y / height;
 
-	let u = rel_u - center_x;
-	let v = rel_v - center_y;
+	let cu = rel_u - center_x; //-.5 - .5 
+	let cv = rel_v - center_y;
+
+	let u = cu * parameters.fx + cu;
+	let v = cv * parameters.fy + cv;
 
 	let max_radius = ((center_x * center_x) + (center_y * center_y));
 	let pix_radius = ((u * u) + (v * v));
-	let radius = pix_radius / max_radius;
+	//let radius = pix_radius / max_radius;
+	let radius = pix_radius;
 	let model = ((Math.pow(radius, 2) * parameters.k1) +
 				 (Math.pow(radius, 4) * parameters.k2) +
-				 (Math.pow(radius, 6) * parameters.k3)) * parameters.direction;
+				 (Math.pow(radius, 6) * parameters.k3));// * parameters.direction;
 
-	let undistort_u = (u * model);
-	let undistort_v = (v * model);
+	let undistort_u = model * u;
+	let undistort_v = model * v;
 
-	let undistort_rel_u = undistort_u + rel_u;
-	let undistort_rel_v = undistort_v + rel_v;
+	let undistort_rel_u = undistort_u * d + rel_u; // + 0 - 1
+	let undistort_rel_v = undistort_v * d + rel_v;
 
 	let edge = radius >= 1.0;
 	//edge = (Math.abs(undistort_rel_u - 0.5) > 0.5 || Math.abs(undistort_rel_v - 0.5) > 0.5);
@@ -286,6 +299,8 @@ function render_distortion(camera) {
 	
 	let dx = (width - 1) / divisions;
 	let dy = dx / params.aspect;
+
+	console.log(params);
 	
 	for (let _dx = 0; _dx < width; _dx+=dx) {
 		for (let _y = 0; _y < height; _y++) {
@@ -351,7 +366,7 @@ function display_image(camera) {
 	if (!is_image_loaded())
 		return;
 
-	let parameters = get_distort_parameters(camera, -1);
+	let parameters = get_distort_parameters(camera, 1);
 	let image = get_image(300, parameters.aspect);
 	let ctx = image.canvas_undistort_preview;
 	let ctxW = image.width_undistort_preview, ctxH = image.height_undistort_preview;
@@ -364,28 +379,60 @@ function display_image(camera) {
 	
 	ctx.clearRect(0, 0, ctxW, ctxH);
 
+	console.log(parameters);
+
 	for (let canvas_x = 0; canvas_x < ctxW; canvas_x++) {
 		for (let canvas_y = 0; canvas_y < ctxH; canvas_y++) {
+			let cu = canvas_x / ctxW;
+			let cv = canvas_y / ctxH;
+
 			let uv = distort_pixel(parameters, canvas_x, canvas_y, ctxW, ctxH);
 
+			if (!uv.edge)
 			emplace_pixel_bound(
 				image.imagedata_undistort_preview.data,
 				sample_pixel_bound(
 					image.imagedata_image_source.data, 
-					uv.u * imgW,
-					uv.v * imgH,
+					cu * imgW,
+					cv * imgH,
 					imgW,
 					imgH
 				),
-				canvas_x,
-				canvas_y,
+				uv.u * ctxW,
+				uv.v * ctxH,
 				ctxW,
 				ctxH
 			);
 		}
-		
-		ctx.putImageData(image.imagedata_undistort_preview, 0, 0);
 	}
+
+	//ctx.putImageData(image.imagedata_undistort_preview, 0, 0);
+
+	for (let image_x = 0; image_x < imgW; image_x++) {
+		for (let image_y = 0; image_y < imgH; image_y++) {
+			let uv = distort_pixel(parameters, image_x, image_y, imgW, imgH);
+
+			if (uv.edge)
+				continue;
+
+			emplace_pixel_bound(
+				image.imagedata_undistort_preview.data,
+				sample_pixel(
+					image.imagedata_image_source.data,
+					image_x,
+					image_y,
+					imgW,
+					imgH
+				),
+				uv.u * ctxW,
+				uv.v * ctxH,
+				ctxW,
+				ctxH
+			)
+		}
+	}
+
+	ctx.putImageData(image.imagedata_undistort_preview, 0, 0);
 }
 
 function load_image_data(data) {
