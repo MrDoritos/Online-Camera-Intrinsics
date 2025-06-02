@@ -927,11 +927,17 @@ async function on_preset(element) {
 }
 
 async function do_calib_input_dialog() {
-	function matrix_input(rows, cols) {
+	function matrix_input(rows, cols, disp_guide) {
 		let str = '';
-		for (let r = 0; r < rows; r++)
-			for (let c = 0; c < cols; c++)
-				str += `<div id="input_matrix" style="grid-area:${r+1}/${c+1}" row="${r}" col="${r}"><input type="number"></input></div>`;
+		for (let r = 0; r < rows; r++) {
+			for (let c = 0; c < cols; c++) {
+				let disable = '';
+				let guide = disp_guide ? disp_guide[r][c] : '';
+				if (!guide || (guide.length && guide instanceof Array && guide[1]) || guide.length < 1)
+					disable = 'disabled';
+				str += `<div id="input_matrix" style="grid-area:${r+1}/${c+1}" row="${r}" col="${c}"><input type="number" ${disable}></input></div>`;
+			}
+		}
 		return str;
 	};
 
@@ -941,7 +947,7 @@ async function do_calib_input_dialog() {
 			for (let c = 0; c < cols; c++) {
 				let txt = '';
 				if (data[r] && data[r][c] && data[r][c].length)
-					txt = data[r][c];
+					txt = data[r][c] instanceof Array ? data[r][c][0] : data[r][c];
 				str += `<div id="display_matrix" style="grid-area:${r+1}/${c+1}"><div>${txt}</div></div>`;
 			}
 		}
@@ -949,21 +955,26 @@ async function do_calib_input_dialog() {
 	};
 
 	let cm_info = [
-		['cx','','fx'],
-		['','cy','fy'],
-		['','','1'],
+		['fx','','cx'],
+		['','fy','cy'],
+		['','',['1', true]],
 	];
 
 	let dist_info = [
 		['k1','k2','k3','t1','t2'],
 	];
 
+	let img_size_info = [
+		['width', 'height'],
+	];
+
 	let html = 
 '<div id="input_screen">' +
 '<div id="placement">' +
 '<div>' +
-`<p>Camera Matrix</p><div id="cam_mtx"><div id="input_matrix_container">${matrix_input(3,3)}</div><div id="display_matrix_container">${do_grid(3,3,cm_info)}</div></div>` +
-`<p>Distortion Parameters</p><div id="dist"><div id="input_matrix_container">${matrix_input(1,5)}</div><div id="display_matrix_container">${do_grid(1,5,dist_info)}</div></div>` +
+`<p>Camera Matrix</p><div id="cam_mtx"><div id="input_matrix_container">${matrix_input(3,3,cm_info)}</div><div id="display_matrix_container">${do_grid(3,3,cm_info)}</div></div>` +
+`<div id="img_size_container"><div><input type="checkbox" id="enable"></input><p>Image size</p></div><div id="img_size"><div id="input_matrix_container">${matrix_input(1,2,img_size_info)}</div><div id="display_matrix_container">${do_grid(1,2,img_size_info)}</div></div></div>` +
+`<p>Distortion Parameters</p><div id="dist"><div id="input_matrix_container">${matrix_input(1,5,dist_info)}</div><div id="display_matrix_container">${do_grid(1,5,dist_info)}</div></div>` +
 '</div>' + 
 '<div id="input_buttons">' +
 '<button id="close">Cancel</button>' +
@@ -971,9 +982,98 @@ async function do_calib_input_dialog() {
 '</div>' +
 '</div></div>';
 
+	function cancel_calib() {
+		let e = document.querySelector('#input_screen').parentElement;
+		if (e)
+			e.parentElement.removeChild(e);
+	}
+
+	function get_matrix_values(container, ...args) {
+		let vals = [];
+		for (let i = 0; i < args.length; i++) {
+			let arg = args[i];
+			let e_arg = container.querySelector(`div[row='${arg[0]}'][col='${arg[1]}'] input`);
+			vals.push(e_arg.value);
+		}
+		return vals;
+	}
+
+	function checkbox_input(event) {
+		let es = event.target.parentElement.parentElement.querySelectorAll('#input_matrix_container input');
+		es.forEach(e => e.disabled = !event.target.checked);
+	}
+
+	function apply_calib() {
+		let e = document.querySelector('#input_screen');
+		if (!e)
+			return;
+		let mtx = get_matrix_values(e.querySelector('#cam_mtx #input_matrix_container'), [0,0], [1,1], [0,2], [1,2]);
+		let dist = get_matrix_values(e.querySelector('#dist #input_matrix_container'), [0,0], [0,1], [0,2], [0,3], [0,4]);
+		let size = get_matrix_values(e.querySelector('#img_size #input_matrix_container'), [0,0], [0,1]);
+
+		let use_absolute = e.querySelector('#img_size_container #enable').checked;
+
+		let cam = get_inputs();
+
+		if (dist[0]) cam['brown3-radial1'].value = dist[0];
+		if (dist[1]) cam['brown3-radial2'].value = dist[1];
+		if (dist[2]) cam['brown3-radial3'].value = dist[2];
+
+		let fx = Number(mtx[0]);
+		let fy = Number(mtx[1]);
+		let px = Number(mtx[2]);
+		let py = Number(mtx[3]);
+
+		if (use_absolute && size[0] && size[1]) {
+			if (fx)
+				fx /= size[0];
+			if (fy)
+				fy /= size[1];
+			if (px)
+				px = (px / size[0] - 0.5) * size[0];
+			if (py)
+				py = (py / size[1] - 0.5) * size[1];
+		} else {
+			let w = cam['sensor-pix-x']?.value;
+			let h = cam['sensor-pix-y']?.value;
+			let g = w;
+			if (w && h) g = w > h ? w : h;
+			else if (!w && h) g = h;
+			if (g) {
+				g = Number(g);
+				if (px)
+					px = (px - .5) * g;
+				if (py)
+					py = (py - .5) * g;
+			}
+		}
+
+		if (px) cam['principal-pix-x'].value = px;
+		if (py) cam['principal-pix-y'].value = py;
+
+		let f = (fx + fy) * 0.5 - 0.5;
+		f = 1.0 / f;
+
+		if (mtx[0] && mtx[1]) {
+			cam['focal-length'].value = f;
+			cam['effective-focal-length'].value = '';
+		}
+
+		set_camera(cam);
+
+		cancel_calib();
+	}
+
 	let e = document.createElement('div');
 
 	e.innerHTML = html;
+	e.querySelector('#input_screen').addEventListener('click', cancel_calib);
+	e.querySelector('#placement').addEventListener('click', function(event) {event.stopPropagation();});
+	e.querySelector('#close').addEventListener('click', cancel_calib);
+	e.querySelector('#submit').addEventListener('click', apply_calib);
+	let c = e.querySelector('#img_size_container #enable');
+	c.addEventListener('input', checkbox_input);
+	checkbox_input({target:c});
 
 	document.querySelector('body').appendChild(e);
 	

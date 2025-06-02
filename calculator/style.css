@@ -38,25 +38,34 @@ body {
 }
 
 #input_screen #placement > div:first-child {
-	margin: 1em;
+	margin: 0.5em;
+	overflow-x: scroll;
 }
 
 #input_matrix_container, #display_matrix_container {
 	display:grid;
 	gap:1px;
 	border:1px solid black;
+	margin: 0 0.5em 0.5em 0;
+}
+
+@container (cqmax < width) {
+	#input_matrix_container {
+
+	}
 }
 
 #cam_mtx #display_matrix_container {
-	margin: 0 auto;
+	#margin: 0 auto;
 }
 
-#dist > * {
-	margin-bottom: 1em;
+#dist > *:first-child, #img_size > *:first-child, #cam_mtx > *:first-child {
+	#margin-bottom: 0.5em;
+	margin: 0 0.5em 0.5em 0;
 }
 
 #cam_mtx > * {
-	margin-right: 1em;
+	#margin-right: 1em;
 }
 
 #input_matrix_container {
@@ -71,6 +80,18 @@ body {
 	height: 100%;
 	box-sizing: border-box;
 	text-align: center;
+}
+
+#input_matrix input:focus {
+	position: absolute;
+	height:revert;
+	text-align: start;
+	max-width: 8em;
+}
+
+#img_size_container > div:first-child {
+	width: max-content;
+	display: flex;
 }
 
 #display_matrix, #input_matrix {
@@ -94,6 +115,7 @@ body {
 
 #input_screen #cam_mtx {
 	display:flex;
+	flex-wrap:wrap;
 }
 
 #input_screen #cam_mtx, #input_screen #dist {
@@ -101,7 +123,7 @@ body {
 	justify-content: start;
 }
 
-#input_screen #dist {
+#input_screen #dist, #input_screen #img_size {
 	#display: flex;
 	display: inline-block;
 	flex-wrap: wrap;
