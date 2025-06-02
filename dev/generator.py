@@ -164,8 +164,11 @@ def get_files(dir):
 def get_sensor_dirs():
     return select(get_dirs(directory_filepath), 'name')
 
+def get_server_filepath(path, is_file):
+    return ('/' + os.path.relpath(path).lstrip('.')).rstrip('/')+('' if is_file else '/')
+
 def get_server_path(path):
-    return ('/' + os.path.relpath(path).lstrip('.')).rstrip('/')+'/'
+    return get_server_filepath(path, not path.endswith('index.html'))
 
 def is_ignored_path(path):
     return any(wildcards, path.count) or any(non_wildcards, path.count)
@@ -471,8 +474,8 @@ def add_to_sitemap(dir):
 
     if any(files, lambda x: x.name.endswith('index.html')):
         loc = {
-            'loc': get_server_path(dir),
-            'images': where(select(files, 'path'), lambda x: any(image_filetypes, x.endswith)),
+            'loc': get_server_filepath(dir, False),
+            'images': foreach(where(select(files, 'path'), lambda x: any(image_filetypes, x.endswith)), get_server_path),
             'lastmod': time.gmtime(os.stat(dir).st_mtime),
             'changefreq': 'monthly',
             'priority':0.5
@@ -498,15 +501,15 @@ def generate_sitemap(sitemap_fp):
 
     for loc in locs:
         sitemap_fp.write('\t<url>\n')
-        sitemap_fp.write(f'\t<loc>{protocol}{cname}{loc['loc']}</loc>\n')
+        sitemap_fp.write(f'\t\t<loc>{protocol}{cname}{loc['loc']}</loc>\n')
         if len(loc['images']):
             sitemap_fp.write('\t\t<image:image>\n')
             for image in loc['images']:
                 sitemap_fp.write(f'\t\t\t<image:loc>{protocol}{cname}{image}</image:loc>\n')
             sitemap_fp.write('\t\t</image:image>\n')
-        sitemap_fp.write(f'\t<lastmod>{time.strftime('%Y-%m-%d', loc['lastmod'])}</lastmod>\n')
-        sitemap_fp.write(f'\t<changefreq>{loc['changefreq']}</changefreq>\n')
-        sitemap_fp.write(f'\t<priority>{loc['priority']}</priority>\n')
+        sitemap_fp.write(f'\t\t<lastmod>{time.strftime('%Y-%m-%d', loc['lastmod'])}</lastmod>\n')
+        sitemap_fp.write(f'\t\t<changefreq>{loc['changefreq']}</changefreq>\n')
+        sitemap_fp.write(f'\t\t<priority>{loc['priority']}</priority>\n')
         sitemap_fp.write('\t</url>\n')
 
     sitemap_fp.write('</urlset>')

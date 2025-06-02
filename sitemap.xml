@@ -2,529 +2,529 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
 	xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 	<url>
-	<loc>https://iansweb.org/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/about/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/about/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/calculator/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/calculator/</loc>
+		<lastmod>2025-06-02</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/csv/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/csv/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/log/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/log/</loc>
+		<lastmod>2025-06-02</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/parameters/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/parameters/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/projects/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/projects/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/135/</loc>
+		<loc>https://iansweb.org/sensors/135/</loc>
 		<image:image>
-			<image:loc>https://iansweb.org./sensors/135/1024px-Kodak_Ultramax_400_135_film_cartridge.jpeg</image:loc>
-			<image:loc>https://iansweb.org./sensors/135/31115539188_b02b40f7a5_c.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/135/1024px-Kodak_Ultramax_400_135_film_cartridge.jpeg</image:loc>
+			<image:loc>https://iansweb.org/sensors/135/31115539188_b02b40f7a5_c.jpg</image:loc>
 		</image:image>
-	<lastmod>2025-02-09</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/1in Leica/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/1in Leica/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/APS-C 1/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/APS-C 1/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/APS-C 2/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/APS-C 2/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/APS-C 3/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/APS-C 3/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/APS-H/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/APS-H/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/AR1820/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/AR1820/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/BF314ACS/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/BF314ACS/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/Exmor_RS_CMOS_50MP/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/Exmor_RS_CMOS_50MP/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX208/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX208/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX214/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX214/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX219/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX219/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX230/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX230/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX258/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX258/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX264/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX264/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX265/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX265/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX274/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX274/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX283/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX283/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX290/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX290/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX296/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX296/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX298/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX298/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX316/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX316/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX319/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX319/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX327/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX327/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX334/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX334/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX335/</loc>
-	<lastmod>2025-02-12</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX335/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX355/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX355/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX363/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX363/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX376/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX376/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX412/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX412/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX415/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX415/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX455/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX455/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX458/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX458/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX462/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX462/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX477/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX477/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX500/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX500/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX503/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX503/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX519/</loc>
+		<loc>https://iansweb.org/sensors/IMX519/</loc>
 		<image:image>
-			<image:loc>https://iansweb.org./sensors/IMX519/20250212_155729.jpg</image:loc>
-			<image:loc>https://iansweb.org./sensors/IMX519/IMX519-78-16MP-AF-Camera-details-size.jpg</image:loc>
-			<image:loc>https://iansweb.org./sensors/IMX519/imx519-78-16mp-af-camera-4.jpg</image:loc>
-			<image:loc>https://iansweb.org./sensors/IMX519/s-l1200.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX519/20250212_155729.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX519/IMX519-78-16MP-AF-Camera-details-size.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX519/imx519-78-16mp-af-camera-4.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX519/s-l1200.jpg</image:loc>
 		</image:image>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX557/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX557/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX563/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX563/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX577/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX577/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX582/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX582/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX586/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX586/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX603/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX603/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX615/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX615/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX650-12/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX650-12/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX650-40/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX650-40/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX663/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX663/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX678/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX678/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX686/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX686/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX703/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX703/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX708/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX708/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX766/</loc>
+		<loc>https://iansweb.org/sensors/IMX766/</loc>
 		<image:image>
-			<image:loc>https://iansweb.org./sensors/IMX766/172611twnnqw38unanq8qn.jpg</image:loc>
-			<image:loc>https://iansweb.org./sensors/IMX766/20240109150015dcc6c2de73df4d2faf2d281f6d77e12e.jpg</image:loc>
-			<image:loc>https://iansweb.org./sensors/IMX766/50mp-sony-imx766-camera-modulecd69e3e8-6c46-42f4-8b90-3e95a93498ab.jpg</image:loc>
-			<image:loc>https://iansweb.org./sensors/IMX766/p20240920141208cec97.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX766/172611twnnqw38unanq8qn.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX766/20240109150015dcc6c2de73df4d2faf2d281f6d77e12e.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX766/50mp-sony-imx766-camera-modulecd69e3e8-6c46-42f4-8b90-3e95a93498ab.jpg</image:loc>
+			<image:loc>https://iansweb.org/sensors/IMX766/p20240920141208cec97.jpg</image:loc>
 		</image:image>
-	<lastmod>2025-02-09</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX772/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX772/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX787/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX787/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/IMX989/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/IMX989/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/ISOCELL GN1/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/ISOCELL GN1/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/ISOCELL JN5/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/ISOCELL JN5/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/ISOCELL S5K3T2/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/ISOCELL S5K3T2/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/ISOCELL S5K4H7/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/ISOCELL S5K4H7/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/LYT-500/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/LYT-500/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/LYT-600/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/LYT-600/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/LYT-700/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/LYT-700/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/LYT-800/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/LYT-800/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/LYT-818/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/LYT-818/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/LYT-900/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/LYT-900/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/None/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/None/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/OV13850/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/OV13850/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/OV5647/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/OV5647/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/OV64A40/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/OV64A40/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/QV2710/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/QV2710/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/S5KHM1/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/S5KHM1/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/S5KHMXSP03/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/S5KHMXSP03/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/S5KHP9/</loc>
-	<lastmod>2025-02-08</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/S5KHP9/</loc>
+		<lastmod>2025-04-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/S5KJN5/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/S5KJN5/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/Super 35/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/Super 35/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 	<url>
-	<loc>https://iansweb.org/sensors/Ultra Wide/</loc>
-	<lastmod>2025-05-30</lastmod>
-	<changefreq>monthly</changefreq>
-	<priority>0.5</priority>
+		<loc>https://iansweb.org/sensors/Ultra Wide/</loc>
+		<lastmod>2025-05-30</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
 	</url>
 </urlset>
