@@ -397,7 +397,7 @@ function display_image(camera) {
 	
 	ctx.clearRect(0, 0, ctxW, ctxH);
 
-	console.log(parameters);
+	//console.log(parameters);
 
 	for (let canvas_x = 0; canvas_x < ctxW; canvas_x++) {
 		for (let canvas_y = 0; canvas_y < ctxH; canvas_y++) {
@@ -847,6 +847,13 @@ async function load_preset_from_all(sensor_name) {
 
 	if (custom_preset)
 		return custom_preset;
+
+	let first_sensor_name = sensors_cache?.first?.get('sensor-name')?.value;
+
+	if (first_sensor_name)
+		return await load_preset(first_sensor_name);
+
+	return get_empty_outline();
 }
 
 async function load_formats(csv) {
@@ -1035,10 +1042,6 @@ async function do_calib_input_dialog() {
 		let py = Number(mtx[3]);
 
 		if (use_absolute && size[0] && size[1]) {
-			if (fx)
-				fx /= size[0];
-			if (fy)
-				fy /= size[1];
 			if (px)
 				px = (px / size[0] - 0.5) * size[0];
 			if (py)
@@ -1055,18 +1058,25 @@ async function do_calib_input_dialog() {
 					px = (px - .5) * g;
 				if (py)
 					py = (py - .5) * g;
+				if (fx)
+					fx = (fx * g);
+				if (fy)
+					fy = (fy * g);
 			}
 		}
 
 		if (px) cam['principal-pix-x'].value = px;
 		if (py) cam['principal-pix-y'].value = py;
 
-		let f = (fx + fy) * 0.5 - 0.5;
-		f = 1.0 / f;
+		if (cam['sensor-pix-size']?.value && mtx[0] && mtx[1]) {
+			let ps = Number(cam['sensor-pix-size'].value)*0.001;
 
-		if (mtx[0] && mtx[1]) {
-			cam['focal-length'].value = f;
-			cam['effective-focal-length'].value = '';
+			fx *= ps;
+			fy *= ps;
+			let f = Math.sqrt((fx * fx) + (fy * fy));
+
+			cam['focal-length'].value = '';
+			cam['effective-focal-length'].value = f;
 		}
 
 		set_camera(cam);
