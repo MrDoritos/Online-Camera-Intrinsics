@@ -106,7 +106,7 @@ async function get_preset() {
 
 // #region Modify internal state
 
-function set_presets(sensors) {
+function set_presets() {
 	let template_dropdown = document.querySelector('div #templates');
 
 	function get_option_html(preset) {
@@ -131,7 +131,7 @@ function set_presets(sensors) {
 
 	html += get_option_label_html('Built-in Presets');
 
-	sensors.forEach(sensor => {
+	sensors_cache.forEach(sensor => {
 		html += get_option_html({'sensor-name':{value:sensor[0]}, 'sensor-name-friendly':{'value':sensor[1]}});
 	});
 
@@ -768,107 +768,6 @@ async function load_csv(url) {
 	return csv;
 }
 
-async function load_old_sensors(csv) {
-	let slots = [
-		['outlines', {}],
-		['formats', []],
-		['presets', []]
-	];
-
-	let active = -1;
-	let field = '';
-	let fieldline = false;
-	let tfields = [];
-	let fields = [];
-
-	for (let i = 0; i < csv.length; i++) {
-		let n = csv[i];
-		fieldline = false;
-		if (n[0].length > 0) {
-			for (let j = 0; j < slots.length; j++) {
-				if (n[0] === slots[j][0]) {
-					active = j;
-					field = '';
-					fieldline = true;
-				}
-			}
-
-			if (active > -1) {
-				if (n[0] !== slots[active][0]) {
-					field = n[0];
-				}
-			}
-		}
-
-		if (active < 0)
-			continue;
-
-		let name = slots[active][0];
-		let slot = slots[active][1];
-
-		if (name === 'outlines') {
-			if (fieldline) {
-				fields = n.slice(1);
-				fields.forEach(n => {
-					slot[n] = {};
-				});
-			} else {
-				if (field.length > 0) {
-					for (let i = 0; i < fields.length; i++) {
-						slot[fields[i]][field] = n[i+1];
-					}
-				}
-			}
-			field = '';
-		}
-
-		if (name === 'formats') {
-			if (fieldline) {
-				tfields = n.slice(1);
-			} else {
-				let format = {};
-				if (n[1] === undefined || n[1].length < 1)
-					continue;
-				
-				for (let i = 0; i < tfields.length; i++) {
-					if (tfields[i].length > 0) {
-						format[tfields[i]] = n[i+1];
-					}
-				}
-				slot.push(format);
-			}
-		}
-
-		if (name === 'presets') {
-			if (fieldline) {
-
-			} else {
-				let preset = {};
-				let exit = false;
-				for (let i = 0; i < fields.length; i++) {
-					if (n[i+1] === undefined) {
-						exit = true;
-						break;
-					}
-					let _field = fields[i];
-					//preset[fields[i]] = n[i+1];
-					preset[_field] = { ... slots[0][1][_field] };
-					preset[_field].value = n[i+1];
-				}
-				if (!exit) {
-					slot.push(preset);
-				}
-			}
-		}
-	}
-
-	//console.log("slots:", slots);
-	return {empty: slots[0][1], 
-			fields: fields, 
-			formats: slots[1][1],
-			presets: slots[2][1]};
-}
-
 async function load_cache(csv) {
 	let _cache = [];
 
@@ -996,9 +895,8 @@ function add_custom_preset(camera) {
 
 function remove_custom_preset() {
 	let presets = load_custom_presets();
-	let preset = get_preset();
 
-	let custom_preset = get_custom_preset_entry(presets['sensor-name'].value);
+	let custom_preset = get_custom_preset_entry(presets['sensor-name']?.value);
 
 	if (custom_preset)
 		delete presets[custom_preset.key];
@@ -1084,9 +982,9 @@ async function do_calib_input_dialog() {
 '<div id="input_screen">' +
 '<div id="placement">' +
 '<div>' +
-`<p>Camera Matrix</p><div id="cam_mtx"><div id="input_matrix_container">${matrix_input(3,3,cm_info)}</div><div id="display_matrix_container">${do_grid(3,3,cm_info)}</div></div>` +
-`<div id="img_size_container"><div><input type="checkbox" id="enable"></input><p>Image size</p></div><div id="img_size"><div id="input_matrix_container">${matrix_input(1,2,img_size_info)}</div><div id="display_matrix_container">${do_grid(1,2,img_size_info)}</div></div></div>` +
-`<p>Distortion Parameters</p><div id="dist"><div id="input_matrix_container">${matrix_input(1,5,dist_info)}</div><div id="display_matrix_container">${do_grid(1,5,dist_info)}</div></div>` +
+`<h4>Camera Matrix</h4><div id="cam_mtx"><div id="input_matrix_container">${matrix_input(3,3,cm_info)}</div><div id="display_matrix_container">${do_grid(3,3,cm_info)}</div></div>` +
+`<div id="img_size_container"><div><input type="checkbox" id="enable"></input><h4>Image size</h4></div><div id="img_size"><div id="input_matrix_container">${matrix_input(1,2,img_size_info)}</div><div id="display_matrix_container">${do_grid(1,2,img_size_info)}</div></div></div>` +
+`<h4>Distortion Parameters</h4><div id="dist"><div id="input_matrix_container">${matrix_input(1,5,dist_info)}</div><div id="display_matrix_container">${do_grid(1,5,dist_info)}</div></div>` +
 '</div>' + 
 '<div id="input_buttons">' +
 '<button id="close">Cancel</button>' +
@@ -1195,14 +1093,14 @@ async function do_save_custom_dialog() {
 	let html = 
 	'<div id="input_screen">' +
 	'<div id="placement">' +
-	'<div>' +
+	'<form><div>' +
 	`<h4>Save Custom Preset</h4><p>Preset Name</p>` +
 	`<div id="preset_name"><input type="text"></input></div>` +
 	'</div>' +
 	`<div id="input_buttons">` +
-	'<button id="close">Cancel</button>' +
-	'<button id="submit">Save</button>' +
-	'</div></div></div>';
+	'<input type="button" id="close" value="Cancel" />' +
+	'<button type="submit" id="submit">Save</button>' +
+	'</div></form></div></div>';
 
 	function cancel_save() {
 		let e = document.querySelector('#input_screen')?.parentElement;
@@ -1216,13 +1114,15 @@ async function do_save_custom_dialog() {
 			return;
 		
 		let name = e.value;
+		if (!name)
+			name = 'Untitled Sensor';
 
 		let camera = get_inputs();
 		camera['sensor-name'].value = name;
 
 		add_custom_preset(camera);
 
-		set_presets(sensors_cache);
+		set_presets();
 
 		cancel_save();
 	};
@@ -1230,16 +1130,21 @@ async function do_save_custom_dialog() {
 	let e = document.createElement('div');
 
 	e.innerHTML = html;
+
 	e.querySelector('#input_screen').addEventListener('click', cancel_save);
 	e.querySelector('#placement').addEventListener('click', function(event){event.stopPropagation();});
 	e.querySelector('#close').addEventListener('click', cancel_save);
 	e.querySelector('#submit').addEventListener('click', custom_save);
 
+	let input_e = e.querySelector('#input_screen #preset_name input');
+	input_e.value = get_inputs()['sensor-name']?.value ?? '';
+
 	document.querySelector('body').appendChild(e);
 }
 
 async function do_delete_custom() {
-
+	remove_custom_preset();
+	set_presets();
 }
 
 async function on_calib_input(event) {
@@ -1264,7 +1169,7 @@ async function on_load(element) {
 	sensor_formats = formats.formats;
 	sensor_formats_header = formats.outline;
 
-	set_presets(sensors_cache);
+	set_presets();
 
 	set_preset('IMX766');
 

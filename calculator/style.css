@@ -37,7 +37,11 @@ body {
 	max-width: 90%;
 }
 
-#input_screen #placement > div:first-child {
+#input_screen h4 {
+	margin:0;
+}
+
+#input_screen #placement > div:first-child, #input_screen form > div:first-child {
 	margin: 0.5em;
 	overflow-x: scroll;
 }
@@ -312,7 +316,7 @@ body {
 	margin-top: 0.9em;
 }
 
-button, select, #checkbox p {
+button, select, #checkbox p, input[type='button'] {
 	width:auto;
 	max-width: 14.0em;
 	min-width: 8.0em;
