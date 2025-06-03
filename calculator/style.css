@@ -199,6 +199,36 @@ body {
 	min-width: fit-content;
 }
 
+.header p {
+	margin:0;
+}
+
+.header > #buttons, .header > #custom_buttons {
+	max-width:10em;
+	width:10em;
+}
+
+.header > #buttons > div {
+	#width:inherit;
+}
+
+#custom_buttons {
+	display:flex;
+	width:7em;
+	margin: 0.25em auto;
+}
+
+#custom_buttons button {
+	min-width: initial;
+	flex:1;
+	margin: 0 0.25em;
+}
+
+#custom_buttons #button {
+	flex:1;
+	display:flex;
+}
+
 #center {
 	max-width:50%;
 	min-width:20%;

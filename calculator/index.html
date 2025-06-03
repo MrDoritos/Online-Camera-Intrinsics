@@ -21,10 +21,15 @@
         <div id="button"><button id="calculate" type="button" onclick="calculate_button()">Calculate</button></div>
         <div id="button"><button id="swap" type="button" onclick="swap_button()">Swap</button></div>
         <div id="button"><button id="clear" type="button" onclick="clear_button()">Clear</button></div>
-        <div id="button"><button id="reset" type="button" onclick="reset_button()">Reset Preset</button></div>
-        <div id="button"><button id="save_custom" type="button">Save Preset</button><button style="display:none;" id="delete_custom" type="button">Delete</button></div>
-        <div id="button"><button id="enter_calib" type="button">Enter Calibration</button></div>
+        <div id="button"><button id="reset" type="button" onclick="reset_button()">Reset</button></div>
+        <div id="button"><button id="enter_calib" type="button">Set Matrix</button></div>
+        <p>Presets</p>
         <div id="select"><select id="templates" oninput="on_preset(this)"></select></div>
+        <p>Custom Presets</p>
+        <div id="custom_buttons">
+          <div id="button"><button id="save_custom" type="button">Save</button></div>
+          <div id="button"><button id="delete_custom" type="button">Delete</button></div>
+        </div>
         <div id="sensor_link"><a id="sensor_page_link" href="#">Sensor Page</a></div>
         <div id="param_link"><a id="param_page_link" href="/parameters">Parameters from Image</a></div>
         <div id="db_link"><a id="db_page_link" href="/csv/index.html?csv=/sensors/sensors.csv">Database</a></div>

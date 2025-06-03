@@ -1,3 +1,9 @@
+function uuidv4() {
+    return "10000000100040008000100000000000".replace(/[018]/g, c =>
+      (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
+    );
+}  
+
 function get_file_count(input_element) {
     if (!input_element ||
         !input_element.files ||

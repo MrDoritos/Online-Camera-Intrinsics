@@ -96,28 +96,46 @@ function is_autodistort() {
 	return document.getElementById('autodist').checked;
 }
 
+async function get_preset() {
+	//let presets = document.querySelector('div #templates');
+
+	return get_inputs();
+}
+
 // #endregion
 
 // #region Modify internal state
 
-function set_presets_kvs(kvs) {
-	let template_dropdown = document.querySelector('div #templates');
-	template_dropdown.innerHTML = "<option selected disabled>Sensor Presets</option>";
-	
-	kvs.forEach(kv => {
-		template_dropdown.innerHTML +=
-			`<option value="${kv[0]}">${kv[0]} (${kv[1]})</option>`;
-	});
-}
-
 function set_presets(sensors) {
-	let kvs = [];
+	let template_dropdown = document.querySelector('div #templates');
 
-	sensors.forEach(n => {
-		kvs.push([n['sensor-name'].value,n['sensor-name-friendly'].value]);
+	function get_option_html(preset) {
+		return `<option value="${preset['sensor-name'].value}">${preset['sensor-name'].value} (${preset['sensor-name-friendly'].value})</option>`;
+	};
+
+	function get_option_label_html(label, extra='') {
+		return `<option ${extra} disabled>${label}</option>`;
+	};
+
+	let html = '';
+
+	html += get_option_label_html('Sensor Presets', 'selected');
+
+	let custom_presets = load_custom_presets();
+
+	if (Object.entries(custom_presets).length) {
+		html += get_option_label_html('Custom Presets');
+		for (const [key, value] of Object.entries(custom_presets))
+			html += get_option_html(custom_presets[key]);
+	}
+
+	html += get_option_label_html('Built-in Presets');
+
+	sensors.forEach(sensor => {
+		html += get_option_html({'sensor-name':{value:sensor[0]}, 'sensor-name-friendly':{'value':sensor[1]}});
 	});
 
-	set_presets_kvs(kvs);
+	template_dropdown.innerHTML = html;
 }
 
 async function set_preset(sensor_name) {
@@ -862,15 +880,16 @@ async function load_cache(csv) {
 }
 
 async function load_all(csv) {
-	let columns = outline_fields.length;
+	let columns = sensors_fields.length;
 	let rows = csv.length;
 	let _all = [];
 
 	for (let i_row = 5; i_row < rows; i_row++) {
 		let preset = get_empty_outline();
 
+		console.log(preset);
 		for (let i_column = 0; i_column < columns; i_column++) {
-			let key = outline_fields[i_column];
+			let key = sensors_fields[i_column];
 			let value = csv[i_row][i_column];
 
 			preset[key].value = value;
@@ -879,7 +898,7 @@ async function load_all(csv) {
 		_all.push(preset);
 	}
 
-	return {all:_all};
+	return _all;
 }
 
 async function load_header(csv) {
@@ -920,12 +939,15 @@ async function load_preset_from_all(sensor_name) {
 	let csv = await load_csv('/sensors/sensors_all.csv');
 	let all = await load_all(csv);
 
-	let all_index = all.find(n => n['sensor-name'] === sensor_name);
+	let all_index = all.find(n => n['sensor-name'].value === sensor_name);
 
-	if (!all_index)
-		return;
+	if (all_index)
+		return camera_from_form(all_index);
 
-	return camera_from_form(all_index);
+	let custom_preset = get_custom_preset(sensor_name);
+
+	if (custom_preset)
+		return custom_preset;
 }
 
 async function load_formats(csv) {
@@ -939,6 +961,49 @@ async function load_formats(csv) {
 	}
 
 	return {outline:_formats_outline, formats:_formats};
+}
+
+function load_custom_presets() {
+	return load_local_json('custom_presets', Object.prototype);
+}
+
+function save_custom_presets(custom_presets) {
+	save_local_json('custom_presets', custom_presets);
+}
+
+function get_custom_preset_entry(sensor_name) {
+	let presets = load_custom_presets();
+
+	for (const [key, value] of Object.entries(presets))
+		if (value['sensor-name'].value == sensor_name)
+			return {'key': key, 'value': value};
+}
+
+function get_custom_preset(sensor_name) {
+	let custom_preset = get_custom_preset_entry(sensor_name);
+
+	if (custom_preset)
+		return custom_preset.value;
+}
+
+function add_custom_preset(camera) {
+	let presets = load_custom_presets();
+
+	presets[uuidv4()] = camera;
+
+	save_custom_presets(presets);
+}
+
+function remove_custom_preset() {
+	let presets = load_custom_presets();
+	let preset = get_preset();
+
+	let custom_preset = get_custom_preset_entry(presets['sensor-name'].value);
+
+	if (custom_preset)
+		delete presets[custom_preset.key];
+
+	save_custom_presets(presets);
 }
 
 // #endregion
@@ -1127,7 +1192,50 @@ async function do_calib_input_dialog() {
 }
 
 async function do_save_custom_dialog() {
+	let html = 
+	'<div id="input_screen">' +
+	'<div id="placement">' +
+	'<div>' +
+	`<h4>Save Custom Preset</h4><p>Preset Name</p>` +
+	`<div id="preset_name"><input type="text"></input></div>` +
+	'</div>' +
+	`<div id="input_buttons">` +
+	'<button id="close">Cancel</button>' +
+	'<button id="submit">Save</button>' +
+	'</div></div></div>';
 
+	function cancel_save() {
+		let e = document.querySelector('#input_screen')?.parentElement;
+		if (e)
+			e.parentElement.removeChild(e);
+	};
+
+	function custom_save() {
+		let e = document.querySelector('#input_screen #preset_name input');
+		if (!e)
+			return;
+		
+		let name = e.value;
+
+		let camera = get_inputs();
+		camera['sensor-name'].value = name;
+
+		add_custom_preset(camera);
+
+		set_presets(sensors_cache);
+
+		cancel_save();
+	};
+
+	let e = document.createElement('div');
+
+	e.innerHTML = html;
+	e.querySelector('#input_screen').addEventListener('click', cancel_save);
+	e.querySelector('#placement').addEventListener('click', function(event){event.stopPropagation();});
+	e.querySelector('#close').addEventListener('click', cancel_save);
+	e.querySelector('#submit').addEventListener('click', custom_save);
+
+	document.querySelector('body').appendChild(e);
 }
 
 async function do_delete_custom() {
@@ -1156,7 +1264,7 @@ async function on_load(element) {
 	sensor_formats = formats.formats;
 	sensor_formats_header = formats.outline;
 
-	set_presets_kvs(sensors_cache);
+	set_presets(sensors_cache);
 
 	set_preset('IMX766');
 
