@@ -1,19 +1,20 @@
-async function load_csv(url) {
+function parse_csv(text) {
 	let csv = [];
-	let r = await fetch(url)
-	let text = await r.text();
 	let lines = text.trim().split('\n');
 	lines.forEach(n => {
 		let parts = n.trim().split(',');
 		csv.push(parts);
 	});
-	//console.log("csv:", csv);
 	return csv;
 }
 
 async function load_file(url) {
-    let csv = await load_csv(url);
+	let r = await fetch(url)
+	let text = await r.text();
+    return parse_csv(text);
+}
 
+function load_csv(csv) {
     if (!csv)
         return;
 
@@ -28,8 +29,7 @@ async function load_file(url) {
 
     let e_row = table.insertAdjacentElement(p, document.createElement('tr'));
     for (let c = 0; c < row.length; c++) {
-        e_row.innerHTML += `<th><p>${row[c]}</p></th>`;
-        
+        e_row.innerHTML += `<th><p>${row[c]}</p></th>`;        
     }
 
     for (let r = 1; r < csv.length; r++) {
@@ -43,11 +43,24 @@ async function load_file(url) {
     }
 }
 
-async function load_button() {
+async function load_input(event) {
+    let files = event?.target?.files;
 
+    console.log(event);
+
+    if (!files || !files[0])
+        return;
+
+    let reader = new FileReader();
+
+    reader.onload = function(e) {
+        load_csv(parse_csv(e.result));
+    };
+
+    reader.readAsText(files[0]);
 }
 
-function on_load(element) {
+async function on_load(element) {
     let url = '/sensors/sensors.csv';
     
     const params = new Proxy(new URLSearchParams(window.location.search), {
@@ -57,5 +70,5 @@ function on_load(element) {
     if (params && params.csv)
         url = params.csv;
     
-    load_file(url);
+    load_csv(await load_file(url));
 }

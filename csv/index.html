@@ -12,8 +12,8 @@
   <body onload="on_load(this)">
     <div id="container">
       <div id="control">
-        <div id="title">CSV Viewer</div>
-        <div id="button"><button id="load" type="button" onclick="load_button()">Load file</button></div>
+        <h3 id="title">CSV Viewer</h3>
+        <div id="button"><label for="load">Load File</label><input oninput="load_input(this)" id="load" type="file" accept="text/csv, .csv, *"></input></div>
       </div>
       <div id="csv"></div>
     </div>

@@ -240,10 +240,10 @@ button, select, #checkbox p {
 	overflow-x: clip;
 }
 
-#control {
-	max-width: 20vw;
-}
-
 #csv {
 	padding-bottom: 3em;
+}
+
+label {
+	margin: 0 1em;
 }
