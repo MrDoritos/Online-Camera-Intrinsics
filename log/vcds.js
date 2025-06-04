@@ -375,8 +375,8 @@ function set_css_style(rule, field, value) {
 function get_element_position(element) {
     let rect = element.getBoundingClientRect();
     return {
-        x: rect.left + window.scrollX,
-        y: rect.top + window.scrollY,
+        x: rect.left,// + window.scrollX,
+        y: rect.top,// + window.scrollY,
         width: rect.width,
         height: rect.height,
         size:rect,
@@ -1136,7 +1136,7 @@ class Parameters {
         }
     }
 
-    render() {
+    render(skip_table=false) {
         if (!this.modified)
             return;
 
@@ -1144,7 +1144,7 @@ class Parameters {
         this.render_bars();
         this.render_markers();
         this.render_canvas();
-        this.set_ui();
+        this.set_ui(skip_table);
 
         this.modified = false;
     }
@@ -1220,8 +1220,9 @@ class Parameters {
         this.cursor_info_element = this.get_cursor_info_element();
     }
 
-    set_ui() {
-        this.set_table();
+    set_ui(skip_table=false) {
+        if (!skip_table)
+            this.set_table();
         this.set_canvas_info();
     }
 
@@ -1270,16 +1271,21 @@ class Parameters {
 
     resize_bar_mouse_input(event) {
         let rebars = this.get_resize_bars();
+
         if (event.type == "mousedown") {
             let cur = rebars.find(bar => is_position_of_element(event, bar));
             if (cur)
                 cur.name = "down";
             return !cur;
         }
+
+        if (!rebars.some(bar => bar.name == 'down'))
+            return false;
+
         if (event.type == "mouseup") {
             rebars.forEach(bar => bar.name = "up");
             this.update_canvas_size();
-            this.render();
+            this.render(true);
             return false;
         }
         if (event.type == "mousemove") {
@@ -1288,6 +1294,7 @@ class Parameters {
                 this.resize_bar_drag(event, cur);
             return cur;
         }
+
         return false;
     }
 
@@ -1734,21 +1741,27 @@ class Parameters {
         if (is_position_of_element(event, check_element) && event.detail == 1) {
             block.visible = checked;
         }
-        else if (event.detail == 1) {
+        else if (event.type == 'click') {
+            this.clear_user_selection();
             check_element.checked = !checked;
             block.visible = !checked;
-        } else {
+        } else if (event.type == 'dblclick') {
             this.clear_user_selection();
+            checked = !checked;
             let check_elements = buttons.map(button => button.querySelector('input'));
             let blocks = check_elements.map(check => this.log.get_block(check.className));
             check_elements.forEach(check => check.checked = !checked);
             blocks.forEach(block => block.visible = !checked);
             check_element.checked = checked;
             block.visible = checked;
+        } else {
+            return;
         }
         
         this.modified = true;
-        this.render();
+        this.render(true);
+
+        event.stopPropagation();
     }
 
     get_linear_regression(block, indicies) {
@@ -2217,18 +2230,21 @@ class VCDS {
 
         let lce = params.get_log_view_div();
 
-        let add_mouse_events = function(elem, func) {
-            ['mouseenter', 'mouseleave', 'mousedown', 'mouseup', 'mousemove', 'dblclick'].forEach(
+        let add_mouse_events = function(elem, func, ...extra) {
+            ['mouseenter', 'mouseleave', 'mousedown', 'mouseup', 'mousemove', 'click', 'dblclick'].concat(extra).forEach(
                 event => elem.addEventListener(event, func)
             );            
         };
 
-        let add_events = function(elem, func, events) {
-            events.forEach(event => elem.addEventListener(event, func));
+        let add_events = function(elem, func, ...events) {
+            [].concat(events).forEach(event => elem.addEventListener(event, func));
         };
 
         add_mouse_events(lce, params.mouse_input.bind(params));
-        add_events(params.get_button_div(), params.button_div_mouse_input.bind(params), ['click']);
+        //add_events(params.get_button_div(), params.button_div_mouse_input.bind(params), ['mousedown', 'click', 'dblclick']);
+        let bd = params.get_button_div();
+        bd.onclick = params.button_div_mouse_input.bind(params);
+        bd.ondblclick = params.button_div_mouse_input.bind(params);
         params.remove = function() {
             document.getElementById('log_body').removeChild(params.get_log_view_div());
             this.logs = this.logs.filter(v => v.log.name != params.log.name);
