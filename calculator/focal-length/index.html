@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="focal-length.css">
+    </head>
+    <body>
+        <div id="inputs">
+            <div id="focal_length">
+                <p>Focal Length</p>
+                <div>
+                    <input type="range" id="focal_length" min=0 max=50 value=35 step=0.1 />
+                    <input type="number" id="focal_length" />
+                </div>
+            </div>
+            <div id="effective_focal_length">
+                <p>Effective Focal Length</p>
+                <div>
+                    <input type="range" id="effective_focal_length" min=0 max=50 value=35 step=0.1 />
+                    <input type="number" id="effective_focal_length" />
+                </div>
+            </div>
+            <div>
+                <p>Sensor Size</p>
+                <div id="sensor_dimensions">
+                    <p>width</p>
+                    <p>height</p>
+                    <input type="number" id="sensor_width" autocomplete="on" />
+                    <input type="number" id="sensor_height" autocomplete="on" />
+                </div>
+                <p>Pixel Size</p>
+                <div>
+                    <input type="range" id="pixel_size" min=0.2 max=10 value=1 step=0.01 />
+                    <input type="number" id="pixel_size" />
+                </div>
+            </div>
+            <div>
+                <p>Image Size</p>
+                <div id="image_dimensions">
+                    <p>width</p>
+                    <p>height</p>
+                    <input type="number" id="sensor_pix_x" autocomplete="on" />
+                    <input type="number" id="sensor_pix_y" autocomplete="on" />
+                </div>
+            </div>
+        </div>
+        <div id="outputs">
+            <div id="focal_length">
+                <p>Focal Length</p>
+                <p id="focal_length"></p>
+            </div>
+            <div id="focal_length_canonical">
+                <p></p>
+                <p id="focal_length_canonical"></p>
+            </div>
+            <div id="effective_focal_length">
+                <p>Effective Focal Length</p>
+                <p id="effective_focal_length"></p>
+            </div>
+            <div id="effective_focal_length_canonical">
+                <p></p>
+                <p id="effective_focal_length_canonical"></p>
+            </div>
+            <div>
+                <p>X Focal Length</p>
+                <p>Y Focal Length</p>
+            </div>
+            <div id="xy_focal_length">
+                <p id="x_focal_length"></p>
+                <p id="y_focal_length"></p>
+            </div>
+            <div id="xy_focal_length_canonical">
+                <p id="x_focal_length_canonical"></p>
+                <p id="y_focal_length_canonical"></p>
+            </div>
+            <div>
+                <p>Aspect Ratio</p>
+                <p id="aspect_ratio"></p>
+            </div>
+            <div>
+                <p>Crop Factor</p>
+                <p id="crop_factor"></p>
+            </div>
+            <div>
+                <p>Pixel Size</p>
+                <p id="pixel_size"></p>
+            </div>
+            <div>
+                <p>Pixel Size Estimation</p>
+                <p id="pixel_size_estimation"></p>
+            </div>
+            <div>
+                <p>Sensor Diagonal</p>
+                <p id="sensor_diagonal"></p>
+            </div>
+            <div>
+                <p>Image Diagonal</p>
+                <p id="image_diagonal"></p>
+            </div>
+        </div>
+    </body>
+    <script src="focal-length.js"></script>
+</html>
