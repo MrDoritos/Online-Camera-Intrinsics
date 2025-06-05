@@ -71,9 +71,9 @@ class CanvasContext {
     }
 
     rect(x, y, width, height) {
-        let xy = this.get_absolute({x,y:y<height?height:y});
-        let wh = this.get_absolute({x:width, y:y>height?height:y});
-        this.context.rect(xy.x, xy.y, wh.x, wh.y);
+        let xy = this.get_absolute({x,y:y<height?height+y:y+height});
+        //let wh = this.get_absolute({x:width, y:height * this.height});
+        this.context.rect(xy.x, xy.y, width * this.width, height * this.height);
     }
 
     beginPath = () => this.context.beginPath();
@@ -94,6 +94,7 @@ class CanvasContext {
 
 class Camera {
     static diagonal_35mm = Util.diagonal(36, 24);
+    static focal_length_35mm = 35;
 
     static effective_focal_length_canonical(fx, fy, image_x=1, image_y=1, pixel_size=1) {
         return {x: fx * image_x * pixel_size, y: fy * image_y * pixel_size };
@@ -149,6 +150,9 @@ class Camera {
         return effective_focal_length * crop_factor;
     }
 
+    static relative_focal_length = (focal_length) => focal_length / Camera.focal_length_35mm;
+    static absolute_focal_length = (focal_length_relative) => focal_length_relative * Camera.focal_length_35mm;
+
     static crop_factor(diagonal_mm) {
         return this.diagonal_35mm / diagonal_mm;
     }
@@ -187,6 +191,7 @@ class Camera {
         get_diagonal = () => Util.diagonal(this.width, this.height);
         get_width = () => this.width;
         get_height = () => this.height;
+        get_longest_length = () => this.width > this.height ? this.width : this.height;
 
         set_width = (width) => this.width = width;
         set_height = (height) => this.height = height;
@@ -231,8 +236,11 @@ class Camera {
 
         get_effective_focal_length =
             () => Camera.effective_focal_length(this.get_focal_length(), this.sensor.get_crop_factor());
-        
+
         get_focal_length = () => this.focal_length;
+
+        get_relative_focal_length =
+            () => Camera.relative_focal_length(this.get_focal_length());
 
         set_focal_length = (focal_length) => this.focal_length = focal_length;
 
@@ -309,6 +317,45 @@ class Page {
             //return Camera.pixel
         //}.bind(this);
 
+        let lengthwise_focal_length = function() {
+            //return this.lens.get_focal_length()/(this.sensor.get_diagonal()/this.sensor.get_longest_length());
+            return this.lens.get_focal_length()*Math.SQRT1_2;
+        }.bind(this);
+
+        let lengthwise_focal_length_canonical = function() {
+            return 1 / lengthwise_focal_length();
+        }.bind(this);
+
+        let lengthwise_effective_focal_length = function() {
+            return this.lens.get_effective_focal_length()*Math.SQRT1_2;
+        }.bind(this);
+
+        let lengthwise_effective_focal_length_canonical = function() {
+            return 1 / lengthwise_effective_focal_length();
+        }.bind(this);
+
+        let effective_focal_length_canonical = function() {
+            return 1 / this.lens.get_effective_focal_length();
+        }.bind(this);
+
+        let lengthwise_image_focal_length_wrt_half = function() {
+            //return lengthwise_image_focal_length() + this.sensor.get_image_size().get_longest_length() * 0.5;
+            return lengthwise_effective_focal_length() / this.sensor.get_pixel_size();
+        }.bind(this);
+
+        let lengthwise_image_focal_length = function() {
+            //return lengthwise_effective_focal_length_canonical() / this.sensor.get_pixel_size();
+            return lengthwise_image_focal_length_wrt_half() - this.sensor.get_image_size().get_longest_length() * 0.5;
+        }.bind(this);
+
+        let computed_image_width = function() {
+            return this.sensor.get_image_size().width;
+        }.bind(this);
+
+        let computed_image_height = function() {
+            return this.sensor.get_image_size().height;
+        }.bind(this);
+
         this.inputs = {
             focal_length:make_obj('input#focal_length', this.lens.set_focal_length.bind(this.lens)),
             effective_focal_length:make_obj('input#effective_focal_length', this.lens.set_effective_focal_length.bind(this.lens)),
@@ -321,19 +368,27 @@ class Page {
 
         this.outputs = {
             focal_length:make_obj('p#focal_length', this.lens.get_focal_length.bind(this.lens)),
-            focal_length_canonical:make_obj('p#focal_length_canonical'),
+            focal_length_canonical:make_obj('p#focal_length_canonical', this.lens.get_relative_focal_length.bind(this.lens)),
             effective_focal_length:make_obj('p#effective_focal_length', this.lens.get_effective_focal_length.bind(this.lens)),
-            effective_focal_length_canonical:make_obj('p#effective_focal_length_canonical'),
-            x_focal_length:make_obj('p#x_focal_length'),
-            y_focal_length:make_obj('p#y_focal_length'),
-            x_focal_length_canonical:make_obj('p#x_focal_length_canonical'),
-            y_focal_length_canonical:make_obj('p#y_focal_length_canonical'),
+            effective_focal_length_canonical:make_obj('p#effective_focal_length_canonical', effective_focal_length_canonical),
+            lengthwise_focal_length:make_obj('p#lengthwise_focal_length', lengthwise_focal_length),
+            lengthwise_effective_focal_length:make_obj('p#lengthwise_effective_focal_length', lengthwise_effective_focal_length),
+            lengthwise_focal_length_canonical:make_obj('p#lengthwise_focal_length_canonical', lengthwise_focal_length_canonical),
+            lengthwise_effective_focal_length_canonical:make_obj('p#lengthwise_effective_focal_length_canonical', lengthwise_effective_focal_length_canonical),
+            lengthwise_image_focal_length:make_obj('p#lengthwise_image_focal_length', lengthwise_image_focal_length),
+            lengthwise_image_focal_length_wrt_half:make_obj('p#lengthwise_image_focal_length_wrt_half', lengthwise_image_focal_length_wrt_half),
+            x_focal_length:make_obj('p#x_focal_length', lengthwise_focal_length),
+            y_focal_length:make_obj('p#y_focal_length', lengthwise_focal_length),
+            x_focal_length_canonical:make_obj('p#x_focal_length_canonical', lengthwise_focal_length_canonical),
+            y_focal_length_canonical:make_obj('p#y_focal_length_canonical', lengthwise_focal_length_canonical),
             aspect_ratio:make_obj('p#aspect_ratio', this.sensor.get_aspect_ratio.bind(this.sensor)),
             crop_factor:make_obj('p#crop_factor', this.sensor.get_crop_factor.bind(this.sensor)),
             pixel_size:make_obj('p#pixel_size', this.sensor.get_pixel_size_um.bind(this.sensor)),
             sensor_diagonal:make_obj('p#sensor_diagonal', this.sensor.get_diagonal.bind(this.sensor)),
             image_diagonal:make_obj('p#image_diagonal', this.image.get_diagonal.bind(this.image)),
             pixel_size_estimation:make_obj('p#pixel_size_estimation', Camera.pixel_size_auto.bind(Camera.prototype, this.image,this.sensor)),
+            computed_image_width:make_obj('p#computed_image_width', computed_image_width),
+            computed_image_height:make_obj('p#computed_image_height', computed_image_height),
         };
 
         Object.values(this.inputs).forEach(function(x) {
@@ -347,26 +402,70 @@ class Page {
     async render_canvas() {
         this.canvas.clear();
         const radius = Math.SQRT1_2 * 0.5 - this.canvas.lineWidthRel;
+        const r_in = this.canvas.lineWidthRel * 2;
         this.canvas.context.strokeStyle = "green";
         this.canvas.beginPath();
         //this.canvas.moveTo({x:0.5,y:0.5});
         this.canvas.arc({x:0.5,y:0.5}, radius, 0, Math.PI * 2);
         this.canvas.stroke();
 
-        let sensor_d = this.sensor.get_diagonal();
-        let sensor_w = this.sensor.get_width() / sensor_d;
-        let sensor_h = this.sensor.get_height() / sensor_d;
-        let image_d = this.image.get_diagonal();
-        let image_w = this.image.get_width() / image_d;
-        let image_h = this.image.get_height() / image_d;
+        let image = this.sensor.get_image_size();
+        image.scale(this.sensor.get_pixel_size());
+        image.set_size(image.get_longest_length(), image.get_longest_length());
+        let sensor = this.sensor;
+        let lens = this.lens;
+
+        //sensor = sensor.to_scale(lens.get_focal_length() / Camera.focal_length_35mm);
+
+        let factor = sensor.get_crop_factor();
+
+        let sensor_d = 1/sensor.get_diagonal();
+
+        if (factor > 1) {
+            sensor_d * factor;
+        }
+
+        let sensor_w = sensor.get_width() * sensor_d - r_in;
+        let sensor_h = sensor.get_height() * sensor_d - r_in;
+
+        //let image_d = image.get_diagonal();
+        let image_w = image.get_width() * sensor_d - r_in;
+        let image_h = image.get_height() * sensor_d - r_in;
 
         let sensor_x = (1 - sensor_w) * 0.5;
         let sensor_y = (1 - sensor_h) * 0.5;
+        let image_x = (1 - image_w) * 0.5;
+        let image_y = (1 - image_h) * 0.5;
+
+        if (image_w > image_h) {
+            //image_y = image_x;
+            //image_h = image_w;
+        }
+
+        this.canvas.context.strokeStyle = "black";
+        this.canvas.beginPath();
+        this.canvas.rect(image_x, image_y, image_w, image_h);
+        this.canvas.stroke();
 
         this.canvas.context.strokeStyle = "red";
         this.canvas.beginPath();
         this.canvas.rect(sensor_x, sensor_y, sensor_w, sensor_h);
         this.canvas.stroke();
+
+        this.canvas.beginPath();
+        this.canvas.moveTo({x:sensor_x + sensor_w, y:sensor_y + sensor_h});
+        this.canvas.lineTo({x:sensor_x, y:sensor_y});
+        this.canvas.stroke();
+
+        let ctx = this.canvas.context;
+        ctx.fillStyle = "red";
+
+        let pos = this.canvas.get_absolute({x:.5,y:.5});
+        let angle = Math.atan2(sensor_h, sensor_w);
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(-angle);
+        ctx.fillText(this.lens.get_focal_length(), 0, -this.canvas.lineWidth);
+        ctx.resetTransform();
 
     }
 

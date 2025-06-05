@@ -1,5 +1,6 @@
 :root {
     --font-size: 1.2em;
+    --flex-gap: 0.2em;
 }
 
 body {
@@ -10,6 +11,25 @@ body {
     overflow:hidden;
     font-family: monospace;
     font-size:var(--font-size);
+    background-color: lightgray;
+}
+
+div#container {
+    height: 100vh;
+    width: 100vw;
+    display:flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: var(--flex-gap);
+    overflow:scroll;
+}
+
+div#topflex {
+    display:flex;
+    justify-content: space-around;
+    width:inherit;
+    flex-wrap:wrap;
+    gap: var(--flex-gap);
 }
 
 div#canvas {
@@ -18,11 +38,13 @@ div#canvas {
 }
 
 canvas#focal {
-    width:20em;
-    height:20em;
-    border:1px solid black;
+    #width:20em;
+    #height:20em;
+    #border:1px solid black;
     image-rendering: crisp-edges;
-    border-style:inset;
+    #border-style:inset;
+    flex:1;
+    aspect-ratio: 1;
 }
 
 #inputs {
@@ -58,17 +80,21 @@ canvas#focal {
 }
 
 #inputs, #outputs {
-    margin:1em auto;
     width:fit-content;
     gap:2px;
     background-color: lightgray;
-    border:2px solid lightgray;
+    border:2px solid black;
+}
+
+#topflex, #outputs {
+    #margin:1em auto;
 }
 
 #outputs {
     display: grid;
     #flex-direction: column;
     grid-template-columns: repeat(2,1fr);
+    align-self: center;
 }
 
 #outputs > * {
@@ -89,4 +115,5 @@ canvas#focal {
     min-height: var(--font-size);
     margin:0;
     box-sizing: border-box;
+    padding: 0 var(--flex-gap);
 }
