@@ -33,6 +33,65 @@ class Util {
     }
 };
 
+class CanvasContext {
+    constructor(element) {
+        this.element = element;
+        this.context = element.getContext('2d');
+
+        this.update_size();
+    }
+
+    set_size(width, height) {
+        this.width = this.size.width = this.element.width = width;
+        this.height = this.size.height = this.element.height = height;
+        this.diagonal = Util.diagonal(this.width, this.height);
+    }
+
+    set_stroke_width(width=undefined) { 
+        this.context.lineWidth = this.lineWidth = width ?? this.diagonal / 300;
+        this.lineWidthRel = this.lineWidth / this.diagonal;
+    }
+
+    get_absolute = (relative) => ({x: relative.x * this.width, y: (1 - relative.y) * this.height});
+
+    moveTo(relative) {
+        let pos = this.get_absolute(relative);
+        this.context.moveTo(pos.x, pos.y);
+    }
+
+    lineTo(relative) {
+        let pos = this.get_absolute(relative);
+        this.context.lineTo(pos.x, pos.y);
+    }
+
+    arc(relative, rel_radius, start_angle, end_angle, counter_clockwise=false) {
+        let pos = this.get_absolute(relative);
+        let radius = this.diagonal * rel_radius;
+        this.context.arc(pos.x, pos.y, radius, start_angle, end_angle, counter_clockwise);
+    }
+
+    rect(x, y, width, height) {
+        let xy = this.get_absolute({x,y:y<height?height:y});
+        let wh = this.get_absolute({x:width, y:y>height?height:y});
+        this.context.rect(xy.x, xy.y, wh.x, wh.y);
+    }
+
+    beginPath = () => this.context.beginPath();
+
+    stroke = () => this.context.stroke();
+
+    fill = () => this.context.fill();
+
+    clear = () => this.context.clearRect(0,0,this.width,this.height);
+
+    update_size() {
+        this.size = this.element.getBoundingClientRect();
+        
+        this.set_size(this.size.width, this.size.height);
+        this.set_stroke_width();
+    }
+};
+
 class Camera {
     static diagonal_35mm = Util.diagonal(36, 24);
 
@@ -240,6 +299,7 @@ class Page {
         this.sensor = new Camera.Sensor();
         this.image = new Camera.Image();
         this.lens = new Camera.Lens(this.sensor, this.image, 25);
+        this.canvas = new CanvasContext(document.querySelector('canvas#focal'));
 
         function make_obj(selector, call) {
             return {selector,call,elements:Object.values(document.querySelectorAll(selector))};
@@ -284,7 +344,34 @@ class Page {
         }.bind(this));
     }
 
+    async render_canvas() {
+        this.canvas.clear();
+        const radius = Math.SQRT1_2 * 0.5 - this.canvas.lineWidthRel;
+        this.canvas.context.strokeStyle = "green";
+        this.canvas.beginPath();
+        //this.canvas.moveTo({x:0.5,y:0.5});
+        this.canvas.arc({x:0.5,y:0.5}, radius, 0, Math.PI * 2);
+        this.canvas.stroke();
+
+        let sensor_d = this.sensor.get_diagonal();
+        let sensor_w = this.sensor.get_width() / sensor_d;
+        let sensor_h = this.sensor.get_height() / sensor_d;
+        let image_d = this.image.get_diagonal();
+        let image_w = this.image.get_width() / image_d;
+        let image_h = this.image.get_height() / image_d;
+
+        let sensor_x = (1 - sensor_w) * 0.5;
+        let sensor_y = (1 - sensor_h) * 0.5;
+
+        this.canvas.context.strokeStyle = "red";
+        this.canvas.beginPath();
+        this.canvas.rect(sensor_x, sensor_y, sensor_w, sensor_h);
+        this.canvas.stroke();
+
+    }
+
     async set_outputs() {
+        this.render_canvas();
         Object.values(this.outputs).forEach(x =>
             x.elements[0].innerText = x.call ? x.call() : '');
     }

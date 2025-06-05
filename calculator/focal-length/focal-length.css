@@ -12,6 +12,19 @@ body {
     font-size:var(--font-size);
 }
 
+div#canvas {
+    display:flex;
+    justify-content: center;
+}
+
+canvas#focal {
+    width:20em;
+    height:20em;
+    border:1px solid black;
+    image-rendering: crisp-edges;
+    border-style:inset;
+}
+
 #inputs {
     display:flex;
     flex-direction: column;
@@ -45,7 +58,7 @@ body {
 }
 
 #inputs, #outputs {
-    margin:5em auto;
+    margin:1em auto;
     width:fit-content;
     gap:2px;
     background-color: lightgray;
