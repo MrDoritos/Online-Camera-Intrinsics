@@ -1,0 +1,123 @@
+:root {
+    --textbox-width: 20em;
+    --font-size: 2em;
+}
+
+@media only screen and (max-width: 40em) {
+    :root {
+        --textbox-width:95vw;
+        --font-size:calc(100vw * 0.05);
+    }
+
+    div#wordlist {
+        flex-direction: column;
+    }
+
+    div#wordlist p#stats {
+
+    }
+}
+
+* {
+    box-sizing: border-box;
+    font-family:sans-serif;
+    margin:0;
+}
+
+body {
+    height:100vh;
+    width:100vw;
+}
+
+#body {
+    height:inherit;
+    width: inherit;
+    overflow:hidden;
+}
+
+div#wordlist {
+    position: fixed;
+    width:inherit;
+    background-color: white;
+    padding: 2px;
+    display: flex;
+    border-bottom: 2px solid black;
+    text-wrap:nowrap;
+    max-height: 30vh;
+    gap:2px;
+}
+
+div#wordlist p#stats {
+    margin: 0 0 0 auto;
+    overflow:scroll;
+    scrollbar-width: none;
+}
+
+div#wordlist > * {
+    display: inline-block;
+}
+
+#precontainer {
+    align-content: center;
+    width:inherit;
+    height: inherit;
+    background-color: lightgray;
+}
+
+#usercontainer {
+    width:var(--textbox-width);
+    font-size: var(--font-size);
+    margin:0 auto;
+    display: grid;
+    gap:2px;
+}
+
+#preview {
+    #width:var(--textbox-width);
+    #font-size:var(--font-size);
+    display:grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    background-color:silver;
+    border:1px solid black;
+}
+
+#preview > div {
+    min-width: 0;
+}
+
+#preview > div > p {
+    text-wrap:nowrap;
+    margin:0;
+    text-align: center;
+    overflow:hidden;
+    text-overflow: ellipsis;
+}
+
+#input:has(#textbox) {
+    display: flex;
+    width:inherit;
+    border:2px solid black;
+    border-style:inset;
+}
+
+#input #textbox_enter {
+    display:none;
+}
+
+#input form {
+    width:inherit;
+    height: inherit;
+    display: contents;
+}
+
+#textbox {
+    border:none;
+    text-align:center;
+    width:inherit;
+    font-size:inherit;
+}
+
+#textbox:focus-visible {
+    outline:none;
+}
