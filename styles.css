@@ -34,15 +34,16 @@ body {
 @media screen and not (min-width: 600px) {
     #header_container > *:first-child {
         display:block;
-        margin-inline:40%;
-        margin-bottom:0.5em;
+        #margin-inline:40%;
+        #margin-bottom:0.5em;
     }
 
     #header_container {
-        #display:block;
+        gap:4px;
+        padding:4px 0;
     }
 
-    #header_container > *, #header_container #tools > * {
+    #header_container > *, #header_container #tools > *, #header_container .link {
         padding: 0 1em 0 1em;
         width: fit-content;
     }
@@ -50,10 +51,18 @@ body {
     #header_container #tools {
         padding:0;
     }
+
+    #header_container .growing {
+        display: flex;
+        min-width: 100%;
+        justify-content: center;
+        padding:0;
+        background-color: revert;
+    }
 }
 
-#header_container > * {
-    display:inline-block;
+#header_container > *, #header_container .link {
+    #display:inline-block;
     background-color: lightgray;
     margin: 0 auto;
     flex: .15 0 1em;
@@ -61,10 +70,17 @@ body {
     height:fit-content;
 }
 
-#header_container > a {
+#header_container .link {
+    border:1px solid black;
+    background-color: lightgray;
+    width:initial;
+}
+
+#header_container .link a {
     text-decoration: none;
     color:black;
-    border:1px solid black;
+    display: block;
+    width: inherit;
 }
 
 #header_container div > p {
@@ -80,7 +96,7 @@ body {
     padding:1em 0.2em;
 }
 
-#header_container > *:hover {
+#header_container #tools:hover, #header_container .link:hover {
     background-color: gray;
 }
 
