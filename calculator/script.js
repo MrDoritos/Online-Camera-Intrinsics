@@ -757,20 +757,7 @@ function calculate_partial(camera) {
 
 // #region Loaders
 
-async function load_csv(url) {
-	let csv = [];
-	let r = await fetch(url)
-	let text = await r.text();
-	let lines = text.trim().split('\n');
-	lines.forEach(n => {
-		let parts = n.trim().split(',');
-		csv.push(parts);
-	});
-	//console.log("csv:", csv);
-	return csv;
-}
-
-async function load_cache(csv) {
+function load_cache(csv) {
 	let _cache = [];
 
 	for (let i = 1; i < csv.length; i++) {
@@ -780,7 +767,7 @@ async function load_cache(csv) {
 	return {cache:_cache};
 }
 
-async function load_all(csv) {
+function load_all(csv) {
 	let columns = sensors_fields.length;
 	let rows = csv.length;
 	let _all = [];
@@ -802,7 +789,7 @@ async function load_all(csv) {
 	return _all;
 }
 
-async function load_header(csv) {
+function load_header(csv) {
 	let _empty = {};
 	let _fields = [];
 
@@ -837,7 +824,8 @@ async function load_preset(sensor_name) {
 }
 
 async function load_preset_from_all(sensor_name) {
-	let csv = await load_csv('/sensors/sensors_all.csv');
+	//let csv = await load_csv('/sensors/sensors_all.csv');
+	let csv = CSV.loadCSV(await load_text_url('/sensors/sensors_all.csv'));
 	let all = await load_all(csv);
 
 	let all_index = all.find(n => n['sensor-name'].value === sensor_name);
@@ -858,7 +846,7 @@ async function load_preset_from_all(sensor_name) {
 	return get_empty_outline();
 }
 
-async function load_formats(csv) {
+function load_formats(csv) {
 	let _formats = [];
 	let _formats_outline = [];
 
@@ -1171,9 +1159,12 @@ async function on_load(element) {
 	let loadingElement = document.querySelector('#loading');
 	loadingElement.textContent = "Loading...";
 
-	let header = await load_header(await load_csv('/sensors/sensors_header.csv'));
-	let cache = await load_cache(await load_csv('/sensors/sensors_cache.csv'));
-	let formats = await load_formats(await load_csv('/sensors/sensors_format.csv'));
+	//let header = await load_header(await load_csv('/sensors/sensors_header.csv'));
+	//let cache = await load_cache(await load_csv('/sensors/sensors_cache.csv'));
+	//let formats = await load_formats(await load_csv('/sensors/sensors_format.csv'));
+	let header = load_header(CSV.loadCSV(await load_text_url('/sensors/sensors_header.csv')));
+	let cache = load_cache(CSV.loadCSV(await load_text_url('/sensors/sensors_cache.csv')));
+	let formats = load_formats(CSV.loadCSV(await load_text_url('/sensors/sensors_format.csv')));
 
 	sensors_cache = cache.cache;
 	sensors_fields = header.fields;

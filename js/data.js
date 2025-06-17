@@ -22,21 +22,49 @@ function load_file_stream(input_element) {
     return file.stream();
 }
 
-function load_json_file(input_element, object_prototype) {
-    if (!get_file_count(input_element))
-        return undefined;
+async function load_text_file(blob, encoding=undefined) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
 
-    let form = input_element.files[0];
-    let reader = new FileReader();
-    let obj = undefined;
+        reader.onerror = (e) => reject('Read error');
 
-    reader.onload = function(e) {
-        obj = Object.assign(object_prototype, JSON.parse(reader.result));
-    };
+        reader.onloadend = () => resolve(reader.result);
 
-    reader.readAsText(form);
+        reader.readAsText(blob, encoding);
+    });  
+}
 
-    return obj;
+async function load_text_inputform(input_element, encoding=undefined) {
+    return new Promise((resolve, reject) => {
+        if (!get_file_count(input_element))
+            reject('No file');
+
+        load_text_file(input_element.files[0], encoding)
+            .then(resolve, reject);
+    });
+}
+
+async function load_text_url(url) {
+    return new Promise((resolve, reject) => {
+        fetch(url)
+            .then(
+                (resp) => resolve(resp.text()),
+                reject
+            );
+    });
+}
+
+async function load_json_inputform(input_element, object_prototype) {
+    return new Promise((resolve, reject) => {
+        load_text_inputform(input_element).then(
+            (text) => {
+                resolve(() =>
+                    Object.assign(object_prototype, JSON.parse(text))
+                );
+            },
+            reject
+        );
+    });
 }
 
 function open_file() {

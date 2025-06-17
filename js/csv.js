@@ -1,21 +1,24 @@
 class CSV {
-    constructor(delimiters=[','],escapes=['\\'],comments=['#'],quotes=['"',"'"],trims=[' ','\r','\n']) {
+    constructor(delimiters=[','],escapes=['\\'],comments=['#'],quotes=['"',"'"],trim=true) {
         this.delimiters = delimiters;
         this.escapes = escapes;
         this.comments = comments;
         this.quotes = quotes;
-        this.trims = trims;
+        this.trim = trim;
         this.rows = [];
     }
 
     parseLine(line) {
-        let escapes = this.escapes, delimiters = this.delimiters;
-        let quotes = this.quotes, comments = this.comments;
-        let trims = this.trims;
+        const escapes = this.escapes, delimiters = this.delimiters;
+        const quotes = this.quotes, comments = this.comments;
+        const trim = this.trim;
+        
         let escaped = false, quoted = false, quoteChar = undefined;
 
         let ret = [];
         let field = '';
+
+        const push_field = (fd) => ret.push(trim ? fd.trim() : fd);
 
         for (const c of line) {
             if (escaped) {
@@ -42,13 +45,9 @@ class CSV {
                 continue;
             }
 
-            if (trims && trims.includes(c)) {
-                continue;
-            }
-
             if (delimiters && delimiters.includes(c)) {
                 if (!quoted) {
-                    ret.push(field);
+                    push_field(field);
                     field = '';
                     continue;
                 }
@@ -61,7 +60,7 @@ class CSV {
             field += c;
         }
 
-        ret.push(field);
+        push_field(field);
 
         return ret;
     }
@@ -71,8 +70,17 @@ class CSV {
         this.rows = [];
 
         for (const line of text.split('\n')) {
-            this.rows.push(this.parseLine(line));
+            const row = this.parseLine(line);
+            if (this.trim && (!row.length || (row.length < 2 && !row[0].length)))
+                continue;
+            this.rows.push(row);
         }
+    }
+
+    static loadCSV(text) {
+        const csv = new CSV();
+        csv.parseText(text);
+        return csv.rows;
     }
 
     forEachRow = (callback) => this.rows.forEach((row) => callback(row));

@@ -1,19 +1,3 @@
-function parse_csv(text) {
-	let csv = [];
-	let lines = text.trim().split('\n');
-	lines.forEach(n => {
-		let parts = n.trim().split(',');
-		csv.push(parts);
-	});
-	return csv;
-}
-
-async function load_file(url) {
-	let r = await fetch(url)
-	let text = await r.text();
-    return parse_csv(text);
-}
-
 function load_csv(csv) {
     if (!csv)
         return;
@@ -44,23 +28,10 @@ function load_csv(csv) {
 }
 
 async function load_input(event) {
-    let files = event?.target?.files;
-
-    console.log(event);
-
-    if (!files || !files[0])
-        return;
-
-    let reader = new FileReader();
-
-    reader.onload = function(e) {
-        load_csv(parse_csv(e.result));
-    };
-
-    reader.readAsText(files[0]);
+    load_csv(CSV.loadCSV(await load_text_inputform(event?.target)));
 }
 
-async function on_load(element) {
+async function on_load() {
     let url = '/sensors/sensors.csv';
     
     const params = new Proxy(new URLSearchParams(window.location.search), {
@@ -70,5 +41,5 @@ async function on_load(element) {
     if (params && params.csv)
         url = params.csv;
     
-    load_csv(await load_file(url));
+    load_csv(CSV.loadCSV(await load_text_url(url)));
 }
