@@ -638,6 +638,8 @@ const solve_requirements = [
 	['effective-focal-length', 'lens-dfov', 'sensor-diagonal', auto_xefl, 1],
 	['effective-focal-length', 'lens-hfov', 'sensor-width', auto_xefl, 1],
 	['effective-focal-length', 'lens-vfov', 'sensor-height', auto_xefl, 1],
+	['sensor-area', 'sensor-diagonal', 'sensor-diagonal', auto_mul, 0.5],
+	['sensor-diagonal','sensor-crop-factor','sensor-crop-factor',auto_cf,1],
 ];
 
 function multipass_solver(cam, set_id) {
