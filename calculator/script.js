@@ -12,6 +12,65 @@ const blue_color = [0,0,255,255];
 const green_color = [0,255,0,255];
 const std_diag_35mm = 43.3; //43.267
 
+class SensorDB {
+	constructor() {
+		this.acronyms = [];
+		this.formats = [];
+		this.models = [];
+		this.sensors = [];
+		this.sensor_header = [];
+	}
+
+	acronyms_parse(rows) {
+		console.log(rows);
+		this.acronyms = rows;
+	}
+
+	formats_parse(rows) {
+		console.log(rows);
+		this.formats = rows;
+	}
+
+	models_parse(rows) {
+		console.log(rows);
+		this.models = rows;
+	}
+
+	sensors_parse(rows) {
+		console.log(rows);
+		this.sensors = rows;
+	}
+
+	async resource_fetch() {
+		const resources = [
+			['/sensors/acronyms.csv', this.acronyms_parse],
+			['/sensors/formats.csv', this.formats_parse],
+			['/sensors/models.csv', this.models_parse],
+			['/sensors/sensors.csv', this.sensors_parse],
+		];
+
+		const requests = resources.map((rsrc) =>
+			new Promise((resolve, reject) => {
+				fetch(rsrc[0])
+					.then(
+						(resp) => {
+							resp.text()
+								.then((text) => {
+									rsrc[1](CSV.loadCSV(text));
+									resolve(1);
+								}, 
+								reject('text error')
+							);
+						},
+						reject('fetch error')
+				);
+			})
+		);
+
+		return Promise.all(requests);
+	}
+};
+
 // #endregion
 
 // #region Data generation
@@ -1162,9 +1221,14 @@ async function on_load(element) {
 	//let header = await load_header(await load_csv('/sensors/sensors_header.csv'));
 	//let cache = await load_cache(await load_csv('/sensors/sensors_cache.csv'));
 	//let formats = await load_formats(await load_csv('/sensors/sensors_format.csv'));
-	let header = load_header(CSV.loadCSV(await load_text_url('/sensors/sensors_header.csv')));
-	let cache = load_cache(CSV.loadCSV(await load_text_url('/sensors/sensors_cache.csv')));
-	let formats = load_formats(CSV.loadCSV(await load_text_url('/sensors/sensors_format.csv')));
+	//let header = load_header(CSV.loadCSV(await load_text_url('/sensors/sensors_header.csv')));
+	//let cache = load_cache(CSV.loadCSV(await load_text_url('/sensors/sensors_cache.csv')));
+	//let formats = load_formats(CSV.loadCSV(await load_text_url('/sensors/sensors_format.csv')));
+
+	let p = new SensorDB();
+	await p.resource_fetch();
+	console.log('complete');
+	return;
 
 	sensors_cache = cache.cache;
 	sensors_fields = header.fields;
