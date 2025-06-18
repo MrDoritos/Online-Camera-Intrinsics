@@ -15,30 +15,35 @@ const std_diag_35mm = 43.3; //43.267
 class SensorDB {
 	constructor() {
 		this.acronyms = [];
+		this.acronym_header = [];
 		this.formats = [];
+		this.format_header = [];
 		this.models = [];
+		this.model_header = [];
 		this.sensors = [];
 		this.sensor_header = [];
+		this.sensor_outline = [];
 	}
 
 	acronyms_parse(rows) {
-		console.log(rows);
-		this.acronyms = rows;
+		this.acronym_header = rows[0];
+		this.acronyms = rows.slice(1, rows.length);
 	}
 
 	formats_parse(rows) {
-		console.log(rows);
-		this.formats = rows;
+		this.format_header = rows[0];
+		this.formats = rows.slice(1, rows.length);
 	}
 
 	models_parse(rows) {
-		console.log(rows);
-		this.models = rows;
+		this.model_header = rows[0];
+		this.models = rows.slice(1, rows.length);
 	}
 
 	sensors_parse(rows) {
-		console.log(rows);
-		this.sensors = rows;
+		this.sensor_outline = rows.slice(0, 5);
+		this.sensor_header = rows[0];
+		this.sensors = rows.slice(8, rows.length);
 	}
 
 	async resource_fetch() {
