@@ -84,7 +84,7 @@ class Log {
         let min_index = 0;
         for (let i = 0; i < this.rows.length; i++) {
             //let t = Math.abs(time - this.rows[i].seconds);
-            let t = time - this.rows[i].seconds;
+            const t = time - this.rows[i].seconds;
             if (t < min_time && t >= 0) {
                 min_time = t;
                 min_index = i;
@@ -325,17 +325,30 @@ class Log {
 };
 
 class SensaGramLog extends Log {
-    constructor(filename, text) {
+    constructor(filename, text=undefined, interpolate=true, maxSampleCount=-1,multithreaded=true) {
         super(filename, undefined);
+
+        this.interpolate = interpolate;
+        this.maxSampleCount = maxSampleCount;
+        this.multithreaded = multithreaded;
 
         if (!text || !text.length)
             return;
 
-        this.text = text;
-        this.parse();
+        this.parse(text);
     }
 
-    parse() {
+    async parseText(text, interpolate=true, maxSampleCount=-1, multithreaded=true, threadCount=8) {
+        this.text = text;
+        this.interpolate = interpolate;
+        this.maxSampleCount = maxSampleCount;
+        this.multithreaded = multithreaded;
+        this.threadCount = threadCount;
+        
+        await this.parse();
+    }
+
+    async parse() {
         const s_sg = 'SensaGram';
 
         this.header = {
@@ -354,12 +367,15 @@ class SensaGramLog extends Log {
             part_name: s_sg,
         };
 
+        //const text = text;
+        //this.text = text;
         const text = this.text;
         const length = text.length;
         
         this.objs = [];
         let token_start = 0;
 
+        //console.log('split by entry');
         for (let i = 0; i < length; i++) {
             const c = text[i];
             
@@ -374,7 +390,45 @@ class SensaGramLog extends Log {
             }
         }
 
-        this.jobjs = this.objs.map(JSON.parse);
+        this.jobjs = [];
+
+        let step = 1;
+        if (this.maxRowCount > 0 && this.maxRowCount < this.objs.length) {
+            step = Math.floor(this.objs.length / this.maxRowCount);
+        }
+        this.step = step;
+
+        const thread_count = this.threadCount ?? 8;
+        const entry_count = this.objs.length;
+        const tasks_per_worker = Math.floor(entry_count / thread_count);
+        //this.jobjs = this.objs.map(JSON.parse);
+
+        let workers = [];
+
+        if (this.multithreaded) {
+            await new Promise(resolve => setTimeout(resolve, 1));
+            for (let i = 0; i < thread_count; i++) {
+                const start = i * tasks_per_worker;
+                let end = start + tasks_per_worker;
+                if (i == thread_count-1)
+                    end = entry_count;
+                workers.push(new Promise((resolve) => {
+                    let resolved = [];
+                    for (let j = start; j < end; j++) {
+                        resolved.push(JSON.parse(this.objs[j]));
+                    }
+                    resolve(resolved);
+                }));
+            }
+
+            await Promise.all(workers).then((resolved) => {
+                resolved.map(x => this.jobjs = this.jobjs.concat(x));
+            });
+        } else {
+            for (let i = 0; i < entry_count; i+=step) {
+                this.jobjs.push(JSON.parse(this.objs[i]));
+            }
+        }
 
         const time_scale = 0.000000001; //nanoseconds
         let time_start = undefined;
@@ -384,6 +438,7 @@ class SensaGramLog extends Log {
             return field.timestamp ?? field.elapsedRealtimeNanos;
         };
 
+        //console.log('parse javascript');
         for (const entry of this.jobjs) {
             const key = entry.type;
 
@@ -439,9 +494,11 @@ class SensaGramLog extends Log {
             const degrees = '\u00B0';
             const percent = '%';
             const MPS = 'm/s';
+            const MPS2 = 'm/s²';
+            const RPS = 'rad/s';
             const units = {
-                "android.sensor.accelerometer": G,
-                "android.sensor.gyroscope": G,
+                "android.sensor.accelerometer": MPS2,
+                "android.sensor.gyroscope": RPS,
                 "longitude": degrees,
                 "latitude": degrees,
                 "bearing": degrees,
@@ -455,6 +512,12 @@ class SensaGramLog extends Log {
         };
 
         let block_count = 0;
+
+        let stubOf = (group_num, field_num) => {
+            const group_stub = 'G' + String(group_num).padStart(3, '0');
+            const field_stub = `F${field_num}`;
+            return group_stub + field_stub;
+        };
 
         let createBlock = (group_num, field_num, group_key, field_key) => {
             const fieldOrGroup = field_key ?? group_key;
@@ -477,12 +540,14 @@ class SensaGramLog extends Log {
                     depth,
                     field:field_stub,
                     field_num,
+                    field_key,
                     group:group_stub,
                     group_num,
-                    max:0,
-                    max_time:0,
-                    min:0,
-                    min_time:0,
+                    group_key,
+                    max:undefined,
+                    max_time:undefined,
+                    min:undefined,
+                    min_time:undefined,
                     name,
                     range:0,
                     range_inv:0,
@@ -499,14 +564,22 @@ class SensaGramLog extends Log {
 
         let maxRowCount = 0;
 
+        //console.log('get max row count');
         for (let i = 0; i < fmtLength; i++) {
             const rowCount = fmtVals[i].length;
             if (rowCount > maxRowCount)
                 maxRowCount = rowCount;
         }
 
+        //console.log('filter complete');
         const wMaxRows = fmtVals.filter(x => x.length == maxRowCount);
+        //console.log('filter sparse');
+        const nMaxRows = Object.entries(fmt).filter(v => v[1].length != maxRowCount);
 
+        this.wMaxRows = wMaxRows;
+        this.nMaxRows = nMaxRows;
+
+        //console.log('fill rows');
         for (let i = 0; i < maxRowCount; i++) {
             //const min = Math.min(wMaxRows.map(x => x[i]).map(x => x.timestamp ?? x.elapsedRealtimeNanos));
             const min = wMaxRows.reduce((acculumator,current) => 
@@ -518,6 +591,7 @@ class SensaGramLog extends Log {
         }
         this.rows = rows;
 
+        //console.log('fill data');
         for (let i = 0; i < fmtLength; i++) {
             const column = fmtVals[i];
             const group = i;
@@ -536,6 +610,7 @@ class SensaGramLog extends Log {
                 const seconds = toSeconds(rTime - time_start);
 
                 const curRow = this.get_row_by_seconds(seconds);
+                //const curRow = this.get_row_index_by_seconds_via_approximation(seconds);
                 const curCol = curRow.columns;
                 const values = block.values;
 
@@ -555,12 +630,12 @@ class SensaGramLog extends Log {
 
                         const blockField = blockRaw[field];
 
-                        if (blockField.max < value) {
+                        if (blockField.max == undefined || blockField.max < value) {
                             blockField.max = value;
                             blockField.max_time = seconds;
                         }
 
-                        if (blockField.min > value) {
+                        if (blockField.min == undefined || blockField.min > value) {
                             blockField.min = value;
                             blockField.min_time = seconds;
                         }
@@ -590,12 +665,12 @@ class SensaGramLog extends Log {
 
                         const blockField = blockRaw[field];
 
-                        if (blockField.max < value) {
+                        if (blockField.max == undefined || blockField.max < value) {
                             blockField.max = value;
                             blockField.max_time = seconds;
                         }
 
-                        if (blockField.min > value) {
+                        if (blockField.min == undefined || blockField.min > value) {
                             blockField.min = value;
                             blockField.min_time = seconds;
                         }
@@ -614,6 +689,7 @@ class SensaGramLog extends Log {
         this.blocksRaw = blocksRaw;
         this.blocks = [];
 
+        //console.log('realize blocks');
         for (const group of Object.values(blocksRaw)) {
             for (const block of Object.values(group)) {
                 block.range = block.max - block.min;
@@ -622,9 +698,69 @@ class SensaGramLog extends Log {
             }
         }
 
+        const getFmtSec = (fmt) => {
+            return toSeconds(getTimestamp(fmt)-time_start);
+        };
+
+        //console.log('fill sparse blocks');
+        for (const group of nMaxRows) {
+            let groupIndex = 0;
+            const group_key = group[0];
+            const columns = group[1];
+            const groupMaxCount = columns.length;
+            const fmtSrc = fmt[group_key];
+            const stubs = this.blocks.filter(x => x.group_key == group_key);
+            for (let i = 0; i < maxRowCount; i++) {
+                const row = rows[i];
+                const seconds = row.seconds;
+                const groupCur = fmtSrc[groupIndex]; 
+                const groupSec = getFmtSec(groupCur);
+                const rowPrev = i > 0 ? rows[i-1] : undefined;
+                const rowNext = i + 2 < maxRowCount ? rows[i+1] : undefined;
+                const groupPrev = groupIndex > 0 ? groupIndex-1 : undefined;
+                const groupNext = groupIndex + 2 < groupMaxCount ? groupIndex+1 : undefined;
+                for (const block of stubs) {
+                    const field_key = block.field_key;
+                    const value = fmtSrc[groupIndex][field_key];
+                    if (groupPrev == undefined || groupNext == undefined) {
+                        row.columns[block.stub] = {
+                            seconds,
+                            value,
+                        };
+                        continue;
+                    }
+                    const fmtPrev = fmtSrc[groupPrev], fmtNext = fmtSrc[groupNext];
+                    const fmtPrevS = getFmtSec(fmtPrev), fmtNextS = getFmtSec(fmtNext);
+                    let srcA = undefined, srcB = undefined;
+                    if (seconds - fmtPrevS >= 0) {
+                        srcA = fmtPrev;
+                        srcB = fmtSrc[groupIndex];
+                    } else {
+                        srcA = fmtSrc[groupIndex];
+                        srcB = fmtNext;
+                    }
+
+                    const factor = (seconds - getFmtSec(srcA)) / (getFmtSec(srcB) - getFmtSec(srcA));
+
+                    row.columns[block.stub] = {
+                        seconds,
+                        value:lerp(srcA[field_key], srcB[field_key], factor),
+                    };
+                }
+                if (groupIndex + 1 < groupMaxCount && seconds > groupSec) {
+                    groupIndex++;
+                    //console.log('increment groupIndex', groupIndex);
+                    //console.log('groupPrev', groupPrev, 'groupNext', groupNext);
+                    //console.log('seconds', seconds, 'groupSecs', groupSec);
+                    //console.log('fmt[groupIndex]', fmtSrc[groupIndex]);
+                }
+            }
+        }
+
         this.seconds_min = toSeconds(time_start - time_start);
         this.seconds_max = toSeconds(time_end - time_start);
         this.seconds_range = this.seconds_max - this.seconds_min;
+        //console.log('complete');
     }
 };
 
@@ -1150,10 +1286,16 @@ class Parameters {
         return this.log.rows.slice(rr.start, rr.end);
     }
 
-    foreach_view_row(callback) {
-        let rr = this.get_view_row_range();
+    foreach_view_row(callback, rowLimit=-1) {
+        const rr = this.get_view_row_range();
+        const range = rr.end - rr.start;
 
-        for (let i = rr.start; i < rr.end; i += 1) {
+        let rs = 1;
+        if (rowLimit > 0 && range > rowLimit) {
+            rs = Math.floor((rr.end - rr.start) / rowLimit);
+        }
+
+        for (let i = rr.start; i < rr.end; i += rs) {
             callback(this.log.rows[i]);
         }
     }
@@ -1455,7 +1597,7 @@ class Parameters {
                 str += `<td><p>${v.value}</p></td>`;
             }
             str += "</tr>";
-        }.bind(this));
+        }.bind(this), 10000);
 
         return str;
     }
@@ -2588,9 +2730,11 @@ class VCDS {
         let e = this.get_element('log_load_sensagram');
         if (!e || !e.files || !e.files.length)
             return;
-        load_text_inputform(e).then((text) => {
-            this.add_log(new SensaGramLog(e.files[0].name, text));
-        });
+
+        const text = await load_text_inputform(e);
+        let log = new SensaGramLog(e.files[0].name, undefined, true, 10000);
+        await log.parseText(text);
+        this.add_log(log);
     }
 
     async log_export_range_input(event) {
