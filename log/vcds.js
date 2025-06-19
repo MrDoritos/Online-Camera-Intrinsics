@@ -41,9 +41,13 @@ class Log {
 
     constructor(filename, text) {
         this.filename = filename;
+        this.name = uuidv4();
+
+        if (!text || !text.length)
+            return;
+
         this.text = text;
         this.csv = CSV.parseCSV(text);
-        this.name = uuidv4();
         this.parse();
     }
 
@@ -317,6 +321,310 @@ class Log {
 
             this.rows.push(row);
         }.bind(this));
+    }
+};
+
+class SensaGramLog extends Log {
+    constructor(filename, text) {
+        super(filename, undefined);
+
+        if (!text || !text.length)
+            return;
+
+        this.text = text;
+        this.parse();
+    }
+
+    parse() {
+        const s_sg = 'SensaGram';
+
+        this.header = {
+            build: '0',
+            data_version: '0',
+            day: '0',
+            log_type: s_sg,
+            month: '0',
+            version: '0',
+            weekday: '0',
+            year: '0',
+        };
+
+        this.module = {
+            part_number: s_sg,
+            part_name: s_sg,
+        };
+
+        const text = this.text;
+        const length = text.length;
+        
+        this.objs = [];
+        let token_start = 0;
+
+        for (let i = 0; i < length; i++) {
+            const c = text[i];
+            
+            if (c == '{') {
+                token_start = i;
+                continue;
+            }
+
+            if (c == '}') {
+                this.objs.push(text.slice(token_start, i+1));
+                continue;
+            }
+        }
+
+        this.jobjs = this.objs.map(JSON.parse);
+
+        const time_scale = 0.000000001; //nanoseconds
+        let time_start = undefined;
+        let fmt = {};
+
+        const getTimestamp = (field) => {
+            return field.timestamp ?? field.elapsedRealtimeNanos;
+        };
+
+        for (const entry of this.jobjs) {
+            const key = entry.type;
+
+            if (!fmt[key])
+                fmt[key] = [];
+                
+            fmt[key].push(entry);
+
+            const seconds = getTimestamp(entry);
+
+            if (time_start == undefined)
+                time_start = seconds;
+            else
+            if (time_start > seconds)
+                time_start = seconds;
+        }
+
+        let toSeconds = (time, magnitude=time_scale) => {
+            return time * magnitude;
+        };
+
+        this.fmt = fmt;
+
+        let rows = [];
+
+        let offsets = Object.values(fmt).map(() => 0);
+
+        let offsetRow = rows.length;
+
+        let blocksRaw = {};
+
+        let nameOf = (key) => {
+            const names = {
+                "android.sensor.accelerometer": 'Accelerometer',
+                "android.sensor.gyroscope": "Gyroscope",
+                "android.gps": "GPS",
+            };
+
+            return names[key] ?? key;
+        };
+
+        let nameOfField = (key) => {
+            const fields = {
+                "android.sensor.accelerometer": ['X', 'Y', 'Z'],
+                "android.sensor.gyroscope": ['X', 'Y', 'Z'],
+            };
+
+            return fields[key];
+        };
+
+        let unitOf = (key) => {
+            const G = 'G';
+            const degrees = '\u00B0';
+            const percent = '%';
+            const MPS = 'm/s';
+            const units = {
+                "android.sensor.accelerometer": G,
+                "android.sensor.gyroscope": G,
+                "longitude": degrees,
+                "latitude": degrees,
+                "bearing": degrees,
+                "accuracy": percent,
+                "speed": MPS,
+                "speedAccuracyMetersPerSecond": MPS,
+                "bearingAccuracyDegrees": degrees,
+            };
+
+            return units[key] ?? '';
+        };
+
+        let block_count = 0;
+
+        let createBlock = (group_num, field_num, group_key, field_key) => {
+            const fieldOrGroup = field_key ?? group_key;
+            const depth = block_count++;
+            const color = this.colors[depth];
+            const combined_name = `Group ${group_num} - Field ${field_num}`;
+            const group_stub = 'G' + String(group_num).padStart(3, '0');
+            const field_stub = `F${field_num}`;
+            const stub = group_stub + field_stub;
+            const groupname = nameOf(group_key);
+            const fieldnames = nameOfField(group_key);
+            const fieldname = (fieldnames && fieldnames.length > field_num) ? fieldnames[field_num] : field_key;
+            const name = `${groupname} - ${fieldname}`;
+            const unit = unitOf(fieldOrGroup);
+
+            if (!blocksRaw[group_num][field_num]) {
+                blocksRaw[group_num][field_num] = {
+                    color,
+                    combined_name,
+                    depth,
+                    field:field_stub,
+                    field_num,
+                    group:group_stub,
+                    group_num,
+                    max:0,
+                    max_time:0,
+                    min:0,
+                    min_time:0,
+                    name,
+                    range:0,
+                    range_inv:0,
+                    stub,
+                    unit,
+                    visible:true,
+                };
+            }
+        };
+
+        let time_end = time_start;
+        let fmtVals = Object.values(fmt);
+        let fmtLength = fmtVals.length;
+
+        let maxRowCount = 0;
+
+        for (let i = 0; i < fmtLength; i++) {
+            const rowCount = fmtVals[i].length;
+            if (rowCount > maxRowCount)
+                maxRowCount = rowCount;
+        }
+
+        const wMaxRows = fmtVals.filter(x => x.length == maxRowCount);
+
+        for (let i = 0; i < maxRowCount; i++) {
+            //const min = Math.min(wMaxRows.map(x => x[i]).map(x => x.timestamp ?? x.elapsedRealtimeNanos));
+            const min = wMaxRows.reduce((acculumator,current) => 
+                Math.min(acculumator, getTimestamp(current[i])),
+                getTimestamp(wMaxRows[0][i])
+            );
+            const seconds = toSeconds(min-time_start);
+            rows.push({marker:0,seconds:seconds,columns:{}});
+        }
+        this.rows = rows;
+
+        for (let i = 0; i < fmtLength; i++) {
+            const column = fmtVals[i];
+            const group = i;
+            const group_stub = 'G' + String(i).padStart(3, '0');
+
+            blocksRaw[i] = {};
+            const blockRaw = blocksRaw[i];
+
+            for (let j = 0; j < column.length; j++) {
+                const fmtOffset = offsets[i];
+                offsets[i] += 1;
+                const block = column[j];
+                const slug = block.type;
+
+                const rTime = block.timestamp ?? block.elapsedRealtimeNanos;
+                const seconds = toSeconds(rTime - time_start);
+
+                const curRow = this.get_row_by_seconds(seconds);
+                const curCol = curRow.columns;
+                const values = block.values;
+
+                if (rTime > time_end)
+                    time_end = rTime;
+
+                if (values) {
+                    for (let h = 0; h < values.length; h++) {
+                        const field = h;
+                        const field_stub = `F${field}`;
+                        const stub = group_stub + field_stub;
+                        const value = values[field];
+
+                        if (!blocksRaw[group][field]) {
+                            createBlock(group, field, slug, slug);
+                        }
+
+                        const blockField = blockRaw[field];
+
+                        if (blockField.max < value) {
+                            blockField.max = value;
+                            blockField.max_time = seconds;
+                        }
+
+                        if (blockField.min > value) {
+                            blockField.min = value;
+                            blockField.min_time = seconds;
+                        }
+
+                        curCol[stub] = {
+                            value,
+                            seconds,
+                        };
+                    }
+                }
+
+                if (slug == "android.gps") {
+                    const field_slugs = [
+                        'latitude', 'longitude', 'altitude', 'bearing', 'accuracy', 'speed'
+                    ];
+
+                    for (let h = 0; h < field_slugs.length; h++) {
+                        const field = h;
+                        const field_slug = field_slugs[field];
+                        const field_stub = `F${field}`;
+                        const stub = group_stub + field_stub;
+                        const value = block[field_slug];
+
+                        if (!blocksRaw[group][field]) {
+                            createBlock(group, field, slug, field_slug);
+                        }
+
+                        const blockField = blockRaw[field];
+
+                        if (blockField.max < value) {
+                            blockField.max = value;
+                            blockField.max_time = seconds;
+                        }
+
+                        if (blockField.min > value) {
+                            blockField.min = value;
+                            blockField.min_time = seconds;
+                        }
+
+                        curCol[stub] = {
+                            value,
+                            seconds,
+                        };
+                    }
+                }
+            }
+        }
+
+        this.rows = rows;
+        this.markers = [];
+        this.blocksRaw = blocksRaw;
+        this.blocks = [];
+
+        for (const group of Object.values(blocksRaw)) {
+            for (const block of Object.values(group)) {
+                block.range = block.max - block.min;
+                block.range_inv = 1.0 / block.range;
+                this.blocks.push(block);
+            }
+        }
+
+        this.seconds_min = toSeconds(time_start - time_start);
+        this.seconds_max = toSeconds(time_end - time_start);
+        this.seconds_range = this.seconds_max - this.seconds_min;
     }
 };
 
@@ -1875,6 +2183,7 @@ class VCDS {
 
     events = [
         ['log_load', 'input', this.log_load_input],
+        ['log_load_sensagram', 'input', this.log_load_input_sensagram],
         ['define_engine', 'click', this.define_engine_input],
         ['clear_engine', 'click', this.clear_engine_input],
         ['save_engine', 'click', this.save_engine_input],
@@ -2273,6 +2582,15 @@ class VCDS {
         }.bind(this);
 
         reader.readAsText(form);
+    }
+
+    async log_load_input_sensagram(event) {
+        let e = this.get_element('log_load_sensagram');
+        if (!e || !e.files || !e.files.length)
+            return;
+        load_text_inputform(e).then((text) => {
+            this.add_log(new SensaGramLog(e.files[0].name, text));
+        });
     }
 
     async log_export_range_input(event) {
