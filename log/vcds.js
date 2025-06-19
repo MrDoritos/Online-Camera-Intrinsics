@@ -36,7 +36,15 @@ class Log {
         "coral",
         "greenyellow",
         "magenta",
-        "maroon"
+        "maroon",
+        "aquamarine",
+        "blueviolet",
+        "chartreuse",
+        "cadetblue",
+        "cornflowerblue",
+        "dodgerblue",
+        "hotpink",
+        "salmon",
     ];
 
     constructor(filename, text) {
@@ -391,6 +399,7 @@ class SensaGramLog extends Log {
         this.parse(text);
     }
 
+    // Entry point for parse with extra parameters
     async parseText(text, interpolate=true, maxSampleCount=-1, multithreaded=true, threadCount=8) {
         this.text = text;
         this.interpolate = interpolate;
@@ -403,7 +412,10 @@ class SensaGramLog extends Log {
 
     async parse() {
         const s_sg = 'SensaGram';
+        const text = this.text, length = this.text.length;
+        let objs = [], token_start = 0, jobjs = [], step = 1;
 
+        // Dummy header
         this.header = {
             build: '0',
             data_version: '0',
@@ -415,19 +427,13 @@ class SensaGramLog extends Log {
             year: '0',
         };
 
+        // Dummy module
         this.module = {
             part_number: s_sg,
             part_name: s_sg,
         };
 
-        //const text = text;
-        //this.text = text;
-        const text = this.text, length = this.text.length;
-        
-        let objs = [];
-        let token_start = 0;
-
-        //console.log('split by entry');
+        // Split mal-formatted json by { } tokens
         for (let i = 0; i < length; i++) {
             const c = text[i];
             
@@ -442,21 +448,19 @@ class SensaGramLog extends Log {
             }
         }
 
-        let jobjs = [];
-
-        let step = 1;
-        if (this.maxRowCount > 0 && this.maxRowCount < objs.length) {
+        // Limit number of data points (not working)
+        if (this.maxRowCount > 0 && this.maxRowCount < objs.length)
             step = Math.floor(objs.length / this.maxRowCount);
-        }
-        this.step = step;
 
         const thread_count = this.threadCount ?? 8;
         const entry_count = objs.length;
         const tasks_per_worker = Math.floor(entry_count / thread_count);
 
+        // Parse javascript
         if (this.multithreaded) {
             let workers = [];
             await new Promise(resolve => setTimeout(resolve, 1));
+            // Multithread without workers ? I don't think it works
             for (let i = 0; i < thread_count; i++) {
                 const start = i * tasks_per_worker;
                 let end = start + tasks_per_worker;
@@ -475,14 +479,14 @@ class SensaGramLog extends Log {
                 resolved.map(x => jobjs = jobjs.concat(x));
             });
         } else {
+            // Parse synchronously
             for (let i = 0; i < entry_count; i+=step) {
                 jobjs.push(JSON.parse(objs[i]));
             }
         }
 
         const time_scale = 0.000000001; //nanoseconds
-        let rows = [], blocksRaw = {}, fmt = {}, block_count = 0, time_start = 0;
-        //this.fmt = fmt;
+        let rows = [], blocksRaw = {}, fmt = {}, block_count = 0, time_start = undefined;
 
         const getTimestamp = (field) => {
             return field.timestamp ?? field.elapsedRealtimeNanos;
@@ -501,16 +505,26 @@ class SensaGramLog extends Log {
                 "android.sensor.accelerometer": 'Accelerometer',
                 "android.sensor.gyroscope": "Gyroscope",
                 "android.gps": "GPS",
+                "android.sensor.gyroscope_uncalibrated": "Gyroscope Uncalibrated",
+                "android.sensor.accelerometer_uncalibrated": "Accelerometer Uncalibrated",
             };
 
             return names[key] ?? key;
         };
 
         const nameOfField = (key) => {
-            const fields = {
-                "android.sensor.accelerometer": ['X', 'Y', 'Z'],
-                "android.sensor.gyroscope": ['X', 'Y', 'Z'],
-            };
+            const XYZ = ['X', 'Y', 'Z', 'X\'', 'Y\'', 'Z\''];
+            const fields = { };
+
+            const XYZfields = [
+                "android.sensor.accelerometer",
+                "android.sensor.gyroscope",
+                "android.sensor.gyroscope_uncalibrated",
+                "android.sensor.accelerometer_uncalibrated",
+            ];
+
+            if (XYZfields.includes(key))
+                return XYZ;
 
             return fields[key];
         };
@@ -524,7 +538,9 @@ class SensaGramLog extends Log {
             const RPS = 'rad/s';
             const units = {
                 "android.sensor.accelerometer": MPS2,
+                "android.sensor.accelerometer_uncalibrated": MPS2,
                 "android.sensor.gyroscope": RPS,
+                "android.sensor.gyroscope_uncalibrated": RPS,
                 "longitude": degrees,
                 "latitude": degrees,
                 "bearing": degrees,
@@ -582,56 +598,6 @@ class SensaGramLog extends Log {
             }
         };
 
-        //console.log('parse javascript');
-        for (const entry of jobjs) {
-            const key = entry.type;
-
-            if (!fmt[key])
-                fmt[key] = [];
-                
-            fmt[key].push(entry);
-
-            const seconds = getTimestamp(entry);
-
-            if (time_start == undefined)
-                time_start = seconds;
-            else
-            if (time_start > seconds)
-                time_start = seconds;
-        }
-
-        let time_end = time_start;
-        const fmtVals = Object.values(fmt);
-        const fmtLength = fmtVals.length;
-
-        let maxRowCount = 0;
-
-        //console.log('get max row count');
-        for (let i = 0; i < fmtLength; i++) {
-            const rowCount = fmtVals[i].length;
-            if (rowCount > maxRowCount)
-                maxRowCount = rowCount;
-        }
-
-        //console.log('filter complete');
-        const wMaxRows = fmtVals.filter(x => x.length == maxRowCount);
-        //console.log('filter sparse');
-        const nMaxRows = Object.entries(fmt).filter(v => v[1].length != maxRowCount);
-
-        //this.wMaxRows = wMaxRows;
-        //this.nMaxRows = nMaxRows;
-
-        //console.log('fill rows');
-        for (let i = 0; i < maxRowCount; i++) {
-            const min = wMaxRows.reduce((acculumator,current) => 
-                Math.min(acculumator, getTimestamp(current[i])),
-                getTimestamp(wMaxRows[0][i])
-            );
-            const seconds = toSeconds(min-time_start);
-            rows.push({marker:0,seconds:seconds,columns:{}});
-        }
-        this.rows = rows;
-
         const blockMinMax = (block, value, seconds) => {
             if (block.max == undefined || block.max < value) {
                 block.max = value;
@@ -654,7 +620,52 @@ class SensaGramLog extends Log {
             };
         };
 
-        //console.log('fill data');
+        // Add JSON entries to a dictionary of arrays
+        for (const entry of jobjs) {
+            const key = entry.type;
+
+            if (!fmt[key])
+                fmt[key] = [];
+                
+            fmt[key].push(entry);
+
+            const seconds = getTimestamp(entry);
+
+            if (time_start == undefined)
+                time_start = seconds;
+            else
+            if (time_start > seconds)
+                time_start = seconds;
+        }
+
+        let time_end = time_start, maxRowCount = 0;
+        const fmtVals = Object.values(fmt);
+        const fmtLength = fmtVals.length;
+
+        // Find max row count to pre-generate rows
+        for (let i = 0; i < fmtLength; i++) {
+            const rowCount = fmtVals[i].length;
+            if (rowCount > maxRowCount)
+                maxRowCount = rowCount;
+        }
+
+        // Columns that do and do not have the max row count
+        const wMaxRows = fmtVals.filter(x => x.length == maxRowCount);
+        const nMaxRows = Object.entries(fmt).filter(v => v[1].length != maxRowCount);
+
+        // Pre-generate rows with the min-timestamp
+        for (let i = 0; i < maxRowCount; i++) {
+            const min = wMaxRows.reduce((acculumator,current) => 
+                Math.min(acculumator, getTimestamp(current[i])),
+                getTimestamp(wMaxRows[0][i])
+            );
+            const seconds = toSeconds(min-time_start);
+            rows.push({marker:0,seconds:seconds,columns:{}});
+        }
+
+        this.rows = rows;
+
+        // Process each field of each column and add it to the target row by timestamp
         for (let group = 0; group < fmtLength; group++) {
             const column = fmtVals[group];
             blocksRaw[group] = {};
@@ -670,7 +681,7 @@ class SensaGramLog extends Log {
                 if (timestamp > time_end)
                     time_end = timestamp;
 
-                if (values) {
+                if (block.values) {
                     const values = block.values;
                     for (let h = 0; h < values.length; h++) {
                         const field = h;
@@ -696,12 +707,13 @@ class SensaGramLog extends Log {
             }
         }
 
-        this.rows = rows;
         this.markers = [];
-        //this.blocksRaw = blocksRaw;
         this.blocks = [];
+        this.seconds_min = toSeconds(time_start - time_start);
+        this.seconds_max = toSeconds(time_end - time_start);
+        this.seconds_range = this.seconds_max - this.seconds_min;
 
-        //console.log('realize blocks');
+        // Convert block and group layout into the block header
         for (const group of Object.values(blocksRaw)) {
             for (const block of Object.values(group)) {
                 block.range = block.max - block.min;
@@ -710,7 +722,7 @@ class SensaGramLog extends Log {
             }
         }
 
-        //console.log('fill sparse blocks');
+        // Interpolate missing fields for sparse data within columns
         if (this.interpolate) {
             for (const group of nMaxRows) {
                 let groupIndex = 0;
@@ -754,21 +766,11 @@ class SensaGramLog extends Log {
                             value:lerp(srcA[field_key], srcB[field_key], factor),
                         };
                     }
-                    if (groupIndex + 1 < groupMaxCount && seconds > groupSec) {
+                    if (groupIndex + 1 < groupMaxCount && seconds > groupSec)
                         groupIndex++;
-                        //console.log('increment groupIndex', groupIndex);
-                        //console.log('groupPrev', groupPrev, 'groupNext', groupNext);
-                        //console.log('seconds', seconds, 'groupSecs', groupSec);
-                        //console.log('fmt[groupIndex]', fmtSrc[groupIndex]);
-                    }
                 }
             }
         }
-
-        this.seconds_min = toSeconds(time_start - time_start);
-        this.seconds_max = toSeconds(time_end - time_start);
-        this.seconds_range = this.seconds_max - this.seconds_min;
-        //console.log('complete');
     }
 };
 
