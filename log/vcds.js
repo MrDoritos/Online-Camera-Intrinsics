@@ -79,6 +79,59 @@ class Log {
         return min_index;
     }
 
+    get_row_index_by_seconds_via_binary_search_r(time, start=0,end=-1,depth=0) {
+        if (end == -1) {
+            end = this.rows.length;
+        }
+
+        const range = end-start;
+        const mid = start+Math.floor(range*.5);
+        const midRow = this.rows[mid];
+
+        if (depth > 30)
+            throw "bad";
+
+        if (range < 2) {
+            //console.log('index', start);
+            return start;
+        }
+
+        if (midRow.seconds < time) {
+            //console.log('upper', 'time', time, 'start', start, 'mid', mid, 'end', end, 'range', range);
+            return this.get_row_index_by_seconds_via_binary_search_r(time, mid, end, depth+1);
+        } else {
+            //console.log('lower', 'time', time, 'start', start, 'mid', mid, 'end', end, 'range', range);
+            return this.get_row_index_by_seconds_via_binary_search_r(time, start, mid, depth+1);
+        }
+    }
+
+    get_row_index_by_seconds_via_binary_search(time) {
+        const index = this.get_row_index_by_seconds_via_binary_search_r(time);
+        //if (index < 1 || index + 2 > this.rows.length)
+        //    return index;
+        let search_min = index-1, search_max = index+2;
+        if (index < 1) {
+            search_min = 0;
+            search_max = 3;
+        } else
+        if (index + 2 > this.rows.length) {
+            search_min = this.rows.length - 3;
+            search_max = this.rows.length;
+        }
+
+        let min_time = time - this.rows[search_min].seconds;
+        let min_index = search_min;
+        for (let i = search_min; i < search_max; i++) {
+            const t = time - this.rows[i].seconds;
+            if (t < min_time && t >= 0) {
+                min_time = t;
+                min_index = i;
+            }
+        }
+
+        return min_index;
+    }
+
     get_row_index_by_seconds(time) {
         let min_time = time - this.rows[0].seconds;
         let min_index = 0;
@@ -369,10 +422,9 @@ class SensaGramLog extends Log {
 
         //const text = text;
         //this.text = text;
-        const text = this.text;
-        const length = text.length;
+        const text = this.text, length = this.text.length;
         
-        this.objs = [];
+        let objs = [];
         let token_start = 0;
 
         //console.log('split by entry');
@@ -385,27 +437,25 @@ class SensaGramLog extends Log {
             }
 
             if (c == '}') {
-                this.objs.push(text.slice(token_start, i+1));
+                objs.push(text.slice(token_start, i+1));
                 continue;
             }
         }
 
-        this.jobjs = [];
+        let jobjs = [];
 
         let step = 1;
-        if (this.maxRowCount > 0 && this.maxRowCount < this.objs.length) {
-            step = Math.floor(this.objs.length / this.maxRowCount);
+        if (this.maxRowCount > 0 && this.maxRowCount < objs.length) {
+            step = Math.floor(objs.length / this.maxRowCount);
         }
         this.step = step;
 
         const thread_count = this.threadCount ?? 8;
-        const entry_count = this.objs.length;
+        const entry_count = objs.length;
         const tasks_per_worker = Math.floor(entry_count / thread_count);
-        //this.jobjs = this.objs.map(JSON.parse);
-
-        let workers = [];
 
         if (this.multithreaded) {
+            let workers = [];
             await new Promise(resolve => setTimeout(resolve, 1));
             for (let i = 0; i < thread_count; i++) {
                 const start = i * tasks_per_worker;
@@ -415,62 +465,38 @@ class SensaGramLog extends Log {
                 workers.push(new Promise((resolve) => {
                     let resolved = [];
                     for (let j = start; j < end; j++) {
-                        resolved.push(JSON.parse(this.objs[j]));
+                        resolved.push(JSON.parse(objs[j]));
                     }
                     resolve(resolved);
                 }));
             }
 
             await Promise.all(workers).then((resolved) => {
-                resolved.map(x => this.jobjs = this.jobjs.concat(x));
+                resolved.map(x => jobjs = jobjs.concat(x));
             });
         } else {
             for (let i = 0; i < entry_count; i+=step) {
-                this.jobjs.push(JSON.parse(this.objs[i]));
+                jobjs.push(JSON.parse(objs[i]));
             }
         }
 
         const time_scale = 0.000000001; //nanoseconds
-        let time_start = undefined;
-        let fmt = {};
+        let rows = [], blocksRaw = {}, fmt = {}, block_count = 0, time_start = 0;
+        //this.fmt = fmt;
 
         const getTimestamp = (field) => {
             return field.timestamp ?? field.elapsedRealtimeNanos;
         };
 
-        //console.log('parse javascript');
-        for (const entry of this.jobjs) {
-            const key = entry.type;
-
-            if (!fmt[key])
-                fmt[key] = [];
-                
-            fmt[key].push(entry);
-
-            const seconds = getTimestamp(entry);
-
-            if (time_start == undefined)
-                time_start = seconds;
-            else
-            if (time_start > seconds)
-                time_start = seconds;
-        }
-
-        let toSeconds = (time, magnitude=time_scale) => {
+        const toSeconds = (time, magnitude=time_scale) => {
             return time * magnitude;
         };
 
-        this.fmt = fmt;
+        const getFmtSec = (fmt) => {
+            return toSeconds(getTimestamp(fmt)-time_start);
+        };
 
-        let rows = [];
-
-        let offsets = Object.values(fmt).map(() => 0);
-
-        let offsetRow = rows.length;
-
-        let blocksRaw = {};
-
-        let nameOf = (key) => {
+        const nameOf = (key) => {
             const names = {
                 "android.sensor.accelerometer": 'Accelerometer',
                 "android.sensor.gyroscope": "Gyroscope",
@@ -480,7 +506,7 @@ class SensaGramLog extends Log {
             return names[key] ?? key;
         };
 
-        let nameOfField = (key) => {
+        const nameOfField = (key) => {
             const fields = {
                 "android.sensor.accelerometer": ['X', 'Y', 'Z'],
                 "android.sensor.gyroscope": ['X', 'Y', 'Z'],
@@ -489,7 +515,7 @@ class SensaGramLog extends Log {
             return fields[key];
         };
 
-        let unitOf = (key) => {
+        const unitOf = (key) => {
             const G = 'G';
             const degrees = '\u00B0';
             const percent = '%';
@@ -511,15 +537,13 @@ class SensaGramLog extends Log {
             return units[key] ?? '';
         };
 
-        let block_count = 0;
-
-        let stubOf = (group_num, field_num) => {
+        const stubOf = (group_num, field_num) => {
             const group_stub = 'G' + String(group_num).padStart(3, '0');
             const field_stub = `F${field_num}`;
             return group_stub + field_stub;
         };
 
-        let createBlock = (group_num, field_num, group_key, field_key) => {
+        const createBlock = (group_num, field_num, group_key, field_key) => {
             const fieldOrGroup = field_key ?? group_key;
             const depth = block_count++;
             const color = this.colors[depth];
@@ -558,9 +582,27 @@ class SensaGramLog extends Log {
             }
         };
 
+        //console.log('parse javascript');
+        for (const entry of jobjs) {
+            const key = entry.type;
+
+            if (!fmt[key])
+                fmt[key] = [];
+                
+            fmt[key].push(entry);
+
+            const seconds = getTimestamp(entry);
+
+            if (time_start == undefined)
+                time_start = seconds;
+            else
+            if (time_start > seconds)
+                time_start = seconds;
+        }
+
         let time_end = time_start;
-        let fmtVals = Object.values(fmt);
-        let fmtLength = fmtVals.length;
+        const fmtVals = Object.values(fmt);
+        const fmtLength = fmtVals.length;
 
         let maxRowCount = 0;
 
@@ -576,12 +618,11 @@ class SensaGramLog extends Log {
         //console.log('filter sparse');
         const nMaxRows = Object.entries(fmt).filter(v => v[1].length != maxRowCount);
 
-        this.wMaxRows = wMaxRows;
-        this.nMaxRows = nMaxRows;
+        //this.wMaxRows = wMaxRows;
+        //this.nMaxRows = nMaxRows;
 
         //console.log('fill rows');
         for (let i = 0; i < maxRowCount; i++) {
-            //const min = Math.min(wMaxRows.map(x => x[i]).map(x => x.timestamp ?? x.elapsedRealtimeNanos));
             const min = wMaxRows.reduce((acculumator,current) => 
                 Math.min(acculumator, getTimestamp(current[i])),
                 getTimestamp(wMaxRows[0][i])
@@ -591,59 +632,51 @@ class SensaGramLog extends Log {
         }
         this.rows = rows;
 
-        //console.log('fill data');
-        for (let i = 0; i < fmtLength; i++) {
-            const column = fmtVals[i];
-            const group = i;
-            const group_stub = 'G' + String(i).padStart(3, '0');
+        const blockMinMax = (block, value, seconds) => {
+            if (block.max == undefined || block.max < value) {
+                block.max = value;
+                block.max_time = seconds;
+            }
+            if (block.min == undefined || block.min > value) {
+                block.min = value;
+                block.min_time = seconds;
+            }
+        };
 
-            blocksRaw[i] = {};
-            const blockRaw = blocksRaw[i];
+        const blockProc = (group_num, field_num, group_key, field_key, value, seconds, curCol) => {
+            if (!blocksRaw[group_num][field_num])
+                createBlock(group_num, field_num, group_key, field_key);
+            const block = blocksRaw[group_num][field_num];
+            blockMinMax(block, value, seconds);
+            curCol[block.stub] = {
+                value,
+                seconds,
+            };
+        };
+
+        //console.log('fill data');
+        for (let group = 0; group < fmtLength; group++) {
+            const column = fmtVals[group];
+            blocksRaw[group] = {};
 
             for (let j = 0; j < column.length; j++) {
-                const fmtOffset = offsets[i];
-                offsets[i] += 1;
                 const block = column[j];
                 const slug = block.type;
-
-                const rTime = block.timestamp ?? block.elapsedRealtimeNanos;
-                const seconds = toSeconds(rTime - time_start);
-
-                const curRow = this.get_row_by_seconds(seconds);
-                //const curRow = this.get_row_index_by_seconds_via_approximation(seconds);
+                const timestamp = block.timestamp ?? block.elapsedRealtimeNanos;
+                const seconds = toSeconds(timestamp - time_start);
+                const curRow = this.rows[this.get_row_index_by_seconds_via_binary_search(seconds)];
                 const curCol = curRow.columns;
-                const values = block.values;
 
-                if (rTime > time_end)
-                    time_end = rTime;
+                if (timestamp > time_end)
+                    time_end = timestamp;
 
                 if (values) {
+                    const values = block.values;
                     for (let h = 0; h < values.length; h++) {
                         const field = h;
-                        const field_stub = `F${field}`;
-                        const stub = group_stub + field_stub;
                         const value = values[field];
 
-                        if (!blocksRaw[group][field]) {
-                            createBlock(group, field, slug, slug);
-                        }
-
-                        const blockField = blockRaw[field];
-
-                        if (blockField.max == undefined || blockField.max < value) {
-                            blockField.max = value;
-                            blockField.max_time = seconds;
-                        }
-
-                        if (blockField.min == undefined || blockField.min > value) {
-                            blockField.min = value;
-                            blockField.min_time = seconds;
-                        }
-
-                        curCol[stub] = {
-                            value,
-                            seconds,
-                        };
+                        blockProc(group, field, slug, slug, value, seconds, curCol);
                     }
                 }
 
@@ -655,30 +688,9 @@ class SensaGramLog extends Log {
                     for (let h = 0; h < field_slugs.length; h++) {
                         const field = h;
                         const field_slug = field_slugs[field];
-                        const field_stub = `F${field}`;
-                        const stub = group_stub + field_stub;
                         const value = block[field_slug];
 
-                        if (!blocksRaw[group][field]) {
-                            createBlock(group, field, slug, field_slug);
-                        }
-
-                        const blockField = blockRaw[field];
-
-                        if (blockField.max == undefined || blockField.max < value) {
-                            blockField.max = value;
-                            blockField.max_time = seconds;
-                        }
-
-                        if (blockField.min == undefined || blockField.min > value) {
-                            blockField.min = value;
-                            blockField.min_time = seconds;
-                        }
-
-                        curCol[stub] = {
-                            value,
-                            seconds,
-                        };
+                        blockProc(group, field, slug, field_slug, value, seconds, curCol);
                     }
                 }
             }
@@ -686,7 +698,7 @@ class SensaGramLog extends Log {
 
         this.rows = rows;
         this.markers = [];
-        this.blocksRaw = blocksRaw;
+        //this.blocksRaw = blocksRaw;
         this.blocks = [];
 
         //console.log('realize blocks');
@@ -698,61 +710,57 @@ class SensaGramLog extends Log {
             }
         }
 
-        const getFmtSec = (fmt) => {
-            return toSeconds(getTimestamp(fmt)-time_start);
-        };
-
         //console.log('fill sparse blocks');
-        for (const group of nMaxRows) {
-            let groupIndex = 0;
-            const group_key = group[0];
-            const columns = group[1];
-            const groupMaxCount = columns.length;
-            const fmtSrc = fmt[group_key];
-            const stubs = this.blocks.filter(x => x.group_key == group_key);
-            for (let i = 0; i < maxRowCount; i++) {
-                const row = rows[i];
-                const seconds = row.seconds;
-                const groupCur = fmtSrc[groupIndex]; 
-                const groupSec = getFmtSec(groupCur);
-                const rowPrev = i > 0 ? rows[i-1] : undefined;
-                const rowNext = i + 2 < maxRowCount ? rows[i+1] : undefined;
-                const groupPrev = groupIndex > 0 ? groupIndex-1 : undefined;
-                const groupNext = groupIndex + 2 < groupMaxCount ? groupIndex+1 : undefined;
-                for (const block of stubs) {
-                    const field_key = block.field_key;
-                    const value = fmtSrc[groupIndex][field_key];
-                    if (groupPrev == undefined || groupNext == undefined) {
+        if (this.interpolate) {
+            for (const group of nMaxRows) {
+                let groupIndex = 0;
+                const group_key = group[0];
+                const columns = group[1];
+                const groupMaxCount = columns.length;
+                const fmtSrc = fmt[group_key];
+                const stubs = this.blocks.filter(x => x.group_key == group_key);
+                for (let i = 0; i < maxRowCount; i++) {
+                    const row = rows[i];
+                    const seconds = row.seconds;
+                    const groupCur = fmtSrc[groupIndex]; 
+                    const groupSec = getFmtSec(groupCur);
+                    const groupPrev = groupIndex > 0 ? groupIndex-1 : undefined;
+                    const groupNext = groupIndex + 2 < groupMaxCount ? groupIndex+1 : undefined;
+                    for (const block of stubs) {
+                        const field_key = block.field_key;
+                        const value = fmtSrc[groupIndex][field_key];
+                        if (groupPrev == undefined || groupNext == undefined) {
+                            row.columns[block.stub] = {
+                                seconds,
+                                value,
+                            };
+                            continue;
+                        }
+                        const fmtPrev = fmtSrc[groupPrev], fmtNext = fmtSrc[groupNext];
+                        const fmtPrevS = getFmtSec(fmtPrev), fmtNextS = getFmtSec(fmtNext);
+                        let srcA = undefined, srcB = undefined;
+                        if (seconds - fmtPrevS >= 0) {
+                            srcA = fmtPrev;
+                            srcB = fmtSrc[groupIndex];
+                        } else {
+                            srcA = fmtSrc[groupIndex];
+                            srcB = fmtNext;
+                        }
+
+                        const factor = (seconds - getFmtSec(srcA)) / (getFmtSec(srcB) - getFmtSec(srcA));
+
                         row.columns[block.stub] = {
                             seconds,
-                            value,
+                            value:lerp(srcA[field_key], srcB[field_key], factor),
                         };
-                        continue;
                     }
-                    const fmtPrev = fmtSrc[groupPrev], fmtNext = fmtSrc[groupNext];
-                    const fmtPrevS = getFmtSec(fmtPrev), fmtNextS = getFmtSec(fmtNext);
-                    let srcA = undefined, srcB = undefined;
-                    if (seconds - fmtPrevS >= 0) {
-                        srcA = fmtPrev;
-                        srcB = fmtSrc[groupIndex];
-                    } else {
-                        srcA = fmtSrc[groupIndex];
-                        srcB = fmtNext;
+                    if (groupIndex + 1 < groupMaxCount && seconds > groupSec) {
+                        groupIndex++;
+                        //console.log('increment groupIndex', groupIndex);
+                        //console.log('groupPrev', groupPrev, 'groupNext', groupNext);
+                        //console.log('seconds', seconds, 'groupSecs', groupSec);
+                        //console.log('fmt[groupIndex]', fmtSrc[groupIndex]);
                     }
-
-                    const factor = (seconds - getFmtSec(srcA)) / (getFmtSec(srcB) - getFmtSec(srcA));
-
-                    row.columns[block.stub] = {
-                        seconds,
-                        value:lerp(srcA[field_key], srcB[field_key], factor),
-                    };
-                }
-                if (groupIndex + 1 < groupMaxCount && seconds > groupSec) {
-                    groupIndex++;
-                    //console.log('increment groupIndex', groupIndex);
-                    //console.log('groupPrev', groupPrev, 'groupNext', groupNext);
-                    //console.log('seconds', seconds, 'groupSecs', groupSec);
-                    //console.log('fmt[groupIndex]', fmtSrc[groupIndex]);
                 }
             }
         }
