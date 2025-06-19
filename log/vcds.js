@@ -4,24 +4,6 @@ function uuidv4() {
     );
 }  
 
-class CSV {
-    text = undefined;
-    rows = [];
-
-    constructor(text) {
-        this.text = text;
-        this.parse();
-    }
-
-    parse() {
-        let lines = this.text.trim().split('\n');
-        lines.forEach(function(line) {
-            let cols = line.trim().split(',');
-            this.rows.push(cols);
-        }.bind(this));
-    }
-};
-
 function lerp(v1, v2, factor) {
     return v1 * (1 - factor) + v2 * factor;
 }
@@ -60,7 +42,7 @@ class Log {
     constructor(filename, text) {
         this.filename = filename;
         this.text = text;
-        this.csv = new CSV(this.text);
+        this.csv = CSV.parseCSV(text);
         this.name = uuidv4();
         this.parse();
     }
@@ -261,9 +243,9 @@ class Log {
         this.header.log_type = r[1];
 
         r = rs[2];
-        let r2 = rs[4];
-        let r3 = rs[5];
-        let r4 = rs[6];
+        let r2 = rs[3];
+        let r3 = rs[4];
+        let r4 = rs[5];
 
         let b = r.slice(2);
         let b2 = r2.slice(2);

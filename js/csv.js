@@ -83,6 +83,12 @@ class CSV {
         return csv.rows;
     }
 
+    static parseCSV(text) {
+        const csv = new CSV();
+        csv.parseText(text);
+        return csv;
+    }
+
     forEachRow = (callback) => this.rows.forEach((row) => callback(row));
 
     async parseStream(text_stream) {
