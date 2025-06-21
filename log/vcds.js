@@ -186,6 +186,15 @@ class Log {
         return [a-1, a];
     }
 
+    get_two_rows_indicies(index, time, block) {
+        if (index < 1) return [0, 1];
+        if (index > this.rows.length - 2) return [this.rows.length-2,this.rows.length-1];
+        let field = this.rows[index];
+        if (time - field.columns[block.stub].seconds >= 0)
+            return [index, index+1];
+        return [index-1, index];
+    }
+
     get_two_rows_indicies_by_block_seconds(time, block) {
         let a = this.get_row_index_by_block_seconds(time, block);
         if (a < 1) return [0, 1];
@@ -382,6 +391,95 @@ class Log {
 
             this.rows.push(row);
         }.bind(this));
+    }
+
+    static combine_logs(...p_logs) {
+        let ret = new Log('combined.txt');
+
+        let logs = [].concat(p_logs.map(x => x instanceof Array ? x[0] : x));
+
+        let fit_max = true;
+
+        console.log(p_logs,logs);
+        //let blocks = JSON.parse(JSON.stringify(logs.reduce((accum, current) => accum = accum.concat(current.blocks), [])));
+        //let block_count = blocks.length;
+        let rows = [], blocks = [];
+
+        let seconds_min = Math.min.apply(null, logs.map(x => x.seconds_min));
+        let seconds_max = Math.max.apply(null, logs.map(x => x.seconds_max));
+        let seconds_range = seconds_max - seconds_min;
+
+        console.log('seconds_min', seconds_min, 'seconds_max', seconds_max, 'seconds_range', seconds_range);
+
+        let row_counts = logs.map(x => ({
+            log:x,
+            min:x.get_row_index_by_seconds_via_binary_search(seconds_min),
+            max:x.get_row_index_by_seconds_via_binary_search(seconds_max)
+        }));
+
+        let row_count = Math.max.apply(null, row_counts.map(x => x.max - x.min));
+
+        console.log('row_counts', row_counts, 'row_count', row_count);
+        
+        for (let i = 0; i < row_count; i++) {
+            const n = i / row_count;
+            const seconds = (n * seconds_range) + seconds_min;
+            rows.push({marker:0,seconds,columns:{}});
+        }
+
+        let log_count = 1;
+        for (const rlog of row_counts) {
+            const log = rlog.log;
+            const interp = fit_max && log.rows.count != row_count;
+
+            for (let i = 0; i < row_count; i++) {
+                const n = i / row_count;
+                const seconds = (n * seconds_range) + seconds_min;
+                const index = log.get_row_index_by_seconds_via_binary_search(seconds);
+
+                for (const block of log.blocks) {
+                    const nstub = String(log_count)+block.stub;
+                    if (interp) {
+                        const twoindex = log.get_two_rows_indicies(index, seconds, block);
+                        const srcA = log.rows[twoindex[0]].columns[block.stub];
+                        const srcB = log.rows[twoindex[1]].columns[block.stub];
+                        const factor = (seconds - srcA.seconds) / (srcB.seconds - srcA.seconds);
+                        rows[i].columns[nstub] = log.get_linear_interpolated_block(srcA, srcB, factor);
+                    } else {
+                        rows[i].columns[nstub] = log.rows[index].columns[block.stub];
+                    }
+                }
+            }
+
+            for (const block of log.blocks) {
+                const nstub = String(log_count)+block.stub;
+                let nblock = JSON.parse(JSON.stringify(block));
+                nblock.stub = nstub;
+                blocks.push(nblock);
+            }
+
+            log_count++;
+        }
+
+        ret.blocks = blocks;
+        ret.rows = rows;
+        ret.markers = [];
+        ret.module = Log.make_module();
+        ret.header = Log.make_header();
+        ret.seconds_min = seconds_min;
+        ret.seconds_max = seconds_max;
+        ret.seconds_range = seconds_range;
+
+        return ret;
+        
+    }
+
+    static make_header(build='0',data_version='0',day='0',log_type='0',month='0',version='0',weekday='0',year='0') {
+        return {build,data_version,day,log_type,month,version,weekday,year};
+    }
+
+    static make_module(part_number='0', part_name='0') {
+        return {part_number,part_name};
     }
 };
 
