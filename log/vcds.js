@@ -393,33 +393,40 @@ class Log {
         }.bind(this));
     }
 
-    static combine_logs(...p_logs) {
+    static combine_logs(logs, offsets=[]) {
         let ret = new Log('combined.txt');
-
-        let logs = [].concat(p_logs.map(x => x instanceof Array ? x[0] : x));
 
         let fit_max = true;
 
-        console.log(p_logs,logs);
+        let clogs = [];
+        for (let i = 0; i < logs.length; i++) {
+            const offset = (i < offsets.length) ? offsets[i] : 0;
+            clogs.push({
+                log:logs[i],
+                offset
+            });
+        }
+
         //let blocks = JSON.parse(JSON.stringify(logs.reduce((accum, current) => accum = accum.concat(current.blocks), [])));
         //let block_count = blocks.length;
         let rows = [], blocks = [];
 
         let seconds_min = Math.min.apply(null, logs.map(x => x.seconds_min));
-        let seconds_max = Math.max.apply(null, logs.map(x => x.seconds_max));
+        let seconds_max = Math.max.apply(null, clogs.map(x => x.log.seconds_max + x.offset));
         let seconds_range = seconds_max - seconds_min;
 
         console.log('seconds_min', seconds_min, 'seconds_max', seconds_max, 'seconds_range', seconds_range);
 
-        let row_counts = logs.map(x => ({
-            log:x,
-            min:x.get_row_index_by_seconds_via_binary_search(seconds_min),
-            max:x.get_row_index_by_seconds_via_binary_search(seconds_max)
+        let row_counts = clogs.map(x => ({
+            log:x.log,
+            min:x.log.get_row_index_by_seconds_via_binary_search(seconds_min),
+            max:x.log.get_row_index_by_seconds_via_binary_search(seconds_max),
+            offset:x.offset,
         }));
 
         let row_count = Math.max.apply(null, row_counts.map(x => x.max - x.min));
 
-        console.log('row_counts', row_counts, 'row_count', row_count);
+        console.log('row_counts', row_counts, 'row_count', row_count, 'offsets', offsets);
         
         for (let i = 0; i < row_count; i++) {
             const n = i / row_count;
@@ -430,24 +437,26 @@ class Log {
         let log_count = 1;
         for (const rlog of row_counts) {
             const log = rlog.log;
+            const offset = rlog.offset;
             const interp = fit_max && log.rows.count != row_count;
 
             for (let i = 0; i < row_count; i++) {
                 const n = i / row_count;
                 const seconds = (n * seconds_range) + seconds_min;
-                const index = log.get_row_index_by_seconds_via_binary_search(seconds);
+                const index = log.get_row_index_by_seconds_via_binary_search(seconds - offset);
 
                 for (const block of log.blocks) {
                     const nstub = String(log_count)+block.stub;
-                    if (interp) {
-                        const twoindex = log.get_two_rows_indicies(index, seconds, block);
+                    if (interp || seconds > log.seconds_max || seconds < log.seconds_min) {
+                        const twoindex = log.get_two_rows_indicies(index, seconds - offset, block);
                         const srcA = log.rows[twoindex[0]].columns[block.stub];
                         const srcB = log.rows[twoindex[1]].columns[block.stub];
-                        const factor = (seconds - srcA.seconds) / (srcB.seconds - srcA.seconds);
+                        const factor = ((seconds - offset) - srcA.seconds) / (srcB.seconds - srcA.seconds);
                         rows[i].columns[nstub] = log.get_linear_interpolated_block(srcA, srcB, factor);
                     } else {
-                        rows[i].columns[nstub] = log.rows[index].columns[block.stub];
+                        rows[i].columns[nstub] = JSON.parse(JSON.stringify(log.rows[index].columns[block.stub]));
                     }
+                    rows[i].columns[nstub].seconds = seconds;
                 }
             }
 
