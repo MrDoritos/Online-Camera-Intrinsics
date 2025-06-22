@@ -614,6 +614,10 @@ class SensaGramLog extends Log {
                 "android.gps": "GPS",
                 "android.sensor.gyroscope_uncalibrated": "Gyroscope Uncalibrated",
                 "android.sensor.accelerometer_uncalibrated": "Accelerometer Uncalibrated",
+                "android.sensor.rotation_vector":"Rotation Vector",
+                "android.sensor.linear_acceleration":"Linear Acceleration",
+                "android.sensor.magnetic_field_uncalibrated":"Magnetic Field Uncalibrated",
+                "android.sensor.magnetic_field":"Magnetic Field",
             };
 
             return names[key] ?? key;
@@ -628,6 +632,10 @@ class SensaGramLog extends Log {
                 "android.sensor.gyroscope",
                 "android.sensor.gyroscope_uncalibrated",
                 "android.sensor.accelerometer_uncalibrated",
+                "android.sensor.linear_acceleration",
+                "android.sensor.magnetic_field_uncalibrated",
+                "android.sensor.magnetic_field",
+                "android.sensor.rotation_vector",
             ];
 
             if (XYZfields.includes(key))
@@ -643,11 +651,15 @@ class SensaGramLog extends Log {
             const MPS = 'm/s';
             const MPS2 = 'm/s²';
             const RPS = 'rad/s';
+            const utesla = "μT";
             const units = {
                 "android.sensor.accelerometer": MPS2,
                 "android.sensor.accelerometer_uncalibrated": MPS2,
                 "android.sensor.gyroscope": RPS,
                 "android.sensor.gyroscope_uncalibrated": RPS,
+                "android.sensor.linear_acceleration":MPS2,
+                "android.sensor.magnetic_field_uncalibrated":utesla,
+                "android.sensor.magnetic_field":utesla,
                 "longitude": degrees,
                 "latitude": degrees,
                 "bearing": degrees,
@@ -669,7 +681,7 @@ class SensaGramLog extends Log {
         const createBlock = (group_num, field_num, group_key, field_key) => {
             const fieldOrGroup = field_key ?? group_key;
             const depth = block_count++;
-            const color = this.colors[depth];
+            const color = this.colors[depth%this.colors.length];
             const combined_name = `Group ${group_num} - Field ${field_num}`;
             const group_stub = 'G' + String(group_num).padStart(3, '0');
             const field_stub = `F${field_num}`;
@@ -847,7 +859,13 @@ class SensaGramLog extends Log {
                     const groupNext = groupIndex + 2 < groupMaxCount ? groupIndex+1 : undefined;
                     for (const block of stubs) {
                         const field_key = block.field_key;
-                        const value = fmtSrc[groupIndex][field_key];
+                        const field_num = block.field_num;
+                        const isValueArray = fmtSrc[groupIndex].values != undefined;
+                        let value = undefined;
+                        if (isValueArray)
+                            value = fmtSrc[groupIndex].values[field_num];
+                        else
+                            value = fmtSrc[groupIndex][field_key];
                         if (groupPrev == undefined || groupNext == undefined) {
                             row.columns[block.stub] = {
                                 seconds,
@@ -866,11 +884,14 @@ class SensaGramLog extends Log {
                             srcB = fmtNext;
                         }
 
+                        const valA = isValueArray ? srcA.values[field_num] : srcA[field_key];
+                        const valB = isValueArray ? srcB.values[field_num] : srcB[field_key];
+
                         const factor = (seconds - getFmtSec(srcA)) / (getFmtSec(srcB) - getFmtSec(srcA));
 
                         row.columns[block.stub] = {
                             seconds,
-                            value:lerp(srcA[field_key], srcB[field_key], factor),
+                            value:lerp(valA, valB, factor),
                         };
                     }
                     if (groupIndex + 1 < groupMaxCount && seconds > groupSec)
@@ -1600,32 +1621,41 @@ class Parameters {
         let rr = this.get_view_row_range();
 
         layers.forEach(function(block) {
-            if (!block.visible)
+            if (!block || !block.visible)
                 return;
 
             this.context.strokeStyle = block.color;
+            let rel = {x:-0.01,y:0.5};
 
-            this.context.beginPath();
-            let rel = this.get_column_relative(block, this.log.rows[rr.start].columns[block.stub]);
-            rel.x = -0.01;
+            if (this.log.rows[rr.start].columns[block.stub]) {
+                this.context.beginPath();
+                let rel = this.get_column_relative(block, this.log.rows[rr.start].columns[block.stub]);
+                rel.x = -0.01;
+            }
+            
             this.moveTo(rel);
 
             this.foreach_view_row(function(row) {
-                this.lineTo(this.get_column_relative(block, row.columns[block.stub]));
+                if (row.columns[block.stub])
+                    this.lineTo(this.get_column_relative(block, row.columns[block.stub]));
             }.bind(this));
 
-            rel = this.get_column_relative(block, this.log.rows[rr.end-1].columns[block.stub]);
-            rel.x = 1.01;
-            this.lineTo(rel);
+            if (this.log.rows[rr.end-1].columns[block.stub]) {
+                rel = this.get_column_relative(block, this.log.rows[rr.end-1].columns[block.stub]);
+                rel.x = 1.01;
+                this.lineTo(rel);
+            }
 
             this.context.stroke();
 
             this.context.fillStyle = block.color;
             if (this.get_view_rows_count() <= 60)
             this.foreach_view_row(function(row) { 
-                this.context.beginPath();
-                this.arc(this.get_column_relative(block, row.columns[block.stub]), 5, 0, 2 * Math.PI);
-                this.context.fill();
+                if (row.columns[block.stub]) {
+                    this.context.beginPath();
+                    this.arc(this.get_column_relative(block, row.columns[block.stub]), 5, 0, 2 * Math.PI);
+                    this.context.fill();
+                }
             }.bind(this));
         }.bind(this));
     }
@@ -1711,7 +1741,7 @@ class Parameters {
             str += `<td><p>${row.seconds}</p></td>`;
             
             for (const [k, v] of Object.entries(row.columns)) {
-                str += `<td><p>${v.value}</p></td>`;
+                str += `<td><p>${v ? v.value : "NaN"}</p></td>`;
             }
             str += "</tr>";
         }.bind(this), 10000);
@@ -1782,7 +1812,7 @@ class Parameters {
 
         for (let i = range.start; i < range.end; i+=1) {
             let row = this.log.rows[i];
-            str += `\n${row.seconds},${Object.entries(row.columns).map(x=>x[1].value).join(',')}`;
+            str += `\n${row.seconds},${Object.entries(row.columns).map(x=>x?x[1].value:"NaN").join(',')}`;
         }
 
         return str;
@@ -2003,8 +2033,10 @@ class Parameters {
             main_tooltip.style.transform = 'translate(-50%,0)';
 
             let str = '';
-            str += `<p>${n.column.value.toFixed(2)}${n.block.unit}</p>`;
-            str += `<p>${n.column.seconds.toFixed(2)}</p>`;
+            if (n.column) {
+                str += `<p>${n.column.value.toFixed(2)}${n.block.unit}</p>`;
+                str += `<p>${n.column.seconds.toFixed(2)}</p>`;
+            }
             str += `<p>${n.block.name}</p>`;
             str += `<p>${n.block.group} - ${n.block.field}</p>`;
             main_tooltip.innerHTML = str;
@@ -2017,7 +2049,7 @@ class Parameters {
 
         for (const [key, column] of Object.entries(n.row.columns)) {
             let block = this.log.get_block(key);
-            if (!block.visible)
+            if (!block || !block.visible)
                 continue;
             let iden = this.get_block_identifier(block);
 
@@ -2059,7 +2091,7 @@ class Parameters {
             div.childNodes.forEach(x => div.removeChild(x));
             let value_e = document.createElement('p');
             let name_e = document.createElement('p');
-            value_e.innerText = `${column.value.toFixed(2)}${block.unit}`;
+            value_e.innerText = `${column?column.value.toFixed(2):"NaN"}${block.unit}`;
             name_e.innerText = `${block.name}`;
             let ee = document.createElement('div');
             ee.className = iden;
