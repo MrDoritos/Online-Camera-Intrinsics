@@ -329,6 +329,19 @@ table td:nth-child(1), table th {
     background-color: rgba(160,160,160);
 }
 
+table th:nth-child(1) {
+    z-index: 7;
+}
+
+table td:nth-child(1), table th:nth-child(1) {
+    position: sticky;
+    z-index: 6;
+    left:0;
+    max-width: 10vw;
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+}
+
 table tr, table tr td, table tr th {
     margin: 0;
     padding: 0;
@@ -353,6 +366,8 @@ table thead th p {
     margin:0;
     #font-size: 2vh;
     text-align: center;
+    overflow-x:hidden;
+    text-wrap:nowrap;
 }
 
 table thead th {
@@ -361,6 +376,7 @@ table thead th {
     #background-color: gray;
     #min-height: 100%;
     #height: 100%;
+    max-width:4em;
 }
 
 table * {
@@ -397,8 +413,8 @@ table tr #vertical {
 }
 
 table {
-    #table-layout: fixed;
-    width: 100%;
+    table-layout: fixed;
+    #width: 100%;
     height: 100%;
 }
 
