@@ -18,29 +18,19 @@ const Color = class {
 };
 
 class CanvasBuffer {
-    constructor(element, width=128, height=128) {
-        this.element = document.createElement('div');
-        this.element.id = 'container';
-        element.appendChild(this.element);
+    canvas;
+    context;
+    image;
+    width;
+    height;
 
-        this.canvas = document.createElement('canvas');
-        this.canvas.id = 'canvas';
-        this.element.appendChild(this.canvas);
+    canvas_clear = () => this.context.clearRect(0, 0, this.width, this.height);
 
-        this.context = this.canvas.getContext('2d');
+    get_image_data = () => this.context.getImageData(0,0,this.width,this.height);
 
-        this.set_size(width, height);
-        this.context.clearRect(0, 0, this.width, this.height);
+    put_image_data = () => this.context.putImageData(this.image, 0, 0);
 
-        this.image = this.get_image_data();
-
-        this.context.imageSmoothingQuality = '';
-        this.context.imageSmoothingEnabled = false;
-
-        this.clear(Color.BLACK);
-
-        this.put_image_data();
-    }
+    get_offset = (x, y) => Math.round(Math.round(y) * this.width + x) * 4;
 
     set_size(width, height) {
         this.width = width;
@@ -50,23 +40,74 @@ class CanvasBuffer {
         this.context.height = this.canvas.height = this.height;
     }
 
-    get_image_data = () => this.context.getImageData(0,0,this.width,this.height);
+    set_canvas_size(width, height) {
+        this.set_size(width, height);
+    }
 
-    put_image_data = () => this.context.putImageData(this.image, 0, 0);
+    is_bound(x, y) {
+        return x < this.width && y < this.height && x >= 0 && y >= 0;
+    }
 
+    set_smoothing_off() {
+        this.context.imageSmoothingQuality = '';
+        this.context.imageSmoothingEnabled = false;
+    }
+
+    create_canvas(width, height) {
+        let canvas = document.createElement('canvas');
+        this.load_canvas(canvas, width, height);
+    }
+
+    load_canvas(canvas, width, height) {
+        this.canvas = canvas;
+        this.context = this.canvas.getContext('2d');
+        this.set_canvas_size(width, height);
+        this.image = this.get_image_data();
+        this.canvas_clear();
+    }
+
+    draw_image(x, y, image) {
+        this.context.drawImage(image, x, y);
+    }
+
+    load_image(image) {
+        this.create_canvas(image.width, image.height);
+        this.draw_image(0,0,image);
+    }
+
+    static async load_image_url(url) {
+        return new Promise((resolve, reject) => {
+            let image = new Image();
+            image.crossOrigin = "anonymous";
+            image.src = url;
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error("Could not load image"));
+        });
+    }
+
+    static async load_url(url) {
+        let texture = new CanvasBuffer();
+
+        texture.load_image(await CanvasBuffer.load_image_url(url));
+
+        return texture;
+    }
+};
+
+const TextureReader = (Super) => class extends Super {
+    get_pixel_offset = (offset) => { let pixel = [0,0,0,255]; for (let i = 0; i < 4; i++) pixel[i] = this.image.data[offset + i]; return pixel; };
+
+    get_pixel_bound = (x, y) => { if (this.is_bound(x, y)) this.get_pixel(x, y); };
+
+    get_pixel = (x, y) => this.get_pixel_offset(this.get_offset(x, y));
+};
+
+const TextureWriter = (Super) => class extends Super {
     put_pixel_offset = (offset, pixel) => { for (let i = 0; i < 4; i++) this.image.data[offset + i] = pixel[i]; };
-
-    get_offset = (x, y) => Math.round(Math.round(y) * this.width + x) * 4;
-
-    is_bound = (x, y) => (x < this.width && y < this.height && x >= 0 && y >= 0);
 
     put_pixel = (x, y, pixel) => this.put_pixel_offset(this.get_offset(x, y), pixel);
 
     put_pixel_bound = (x, y, pixel) => { if (this.is_bound(x, y)) this.put_pixel(x, y, pixel); };
-
-    get_pixel = (x, y) => { let pixel = [0,0,0,255]; const offset = this.get_offset(x, y); for (let i = 0; i < 4; i++) pixel[i] = this.image.data[offset + i]; return pixel; };
-
-    get_pixel_bound = (x, y) => { if (this.is_bound(x, y)) this.get_pixel(x, y); };
 
     clear = (pixel) => this.fillrect(0, 0, this.width, this.height, pixel);
 
@@ -79,10 +120,34 @@ class CanvasBuffer {
     };
 };
 
+class Texture extends TextureReader(TextureWriter(CanvasBuffer)) { };
+
+class Atlas {
+    constructor(image_url) {
+
+    }
+};
+
+class UIDisplay extends Texture {
+    constructor(element, width=128, height=128) {
+        super();
+        this.element = document.createElement('div');
+        this.element.id = 'container';
+        element.appendChild(this.element);
+
+        this.create_canvas(width, height);
+        this.canvas.id = 'canvas';
+        this.element.appendChild(this.canvas);
+
+        this.clear(Color.BLACK);
+        this.put_image_data();
+    }
+}
+
 class UITest {
     constructor(element) {
         this.element = element;
-        this.buffer = new CanvasBuffer(this.element);
+        this.buffer = new UIDisplay(this.element);
     }
 };
 
