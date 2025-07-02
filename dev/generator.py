@@ -44,7 +44,7 @@ class SensorParser:
 
     def dbfield(value:str, delim:str=';'):
         if delim in value:
-            return map(SensorParser.dbvalue, value.split(delim))
+            return list(map(SensorParser.dbvalue, value.split(delim)))
         return SensorParser.dbvalue(value)
 
     def dbparse(header:list[str], rows:list[list[str]], holdout:str="hold"):
@@ -292,7 +292,7 @@ def generate_sensor_page(sensor, directory, page_data):
             lambda filename: any(image_filetypes, filename.endswith))
 
     for field in sensor:
-        key_esc = html.escape(str(field))
+        key_esc = html.escape(str(sensor[field]['text']))
         value_esc = html.escape(str(sensor[field]['value']))
         page_data = page_data.replace(f'${field}', value_esc)
         sensor_properties += f'<div><b>{key_esc}:</b><span>{value_esc}</span></div>'
