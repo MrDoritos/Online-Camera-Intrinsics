@@ -26,46 +26,97 @@ class SensorDB {
 		this.sensor_outline = [];
 	}
 
+	static Parser = class {
+		static get_value = (value) => {
+			const delim = ':';
+			if (value.includes(delim)) {
+				const index = value.indexOf(delim);
+				return {
+					key: value.slice(0, index),
+					value: value.slice(index),
+				};
+			}
+
+			return value;
+		};
+
+		static get_field = (value) => {
+			const delim = ';';
+			if (value.includes(delim)) {
+				return value.split(delim).map(SensorDB.Parser.get_value);
+			}
+			return value;
+		};
+
+		static db_parse = (header, rows) => {
+			let objs = [];
+			
+			for (const row of rows) {
+				let obj = {};
+				for (let i = 0; i < header.length; i++) {
+					const field = header[i];
+					if (!field || field.length < 1)
+						continue;
+
+					const value = row[i];
+					obj[field] = SensorDB.Parser.get_field(value);
+				}
+				objs.push(obj);
+			}
+			
+			return objs;
+		};
+	};
+
 	acronyms_parse(rows) {
-		this.acronym_header = rows[0];
-		this.acronyms = rows.slice(1, rows.length);
+		const header = this.acronym_header = rows[0];
+		const acronyms = rows.slice(1, rows.length);
+		this.acronyms = SensorDB.Parser.db_parse(header, acronyms);
 	}
 
 	formats_parse(rows) {
-		this.format_header = rows[0];
-		this.formats = rows.slice(1, rows.length);
+		const header = this.format_header = rows[0];
+		const formats = rows.slice(1, rows.length);
+		this.formats = SensorDB.Parser.db_parse(header, formats);
 	}
 
 	models_parse(rows) {
-		this.model_header = rows[0];
-		let models = rows.slice(1, rows.length);
+		const header = this.model_header = rows[0];
+		const models = rows.slice(1, rows.length);
+		this.models = SensorDB.Parser.db_parse(header, models);
+	}
 
-		for (const row of models) {
+	get_empty_outline() {
+		let ret = {};
+		const outline = this.sensor_outline;
+		const header = this.sensor_header;
+		for (let i = 0; i < header.length; i++) {
+			const field = header[i];
+			if (!field || field.length < 1)
+				continue;
 
+			ret[field] = {};
+			for (let j = 0; j < outline.length; j++) {
+				ret[field][outline[j][0]] = outline[j][i];
+			}
 		}
+		return ret;
 	}
 
 	sensors_parse(rows) {
 		const outline = this.sensor_outline = rows.slice(0, 5);
 		const header = this.sensor_header = rows[0];
-		const sensors = rows.slice(8, rows.length);
+		const sensors = rows.slice(0, rows.length);
 		this.sensors = [];
-		console.log('sensors parse', outline, header, sensors);
-		for (const row of sensors) {
-			let sensor = {};
-			for (let i = 0; i < row.length && i < header.length; i++) {
-				const field = header[i];
-				sensor[field] = {};
-				for (let j = 0; j < outline.length; j++) {
-					const item = outline[j][0];
-					sensor[field][item] = outline[j][i];
-				}
-				sensor[field]['value'] = row[i];
+
+		const dbsensors = SensorDB.Parser.db_parse(header, sensors);
+		for (const dbsensor of dbsensors) {
+			let sensor = this.get_empty_outline();
+			for (const field of Object.keys(dbsensor)) {
+				sensor[field].value = dbsensor[field];
 			}
 			this.sensors.push(sensor);
-			console.log('sensor', sensor);
 		}
-		console.log('sensors', this.sensors);
 	}
 
 	async resource_fetch() {
@@ -75,6 +126,7 @@ class SensorDB {
 			['/sensors/models.csv', this.models_parse],
 			['/sensors/sensors.csv', this.sensors_parse],
 		];
+		let _this = this;
 
 		const requests = resources.map((rsrc) =>
 			new Promise((resolve, reject) => {
@@ -83,7 +135,7 @@ class SensorDB {
 						(resp) => {
 							resp.text()
 								.then((text) => {
-									rsrc[1](CSV.loadCSV(text));
+									rsrc[1].bind(_this, CSV.loadCSV(text))();
 									resolve(1);
 								}, 
 								() => reject('text error')
@@ -1252,9 +1304,11 @@ async function on_load(element) {
 	//let cache = load_cache(CSV.loadCSV(await load_text_url('/sensors/sensors_cache.csv')));
 	//let formats = load_formats(CSV.loadCSV(await load_text_url('/sensors/sensors_format.csv')));
 
-	db = new SensorDB();
-	await db.resource_fetch();
-	console.log('complete', db);
+	console.log('load');
+	let _db = new SensorDB();
+	await _db.resource_fetch();
+	db = _db;
+	console.log('complete', _db, db);
 	return;
 
 	sensors_cache = cache.cache;
