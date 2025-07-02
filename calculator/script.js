@@ -7,6 +7,7 @@ let sensor_empty = {};
 let sensor_formats = [];
 let sensor_formats_header = [];
 let sensors_all = [];
+let db = undefined;
 const red_color = [255,0,0,255];
 const blue_color = [0,0,255,255];
 const green_color = [0,255,0,255];
@@ -37,13 +38,34 @@ class SensorDB {
 
 	models_parse(rows) {
 		this.model_header = rows[0];
-		this.models = rows.slice(1, rows.length);
+		let models = rows.slice(1, rows.length);
+
+		for (const row of models) {
+
+		}
 	}
 
 	sensors_parse(rows) {
-		this.sensor_outline = rows.slice(0, 5);
-		this.sensor_header = rows[0];
-		this.sensors = rows.slice(8, rows.length);
+		const outline = this.sensor_outline = rows.slice(0, 5);
+		const header = this.sensor_header = rows[0];
+		const sensors = rows.slice(8, rows.length);
+		this.sensors = [];
+		console.log('sensors parse', outline, header, sensors);
+		for (const row of sensors) {
+			let sensor = {};
+			for (let i = 0; i < row.length && i < header.length; i++) {
+				const field = header[i];
+				sensor[field] = {};
+				for (let j = 0; j < outline.length; j++) {
+					const item = outline[j][0];
+					sensor[field][item] = outline[j][i];
+				}
+				sensor[field]['value'] = row[i];
+			}
+			this.sensors.push(sensor);
+			console.log('sensor', sensor);
+		}
+		console.log('sensors', this.sensors);
 	}
 
 	async resource_fetch() {
@@ -64,15 +86,15 @@ class SensorDB {
 									rsrc[1](CSV.loadCSV(text));
 									resolve(1);
 								}, 
-								reject('text error')
+								() => reject('text error')
 							);
 						},
-						reject('fetch error')
+						() => reject('fetch error')
 				);
 			})
 		);
 
-		return Promise.all(requests);
+		await Promise.all(requests);
 	}
 };
 
@@ -1230,9 +1252,9 @@ async function on_load(element) {
 	//let cache = load_cache(CSV.loadCSV(await load_text_url('/sensors/sensors_cache.csv')));
 	//let formats = load_formats(CSV.loadCSV(await load_text_url('/sensors/sensors_format.csv')));
 
-	let p = new SensorDB();
-	await p.resource_fetch();
-	console.log('complete');
+	db = new SensorDB();
+	await db.resource_fetch();
+	console.log('complete', db);
 	return;
 
 	sensors_cache = cache.cache;
