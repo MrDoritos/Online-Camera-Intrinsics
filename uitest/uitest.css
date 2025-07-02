@@ -1,0 +1,14 @@
+* {
+    padding: 0;
+    margin: 0;
+}
+
+#canvas {
+    width: inherit;
+    height: inherit;
+}
+
+#container {
+    width: 50vw;
+    aspect-ratio: 1;
+}
