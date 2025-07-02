@@ -41,7 +41,7 @@ class SensorDB {
 			return value;
 		};
 
-		static db_parse = (header, rows) => {
+		static db_parse = (header, rows, holdout="hold") => {
 			let objs = [];
 			
 			for (const row of rows) {
@@ -52,9 +52,15 @@ class SensorDB {
 						continue;
 
 					const value = row[i];
+					if (holdout && value == holdout) {
+						obj = undefined;
+						break;
+					}
+
 					obj[field] = SensorDB.Parser.get_field(value);
 				}
-				objs.push(obj);
+				if (obj != undefined)
+					objs.push(obj);
 			}
 			
 			return objs;
@@ -104,7 +110,8 @@ class SensorDB {
 
 	get_preset_all(sensor_name, clone=true) {
 		return this.get_preset(sensor_name, clone) ?? 
-			   this.get_custom_preset(sensor_name, clone);
+			   this.get_custom_preset(sensor_name, clone) ??
+			   this.get_empty_outline();
 	}
 
 	load_custom_presets() {
@@ -148,6 +155,21 @@ class SensorDB {
 		this.save_custom_presets(presets);
 	}
 
+	get_sensors_sorted() {
+		const sort_string = (sensor) => {
+			const default_str = '!';
+			const manufacturer = sensor['sensor-manufacturer']?.value ?? default_str;
+			const name = sensor['sensor-name']?.value ?? default_str;
+			if (name == "None")
+				return ''.padEnd(3, default_str);
+			return manufacturer+name;
+		};
+
+		return this.sensors.toSorted((a, b) => {
+			return sort_string(a) > sort_string(b);
+		});
+	}
+
 	get_empty_outline() {
 		let ret = {};
 		const outline = this.sensor_outline;
@@ -158,8 +180,8 @@ class SensorDB {
 				continue;
 
 			ret[field] = {};
-			for (let j = 0; j < outline.length; j++) {
-				ret[field][outline[j][0]] = outline[j][i];
+			for (let j = 0; j < outline.length-1; j++) {
+				ret[field][outline[outline.length-1][j]] = outline[j+1][i];
 			}
 		}
 		return ret;
@@ -169,12 +191,12 @@ class SensorDB {
 		let obj = this.get_empty_outline();
 		for (const value of values)
 			if (key_key in value && value_key in value)
-				obj[value[key_key]] = value[value_key];
+				obj[value[key_key]].value = value[value_key];
 		return obj;
 	}
 
 	sensors_parse(rows) {
-		const outline = this.sensor_outline = rows.slice(0, 5);
+		const outline = this.sensor_outline = rows.slice(0, 6);
 		const header = this.sensor_header = rows[0];
 		const sensors = rows.slice(8);
 		this.sensors = [];
@@ -320,7 +342,15 @@ function set_presets() {
 	let template_dropdown = document.querySelector('div #templates');
 
 	function get_option_html(preset) {
-		return `<option value="${preset['sensor-name'].value}">${preset['sensor-name'].value} (${preset['sensor-name-friendly'].value})</option>`;
+		const sensor_name = preset['sensor-name']?.value, 
+			  friendly_name = preset['sensor-name-friendly']?.value,
+			  manufacturer_name = preset['sensor-manufacturer']?.value;
+		let innertext = sensor_name;
+		if (friendly_name?.length ?? 0)
+			innertext += ` (${friendly_name})`;
+		if (manufacturer_name?.length ?? 0)
+			innertext = `${manufacturer_name} - ` + innertext;
+		return `<option value="${sensor_name}">${innertext}</option>`;
 	};
 
 	function get_option_label_html(label, extra='') {
@@ -341,7 +371,7 @@ function set_presets() {
 
 	html += get_option_label_html('Built-in Presets');
 
-	db.sensors.forEach(sensor => {
+	db.get_sensors_sorted().forEach(sensor => {
 		html += get_option_html(sensor);
 	});
 
@@ -381,6 +411,7 @@ function set_inputs(camera) {
 }
 
 function set_outputs(camera) {
+	console.log('outputs', camera);
 	outputs_div = document.getElementById('outputs');
 	outputs_div.innerHTML = quick_format_html(camera, true);
 }
@@ -894,7 +925,7 @@ function nearest_format(camera) {
 
 	let format = db.get_nearest_format(diag);
 
-	let text = format['sensor-name'] + ' (' + get_format_fraction(diag) + ')';
+	let text = format['sensor-format'] + ' (' + get_format_fraction(diag) + ')';
 
 	if ((format['format-name']?.length ?? 0) > 0)
 		text = text + ' (' + format['format-name'] + ')';
@@ -949,7 +980,7 @@ function reset_button() {
 }
 
 function clear_button() {
-	set_camera(get_empty_outline());
+	set_camera(db.get_empty_outline());
 }
 
 function swap_button() {
