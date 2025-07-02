@@ -38,7 +38,7 @@ class SensorDB {
 			if (value.includes(delim)) {
 				return value.split(delim).map(SensorDB.Parser.get_value);
 			}
-			return value;
+			return SensorDB.Parser.get_value(value);
 		};
 
 		static db_parse = (header, rows, holdout="hold") => {
