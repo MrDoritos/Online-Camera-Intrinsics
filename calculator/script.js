@@ -1,12 +1,5 @@
 // #region Internal state and constants
 
-let sensors_header = [];
-let sensors_cache = [];
-let sensors_fields = [];
-let sensor_empty = {};
-let sensor_formats = [];
-let sensor_formats_header = [];
-let sensors_all = [];
 let db = undefined;
 const red_color = [255,0,0,255];
 const blue_color = [0,0,255,255];
@@ -53,7 +46,7 @@ class SensorDB {
 			
 			for (const row of rows) {
 				let obj = {};
-				for (let i = 0; i < header.length; i++) {
+				for (let i = 0; i < header.length && i < row.length; i++) {
 					const field = header[i];
 					if (!field || field.length < 1)
 						continue;
@@ -86,6 +79,75 @@ class SensorDB {
 		this.models = SensorDB.Parser.db_parse(header, models);
 	}
 
+	get_nearest_format(in_diagonal) {
+		let least_format = undefined;
+		let least_distance = Number.MAX_VALUE;
+
+		for (const format of this.formats) {
+			const diagonal = Number(format['sensor-diagonal'] ?? '0');
+			const distance = (diagonal - in_diagonal) ** 2;
+
+			if (distance < least_distance) {
+				least_format = format;
+				least_distance = distance;
+			}
+		}
+
+		return least_format;
+	}
+
+	get_preset(sensor_name, clone=true) {
+		for (const sensor of this.sensors)
+			if (sensor['sensor-name']?.value == sensor_name)
+				return clone ? SensorDB.copy(sensor) : sensor;
+	}
+
+	get_preset_all(sensor_name, clone=true) {
+		return this.get_preset(sensor_name, clone) ?? 
+			   this.get_custom_preset(sensor_name, clone);
+	}
+
+	load_custom_presets() {
+		return load_local_json('custom_presets', Object.prototype);
+	}
+
+	save_custom_presets(custom_presets) {
+		save_local_json('custom_presets', custom_presets);
+	}
+
+	add_custom_preset(camera) {
+		let presets = this.load_custom_presets();
+
+		presets[uuidv4()] = camera;
+
+		this.save_custom_presets(presets);
+	}
+
+	get_custom_preset_entry(sensor_name) {
+		let presets = this.load_custom_presets();
+
+		for (const [key, value] of Object.entries(presets))
+			if (value['sensor-name']?.value == sensor_name)
+				return {key, value};
+	}
+
+	get_custom_preset(sensor_name, clone=true) {
+		let preset = this.get_custom_preset_entry(sensor_name)?.value;
+
+		return clone ? SensorDB.copy(preset) : preset;
+	}
+
+	remove_custom_preset(sensor_name) {
+		let presets = this.load_custom_presets();
+
+		const preset = this.get_custom_preset_entry(sensor_name);
+
+		if (preset)
+			delete presets[preset.key];
+
+		this.save_custom_presets(presets);
+	}
+
 	get_empty_outline() {
 		let ret = {};
 		const outline = this.sensor_outline;
@@ -103,10 +165,18 @@ class SensorDB {
 		return ret;
 	}
 
+	from_sparse(values, key_key, value_key) {
+		let obj = this.get_empty_outline();
+		for (const value of values)
+			if (key_key in value && value_key in value)
+				obj[value[key_key]] = value[value_key];
+		return obj;
+	}
+
 	sensors_parse(rows) {
 		const outline = this.sensor_outline = rows.slice(0, 5);
 		const header = this.sensor_header = rows[0];
-		const sensors = rows.slice(0, rows.length);
+		const sensors = rows.slice(8);
 		this.sensors = [];
 
 		const dbsensors = SensorDB.Parser.db_parse(header, sensors);
@@ -148,6 +218,29 @@ class SensorDB {
 
 		await Promise.all(requests);
 	}
+
+	static copy(obj) {
+		if (obj == null || typeof obj != "object")
+			return obj;
+
+		if (obj instanceof Array)
+			return obj.map(SensorDB.copy);
+
+		if (obj instanceof Object) {
+			let ret = {};
+			for (const [key, value] of Object.entries(obj))
+				ret[key] = SensorDB.copy(value);
+			return ret;
+		}
+
+		if (obj instanceof Date) {
+			let ret = new Date();
+			ret.setTime(obj.getTime());
+			return ret;
+		}
+
+		return undefined;
+	}
 };
 
 // #endregion
@@ -166,35 +259,6 @@ function quick_format_html(outline, readonly) {
 	}
 	
 	return innerHTML;
-}
-
-function get_empty_outline() {
-	let outline_copy = {};
-	for (const [key, value] of Object.entries(sensor_empty)) {
-		outline_copy[key] = { ... value };
-	}
-	return outline_copy;
-}
-
-function camera_from_form(form_input) {
-	let input_camera = get_empty_outline();
-	for (const [key, value] of Object.entries(form_input)) {
-		input_camera[key].value = value;
-	}
-	return input_camera;
-}
-
-function camera_from_json(json) {
-	let input_camera = get_empty_outline();
-
-	if (!json)
-		return input_camera;
-
-	for (const [key, value] of Object.entries(json))
-		if (json[key] && json[key] != 0)
-			input_camera[key].value = value;
-
-	return input_camera;
 }
 
 // #endregion
@@ -219,11 +283,19 @@ function get_form_output() {
 }
 
 function get_inputs() {
-	return camera_from_form(get_form_input());
+	//return camera_from_form(get_form_input());
+	return db.from_sparse(
+		document.querySelectorAll('#inputs input'),
+		'name', 'value'
+	);
 }
 
 function get_outputs() {
-	return camera_from_form(get_form_output());
+	//return camera_from_form(get_form_output());
+	return db.from_sparse(
+		document.querySelectorAll('#outputs input'),
+		'name', 'value'
+	);
 }
 
 function is_autocalc() {
@@ -259,7 +331,7 @@ function set_presets() {
 
 	html += get_option_label_html('Sensor Presets', 'selected');
 
-	let custom_presets = load_custom_presets();
+	let custom_presets = db.load_custom_presets();
 
 	if (Object.entries(custom_presets).length) {
 		html += get_option_label_html('Custom Presets');
@@ -269,22 +341,18 @@ function set_presets() {
 
 	html += get_option_label_html('Built-in Presets');
 
-	sensors_cache.forEach(sensor => {
-		html += get_option_html({'sensor-name':{value:sensor[0]}, 'sensor-name-friendly':{'value':sensor[1]}});
+	db.sensors.forEach(sensor => {
+		html += get_option_html(sensor);
 	});
 
 	template_dropdown.innerHTML = html;
 }
 
 async function set_preset(sensor_name) {
-	let cached = sensors_cache.find(n => n[0] === sensor_name);
-
-	let camera = undefined;
-
-	if (cached)
-		camera = await load_preset(sensor_name);
-	else
-		camera = await load_preset_from_all(sensor_name);
+	let camera = db.get_preset_all(sensor_name);
+	console.log('set preset', sensor_name, camera);
+	if (!camera)
+		return;
 
 	let link_path = '#';
 	
@@ -817,40 +885,21 @@ function get_format_fraction(diagonal) {
 }
 
 function nearest_format(camera) {
-	let diag_str = camera['sensor-diagonal'].value;
+	let diag_str = camera['sensor-diagonal']?.value;
 
 	if (!diag_str)
 		return camera;
 
-	let diag = Number(diag_str)
+	let diag = Number(diag_str);
 
-	let format_diag_index = sensor_formats_header.indexOf('sensor-diagonal');
-	let format_name_index = sensor_formats_header.indexOf('sensor-format');
-	let format_name_index_2 = sensor_formats_header.indexOf('format-name');
+	let format = db.get_nearest_format(diag);
 
-	let least_index = -1;
-	let least_distance = Number.MAX_VALUE;
+	let text = format['sensor-name'] + ' (' + get_format_fraction(diag) + ')';
 
-	for (let i = 0; i < sensor_formats.length; i++) {
-		let cand_diag = Number(sensor_formats[i][format_diag_index]);
-		let diff = diag - cand_diag;
-		if (Math.abs(diff) < least_distance) {
-			least_distance = diff;
-			least_index = i;
-		}
-	}
+	if ((format['format-name']?.length ?? 0) > 0)
+		text = text + ' (' + format['format-name'] + ')';
 
-	let format = sensor_formats[least_index];
-
-	let format_name = format[format_name_index];
-	let format_name_2 = format[format_name_index_2];
-
-	format_name = format_name + ' (' + get_format_fraction(diag) + ')';
-
-	if (format_name_2 && format_name_2.length > 0)
-		format_name = format_name + ' (' + format_name_2 + ')';
-
-	camera['sensor-format'].value = format_name;
+	camera['sensor-format'].value = text;
 
 	return camera;
 }
@@ -889,154 +938,6 @@ function calculate_partial(camera) {
 	}
 
 	return camera;
-}
-
-// #endregion
-
-// #region Loaders
-
-function load_cache(csv) {
-	let _cache = [];
-
-	for (let i = 1; i < csv.length; i++) {
-		_cache.push([csv[i][0], csv[i][1]]);
-	}
-
-	return {cache:_cache};
-}
-
-function load_all(csv) {
-	let columns = sensors_fields.length;
-	let rows = csv.length;
-	let _all = [];
-
-	for (let i_row = 5; i_row < rows; i_row++) {
-		let preset = get_empty_outline();
-
-		console.log(preset);
-		for (let i_column = 0; i_column < columns; i_column++) {
-			let key = sensors_fields[i_column];
-			let value = csv[i_row][i_column];
-
-			preset[key].value = value;
-		}
-
-		_all.push(preset);
-	}
-
-	return _all;
-}
-
-function load_header(csv) {
-	let _empty = {};
-	let _fields = [];
-
-	let field_line = csv[0];
-	const titles = ['outline', 'text', 'value', 'step', 'calc'];
-
-	for (let i = 0; i < field_line.length; i++) {
-		_fields.push(field_line[i]);
-		_empty[field_line[i]] = {};
-	}
-
-	//console.log(csv);
-	for (let i = 1; i < csv.length; i++) {
-		let row = csv[i];
-		//console.log(row);
-		for (let v = 0; v < _fields.length; v++) {
-			//console.log(i,v,row[v],titles[i],_fields[v]);
-			_empty[_fields[v]][titles[i]] = row[v];
-		}
-	}
-
-	return {empty:_empty, fields:_fields};
-}
-
-async function load_preset(sensor_name) {
-	let response = await fetch('/sensors/' + sensor_name + '/' + sensor_name + '.json');
-
-	if (!response)
-		return;
-
-	return camera_from_json(await response.json());
-}
-
-async function load_preset_from_all(sensor_name) {
-	//let csv = await load_csv('/sensors/sensors_all.csv');
-	let csv = CSV.loadCSV(await load_text_url('/sensors/sensors_all.csv'));
-	let all = await load_all(csv);
-
-	let all_index = all.find(n => n['sensor-name'].value === sensor_name);
-
-	if (all_index)
-		return camera_from_form(all_index);
-
-	let custom_preset = get_custom_preset(sensor_name);
-
-	if (custom_preset)
-		return custom_preset;
-
-	let first_sensor_name = sensors_cache?.first?.get('sensor-name')?.value;
-
-	if (first_sensor_name)
-		return await load_preset(first_sensor_name);
-
-	return get_empty_outline();
-}
-
-function load_formats(csv) {
-	let _formats = [];
-	let _formats_outline = [];
-
-	_formats_outline = csv[0];
-
-	for (let i = 1; i < csv.length; i++) {
-		_formats.push(csv[i]);
-	}
-
-	return {outline:_formats_outline, formats:_formats};
-}
-
-function load_custom_presets() {
-	return load_local_json('custom_presets', Object.prototype);
-}
-
-function save_custom_presets(custom_presets) {
-	save_local_json('custom_presets', custom_presets);
-}
-
-function get_custom_preset_entry(sensor_name) {
-	let presets = load_custom_presets();
-
-	for (const [key, value] of Object.entries(presets))
-		if (value['sensor-name'].value == sensor_name)
-			return {'key': key, 'value': value};
-}
-
-function get_custom_preset(sensor_name) {
-	let custom_preset = get_custom_preset_entry(sensor_name);
-
-	if (custom_preset)
-		return custom_preset.value;
-}
-
-function add_custom_preset(camera) {
-	let presets = load_custom_presets();
-
-	presets[uuidv4()] = camera;
-
-	save_custom_presets(presets);
-}
-
-function remove_custom_preset() {
-	let presets = load_custom_presets();
-
-	let custom_preset = get_custom_preset_entry(presets['sensor-name']?.value);
-
-	if (custom_preset)
-		delete presets[custom_preset.key];
-
-	save_custom_presets(presets);
 }
 
 // #endregion
@@ -1281,7 +1182,7 @@ async function do_save_custom_dialog() {
 }
 
 async function do_delete_custom() {
-	remove_custom_preset();
+	//remove_custom_preset();
 	set_presets();
 }
 
@@ -1297,25 +1198,10 @@ async function on_load(element) {
 	let loadingElement = document.querySelector('#loading');
 	loadingElement.textContent = "Loading...";
 
-	//let header = await load_header(await load_csv('/sensors/sensors_header.csv'));
-	//let cache = await load_cache(await load_csv('/sensors/sensors_cache.csv'));
-	//let formats = await load_formats(await load_csv('/sensors/sensors_format.csv'));
-	//let header = load_header(CSV.loadCSV(await load_text_url('/sensors/sensors_header.csv')));
-	//let cache = load_cache(CSV.loadCSV(await load_text_url('/sensors/sensors_cache.csv')));
-	//let formats = load_formats(CSV.loadCSV(await load_text_url('/sensors/sensors_format.csv')));
-
-	console.log('load');
 	let _db = new SensorDB();
 	await _db.resource_fetch();
 	db = _db;
-	console.log('complete', _db, db);
-	return;
-
-	sensors_cache = cache.cache;
-	sensors_fields = header.fields;
-	sensor_empty = header.empty;
-	sensor_formats = formats.formats;
-	sensor_formats_header = formats.outline;
+	console.log('complete', db);
 
 	set_presets();
 
