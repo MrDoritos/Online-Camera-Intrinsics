@@ -32,6 +32,8 @@ class CanvasBuffer {
 
     get_offset = (x, y) => Math.round(Math.round(y) * this.width + x) * 4;
 
+    get_sample_offset = (x, y) => this.get_offset(x * this.width, y * this.height);
+
     set_size(width, height) {
         this.width = width;
         this.height = height;
@@ -85,12 +87,8 @@ class CanvasBuffer {
         });
     }
 
-    static async load_url(url) {
-        let texture = new CanvasBuffer();
-
-        texture.load_image(await CanvasBuffer.load_image_url(url));
-
-        return texture;
+    async load_url(url) {
+        this.load_image(await CanvasBuffer.load_image_url(url));
     }
 };
 
@@ -100,9 +98,13 @@ const TextureReader = (Super) => class extends Super {
     get_pixel_bound = (x, y) => { if (this.is_bound(x, y)) this.get_pixel(x, y); };
 
     get_pixel = (x, y) => this.get_pixel_offset(this.get_offset(x, y));
+
+    get_sample = (x, y) => this.get_pixel_offset(this.get_sample_offset(x, y));
 };
 
 const TextureWriter = (Super) => class extends Super {
+    put_sample = (x, y, pixel) => this.put_pixel_offset(this.get_sample_offset(x, y), pixel);
+
     put_pixel_offset = (offset, pixel) => { for (let i = 0; i < 4; i++) this.image.data[offset + i] = pixel[i]; };
 
     put_pixel = (x, y, pixel) => this.put_pixel_offset(this.get_offset(x, y), pixel);
@@ -122,9 +124,13 @@ const TextureWriter = (Super) => class extends Super {
 
 class Texture extends TextureReader(TextureWriter(CanvasBuffer)) { };
 
-class Atlas {
-    constructor(image_url) {
+class Atlas extends Texture {
+    sprite_width;
+    sprite_height;
 
+    set_sprite_size(width, height) {
+        this.sprite_width = width;
+        this.sprite_height = height;
     }
 };
 

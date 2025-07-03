@@ -6,6 +6,7 @@
 #canvas {
     width: inherit;
     height: inherit;
+    image-rendering: pixelated;
 }
 
 #container {
