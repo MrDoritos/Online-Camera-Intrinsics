@@ -3,6 +3,12 @@
     margin: 0;
 }
 
+@media screen and not (min-width: 600px) {
+    #container {
+        width: 90vw !important;
+    }
+}
+
 #canvas {
     width: inherit;
     height: inherit;
@@ -10,6 +16,7 @@
 }
 
 #container {
+    margin:auto;
     width: 50vw;
     aspect-ratio: 1;
 }
