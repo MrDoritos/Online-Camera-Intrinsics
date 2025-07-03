@@ -40,3 +40,5 @@ The site is generated to be a static site in regards to the server doesn't need 
 For now I use the `dev/sensors.ods` file as the source for the site files with the sensor images in their respective sensor directory. Eventually the source will change such that a centralized source and a binary format for the formats and sensors isn't used. This will most likely become the sensor directories because the site is generated from the directories, not the `dev/sensors.ods` or `sensors.csv`.
 
 With that said, I am comfortable with a contribution in multiple ways. The first is to create a sensor directory with the sensor json (see other sensors as the example, with `sensors/sensors_template.json` used as the template). Second are additions to `sensors.csv`, I can easily take your changes and move them into `dev/sensors.ods`. Third is a change to `dev/sensors.ods`, with it being a binary format the line based tools don't work and I think it will be fine just could possibly be strange.
+
+push
