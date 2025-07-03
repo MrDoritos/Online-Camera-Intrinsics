@@ -3,12 +3,26 @@ const Pixel = class {
         return [r, g, b, 255];
     };
 
+    static pixel_lerp = (p1, p2, f) => {
+        return [
+            lerp(p1[0], p2[0], f),
+            lerp(p1[1], p2[1], f),
+            lerp(p1[2], p2[2], f),
+            lerp(p1[3], p2[3], f),
+        ];
+    };
+
     static gray = (v) => {
         return [v, v, v, 255];
     };
 
     static grayf = (v) => {
         return Pixel.gray(v * 255);
+    };
+
+    static alpha_blend = (p_over, p_under) => {
+        const alpha_over = p_over[3] / 255;
+        return Pixel.pixel_lerp(p_under, p_over, alpha_over);
     };
 };
 
@@ -156,7 +170,29 @@ const TextureWriter = (Super) => class extends Super {
     }
 };
 
-class Texture extends TextureReader(TextureWriter(CanvasBuffer)) { };
+class Texture extends TextureReader(TextureWriter(CanvasBuffer)) {
+    put_pixel_alpha_blend(x, y, pixel) {
+        const mix_pixel = this.get_pixel(x, y);
+        this.put_pixel(x, y, Pixel.alpha_blend(pixel, mix_pixel));
+    }
+
+    put_pixel_alpha_fast(x, y, pixel, alpha_threshold=64) {
+        if (pixel[3] < alpha_threshold)
+            return;
+
+        this.put_pixel(x, y, pixel);
+    }
+
+    draw_sprite_alpha_blend(x, y, sprite, fast=false, fast_alpha_threshold=64) {
+        const put_func = fast ? this.put_pixel_alpha_fast.bind(this) : this.put_pixel_alpha_blend.bind(this);
+        for (let i = sprite.x0, k = x; i < sprite.x1; i++, k++) {
+            for (let j = sprite.y0, l = y; j < sprite.y1; j++, l++) {
+                const pixel = sprite.atlas.get_pixel(i, j);
+                put_func(k, l, pixel);
+            }
+        }
+    }
+};
 
 class Atlas extends Texture {
     sprite_width;
@@ -450,7 +486,7 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 };
 
 class UIText extends UIElement {
-    constructor(url='font.png', font_width=8, font_height=12, text='') {
+    constructor(url='font.png', font_width=8, font_height=12, text='', alpha_blend=true, alpha_fast=true) {
         super();
         this.font_atlas = new FontAtlas();
         this.text = text;
@@ -459,6 +495,8 @@ class UIText extends UIElement {
         this.url = url;
         this.cursor_x = 0;
         this.cursor_y = 0;
+        this.alpha_blend = alpha_blend;
+        this.alpha_fast = alpha_fast;
     }
 
     text;
@@ -483,7 +521,11 @@ class UIText extends UIElement {
     draw_character(x, y, character) {
         const font_sprite = this.font_atlas.get_character(character);
 
-        this.buffer.draw_sprite(x, y, font_sprite);
+        if (this.alpha_blend) {
+            this.buffer.draw_sprite_alpha_blend(x, y, font_sprite, this.alpha_fast);
+        } else {
+            this.buffer.draw_sprite(x, y, font_sprite);
+        }
     }
 
     draw_at_cursor = (character) => this.draw_character(this.cursor_x, this.cursor_y, character);
