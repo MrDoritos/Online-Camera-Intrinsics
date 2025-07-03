@@ -289,12 +289,21 @@ const UISize = (Super) => class extends (Super) {
 class UIEventHandler {
     stopImmediatePropagation;
     stopPropagation;
+    debug_events=false;
 
     do_call(element, event) {
         const callback = element[event.type];
 
         if (callback)
-            callback(event);
+            callback.bind(element, event)();
+
+        if (this.debug_events)
+            console.log(`${element.constructor.name} -> ${callback ? 'hit': 'x'}`);
+    }
+
+    log_stop() {
+        if (this.debug_events)
+            console.log(`${this.stopPropagation ? 'stopPropagation': ''} ${this.stopImmediatePropagation ? 'stopImmediatePropagation': ''}`.trim());
     }
 
     handle(element, event) {
@@ -304,7 +313,7 @@ class UIEventHandler {
         this.do_call(element, event);
 
         if (this.stopPropagation || this.stopImmediatePropagation)
-            return;
+            return this.log_stop();
 
         const children = element.children;
 
@@ -317,7 +326,7 @@ class UIEventHandler {
             this.stopPropagation = false;
 
             if (this.stopImmediatePropagation)
-                return;
+                return this.log_stop();
         }
     }
 
@@ -373,7 +382,7 @@ class UIEventHandler {
         is_arrow_down_key = () => this.key_code == 40;
         is_arrow_left_key = () => this.key_code == 37;
         is_arrow_right_key = () => this.key_code == 39;
-        is_char = () => this.char_code != 0;
+        is_char = () => this.key_code > 31 && this.key_code < 127;
         is_alt_key = () => this.key_code == 18;
         is_ctrl_key = () => this.key_code == 17;
         is_shift_key = () => this.key_code == 16;
@@ -408,7 +417,7 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
     }
 };
 
-class UIElement extends UIElementMixin(object) {};
+class UIElement extends UIElementMixin(Object) {};
 
 class UIRoot extends UIElementMixin(UIEventHandler) {
     constructor(element, width=128, height=128) {
@@ -442,6 +451,7 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 
 class UIText extends UIElement {
     constructor(url='font.png', font_width=8, font_height=12, text='') {
+        super();
         this.font_atlas = new FontAtlas();
         this.text = text;
         this.font_width = font_width;
@@ -479,11 +489,11 @@ class UIText extends UIElement {
     draw_at_cursor = (character) => this.draw_character(this.cursor_x, this.cursor_y, character);
 
     draw() {
-        if (!this.text || this.text.length < 1)
-            return;
-
         this.cursor_x = this.get_left();
         this.cursor_y = this.get_top();
+
+        if (!this.text || this.text.length < 1)
+            return;
 
         for (let i = 0; i < this.text.length; i++) {
             const character = this.text[i];
@@ -514,6 +524,14 @@ class UIText extends UIElement {
         this.draw();
     }
 
+    insert_text(i, text) {
+        this.text = this.text.slice(0, i) + text + this.text.slice(i);
+    }
+
+    remove_range(i, n) {
+        this.text = this.text.slice(0, i) + this.text.slice(i+n);
+    }
+
     static async make(url='font.png', text='') {
         let ret = new UIText(url);
         ret.text = text;
@@ -531,17 +549,20 @@ class UITextInput extends UIText {
     flash_ticks=10;
 
     keyboard(event) {
-        if (event.is_char())
+        if (event.is_char()) {
             this.text += event.key;
-        else
-        if (event.is_backspace_key())
+        } else
+        if (event.is_backspace_key()) {
             if (this.text.length > 0)
                 this.text=this.text.slice(0, this.text.length-1);
-        else
-        if (event.is_enter_key())
+        } else
+        if (event.is_enter_key()) {
             this.text += '\n';
-        else
+        } else {
             return;
+        }
+
+        this.ticks = 0;
 
         this.draw();
     }
@@ -558,7 +579,7 @@ class UITextInput extends UIText {
         super.draw();
 
         const is_flash = this.ticks % (this.flash_ticks * 2) < this.flash_ticks;
-
+        
         this.draw_at_cursor(is_flash ? '|' : ' ');
 
         this.buffer.flush();
