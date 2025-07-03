@@ -42,6 +42,9 @@ class CanvasBuffer {
         this.context.height = this.canvas.height = this.height;
     }
 
+    get_width = () => this.width;
+    get_height = () => this.height;
+
     set_canvas_size(width, height) {
         this.set_size(width, height);
     }
@@ -208,6 +211,14 @@ class FontAtlas extends Atlas {
 };
 
 const UISize = (Super) => class extends (Super) {
+    constructor(offsetx=0, offsety=0, width=0, height=0) {
+        super();
+        this.offsetx = offsetx;
+        this.offsety = offsety;
+        this.width = width;
+        this.height = height;
+    }
+
     offsetx;
     offsety;
     width;
@@ -344,16 +355,62 @@ class UIEventHandler {
             this.handler.stopImmediatePropagation = true;
         }
     };
+
+    static UIKeyboardEvent = class extends UIEventHandler.UIEvent {
+        constructor(handler, key, key_code, char_code) {
+            super(handler, 'keyboard');
+            this.key = key;
+            this.key_code = key_code;
+            this.char_code = char_code;
+        }
+
+        static make = (handler, event) => new UIEventHandler.UIKeyboardEvent(handler, event.key, event.keyCode, event.charCode);
+
+        is_digit = () => this.key_code >= 48 && this.key_code <= 57;
+        is_letter = () => this.key.toLowerCase() != this.key.toUpperCase();
+        is_arrow_key = () => this.key_code >= 37 && this.key_code <= 40;
+        is_arrow_up = () => this.key_code == 38;
+        is_arrow_down = () => this.key_code == 40;
+        is_arrow_left = () => this.key_code == 37;
+        is_arrow_right = () => this.key_code == 39;
+    };
 };
 
 const UIElementMixin = (Super) => class extends UISize(Super) {
     children = [];
+    buffer;
 
     appendChild = (ui_element) => this.children.push(ui_element);
     removeChild = (ui_element) => this.children = this.children.filter(x => x != ui_element);
+
+    set_buffer(buffer) {
+        this.buffer = buffer;
+        this.set_width(buffer.get_width());
+        this.set_height(buffer.get_height());
+    }
 };
 
 class UIElement extends UIElementMixin(object) {};
+
+class UIRoot extends UIElement {
+    constructor(element) {
+        super();
+        this.element = document.createElement('div');
+        this.element.id = 'container';
+        element.appendChild(this.element);
+
+        let buffer = new Texture();
+        buffer.create_canvas(width, height);
+        buffer.canvas.id = 'canvas';
+        this.element.appendChild(buffer.canvas);
+        this.set_buffer(buffer);
+    }
+
+    reset() {
+        this.buffer.clear(Color.BLACK);
+        this.buffer.flush();
+    }
+};
 
 class UIDisplay extends Texture {
     constructor(element, width=128, height=128) {
