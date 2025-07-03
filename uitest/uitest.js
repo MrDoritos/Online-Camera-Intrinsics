@@ -78,6 +78,8 @@ class CanvasBuffer {
         this.image = this.get_image_data();
     }
 
+    flush = () => this.put_image_data();
+
     static async load_image_url(url) {
         return new Promise((resolve, reject) => {
             let image = new Image();
@@ -142,10 +144,10 @@ const TextureWriter = (Super) => class extends Super {
     }
 
     draw_sprite(x, y, sprite) {
-        for (let i = sprite.x0; i < sprite.x1; i++) {
-            for (let j = sprite.y0; j < sprite.y1; j++) {
+        for (let i = sprite.x0, k = x; i < sprite.x1; i++, k++) {
+            for (let j = sprite.y0, l = y; j < sprite.y1; j++, l++) {
                 const pixel = sprite.atlas.get_pixel(i, j);
-                this.put_pixel(x + i, y + j, sprite.atlas.get_pixel(i, j));
+                this.put_pixel(k, l, sprite.atlas.get_pixel(i, j));
             }
         }
     }
@@ -156,11 +158,19 @@ class Texture extends TextureReader(TextureWriter(CanvasBuffer)) { };
 class Atlas extends Texture {
     sprite_width;
     sprite_height;
+    atlas_width;
+    atlas_height;
 
     set_sprite_size(width, height) {
         this.sprite_width = width;
         this.sprite_height = height;
+        this.atlas_width = this.get_atlas_width();
+        this.atlas_height = this.get_atlas_height();
     }
+
+    get_atlas_width = () => this.width / this.sprite_width;
+
+    get_atlas_height = () => this.height / this.sprite_height;
 
     get_sprite_position(x, y, xn=1, yn=1) {
         return [
@@ -188,6 +198,19 @@ class Atlas extends Texture {
     };
 };
 
+class FontAtlas extends Atlas {
+    get_character(char) {
+        const code = char.charCodeAt(0);
+        const x = code % this.atlas_width;
+        const y = (code / this.atlas_width) | 0;
+        return this.get_sprite(x, y);
+    }
+};
+
+const UIElement = (Super) => class extends (Super) {
+
+};
+
 class UIDisplay extends Texture {
     constructor(element, width=128, height=128) {
         super();
@@ -205,7 +228,57 @@ class UIDisplay extends Texture {
 }
 
 class UIText {
-    
+    constructor(url='font.png', font_width=8, font_height=12, text=undefined) {
+        this.font_atlas = new FontAtlas();
+        this.text = text;
+        this.font_width = font_width;
+        this.font_height = font_height;
+        this.url = url;
+    }
+
+    text;
+    font_atlas;
+    font_width;
+    font_height;
+    url;
+
+    async load_resources() {
+        await this.font_atlas.load_url(this.url);
+        this.font_atlas.set_sprite_size(this.font_width, this.font_height);
+    }
+
+    load() {
+        this.load_resources();
+    }
+
+    draw(buffer) {
+        if (!this.text || this.text.length < 1)
+            return;
+
+        let x = 0;
+        let y = 0;
+
+        for (let i = 0; i < this.text.length; i++) {
+            const character = this.text[i];
+            const font_sprite = this.font_atlas.get_character(character);
+            buffer.draw_sprite(x, y, font_sprite);
+
+            x += this.font_atlas.sprite_width;
+            if (x > buffer.width) {
+                x = 0;
+                y += this.font_atlas.sprite_height;
+            }
+        }
+
+        buffer.flush();
+    }
+
+    static async make(url='font.png', text=undefined) {
+        let ret = new UIText(url);
+        ret.text = text;
+        await ret.load_resources();
+        return ret;
+    }
 };
 
 class UITest {
