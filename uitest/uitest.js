@@ -75,6 +75,7 @@ class CanvasBuffer {
     load_image(image) {
         this.create_canvas(image.width, image.height);
         this.draw_image(0,0,image);
+        this.image = this.get_image_data();
     }
 
     static async load_image_url(url) {
@@ -120,6 +121,34 @@ const TextureWriter = (Super) => class extends Super {
             }
         }
     };
+
+    sample_texture(dx0, dy0, dx1, dy1, sx0, sy0, sx1, sy1, texture) {
+        const ix = 1/this.width;
+        const iy = 1/this.height;
+        const dsx = (dx1 - dx0) * this.width;
+        const dsy = (dy1 - dy0) * this.height;
+        const isx = (sx1 - sx0) * texture.width;
+        const isy = (sy1 - sy0) * texture.height;
+        const six = dsx / isx;
+        const siy = dsy / isy;
+
+        for (let dx = dx0, sx = sx0; dx < dx1; dx += ix, sx += six) {
+            for (let dy = dy0, sy = sy0; dy < dy1; dy += iy, sy += siy) {
+                this.put_sample(dx, dy, 
+                    texture.get_sample(sx, sy)
+                );
+            }
+        }
+    }
+
+    draw_sprite(x, y, sprite) {
+        for (let i = sprite.x0; i < sprite.x1; i++) {
+            for (let j = sprite.y0; j < sprite.y1; j++) {
+                const pixel = sprite.atlas.get_pixel(i, j);
+                this.put_pixel(x + i, y + j, sprite.atlas.get_pixel(i, j));
+            }
+        }
+    }
 };
 
 class Texture extends TextureReader(TextureWriter(CanvasBuffer)) { };
@@ -132,6 +161,31 @@ class Atlas extends Texture {
         this.sprite_width = width;
         this.sprite_height = height;
     }
+
+    get_sprite_position(x, y, xn=1, yn=1) {
+        return [
+            x * this.sprite_width,
+            y * this.sprite_height,
+            (x + xn) * this.sprite_width,
+            (y + yn) * this.sprite_height,
+        ];
+    }
+
+    get_sprite(x, y, xn=1, yn=1) {
+        let pos = this.get_sprite_position(x, y, xn, yn);
+        return new Atlas.Sprite(this, pos[0], pos[1], pos[2], pos[3]);
+    }
+
+    static Sprite = class extends Texture {
+        constructor(atlas, x0, y0, x1, y1) {
+            super();
+            this.atlas = atlas;
+            this.x0 = x0;
+            this.y0 = y0;
+            this.x1 = x1;
+            this.y1 = y1;
+        }
+    };
 };
 
 class UIDisplay extends Texture {
@@ -150,11 +204,29 @@ class UIDisplay extends Texture {
     }
 }
 
+class UIText {
+    
+};
+
 class UITest {
     constructor(element) {
         this.element = element;
         this.buffer = new UIDisplay(this.element);
+        this.fontatlas = new Atlas();
+    }
+
+    async load_resources() {
+        await this.fontatlas.load_url('font.png');
+        this.fontatlas.set_sprite_size(8, 12);
+    }
+
+    async test() {
+        await this.load_resources();
+
+        this.buffer.draw_sprite(0, 0, this.fontatlas.get_sprite(0, 0));
+        this.buffer.put_image_data();
     }
 };
 
 ui = new UITest(body);
+ui.test();
