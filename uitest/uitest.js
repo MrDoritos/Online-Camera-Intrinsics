@@ -578,6 +578,9 @@ class UIText extends UIElement {
                 row++;
                 column = 0;
             } else {
+                if (this.text[i] == '\t') {
+                    column++;
+                }
                 column++;
             }
             if (column >= columns) {
@@ -599,17 +602,21 @@ class UIText extends UIElement {
             const character = text[i];
 
             if (character == '\n') {
-                this.cursor_x = 0;
-                this.cursor_y += this.font_atlas.sprite_height;
+                this.cursor_x = this.get_left();
+                this.cursor_y += this.font_height;
                 continue;
             }
 
-            this.draw_at_cursor(character);
+            if (character == '\t') {
+                this.cursor_x += this.font_width;
+            } else {
+                this.draw_at_cursor(character);
+            }
 
-            this.cursor_x += this.font_atlas.sprite_width;
-            if (this.cursor_x + this.font_atlas.sprite_width > this.get_right()) {
-                this.cursor_x = 0;
-                this.cursor_y += this.font_atlas.sprite_height;
+            this.cursor_x += this.font_width;
+            if (this.cursor_x + this.font_width > this.get_right()) {
+                this.cursor_x = this.get_left();
+                this.cursor_y += this.font_height;
             }
         }
 
@@ -819,17 +826,32 @@ class UIClock extends UITicking(UIText) {
 
         this.clear();
 
-        this.cursor_x = this.get_left();
+        this.cursor_x = this.get_right() - this.font_width * 12.5;
         this.cursor_y = this.get_top();
 
-        this.draw_string_at_cursor(`${dayStr} ${combDateStr} ${hourStr}${this.is_tick_major() ? ':' : ' '}${minuteStr}`);
+        this.draw_string_at_cursor(dayStr);
+        //this.cursor_x = this.get_right() - this.font_width * 10.2;
+        this.cursor_x = this.get_right() - this.font_width * 7.8 - (combDateStr.length * .5 * this.font_width);
+        this.draw_string_at_cursor(combDateStr);
+
+        //this.draw_string_at_cursor(`${dayStr} ${combDateStr}`);
+
+        `${hourStr}${this.is_tick_major() ? ':' : ' '}${minuteStr}`;
+        this.cursor_x = this.get_right() - this.font_width * 2;
+        this.draw_string_at_cursor(minuteStr);
+        this.cursor_y = this.get_top();
+        this.cursor_x = this.get_right() - this.font_width * 4.5;
+        this.draw_string_at_cursor(hourStr);
+        this.cursor_x = this.get_right() - this.font_width * 2.6;
+        if (this.is_tick_major())
+            this.draw_string_at_cursor(':');
     }
 };
 
 let ui = new UIRoot(body);
 let uitext = ui.appendChild(new UITextInput());
 let uiclock = ui.appendChild(new UIClock());
-uitext.set_size(0, 16, 64, 64);
+uitext.set_size(8, 16, 112-1, 94);
 uiclock.set_size(0, 0, 128, 12);
 ui.fire('load');
 ui.fire('reset');
