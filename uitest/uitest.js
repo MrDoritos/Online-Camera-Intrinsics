@@ -594,15 +594,9 @@ class UIText extends UIElement {
         this.set_cursor_position(position[0], position[1]);
     }
 
-    draw() {
-        this.cursor_x = this.get_left();
-        this.cursor_y = this.get_top();
-
-        if (!this.text || this.text.length < 1)
-            return;
-
-        for (let i = 0; i < this.text.length; i++) {
-            const character = this.text[i];
+    draw_string_at_cursor(text) {
+        for (let i = 0; i < text.length; i++) {
+            const character = text[i];
 
             if (character == '\n') {
                 this.cursor_x = 0;
@@ -619,10 +613,21 @@ class UIText extends UIElement {
             }
         }
 
+        this.buffer.flush();
+    }
+
+    draw() {
+        this.cursor_x = this.get_left();
+        this.cursor_y = this.get_top();
+
+        if (!this.text || this.text.length < 1)
+            return;
+
+        this.draw_string_at_cursor(this.text);
+
         this.draw_end_x = this.cursor_x;
         this.draw_end_y = this.cursor_y;
 
-        this.buffer.flush();
     }
 
     draw_text(text) {
@@ -779,10 +784,53 @@ class UITextInput extends UIText {
     }
 };
 
+const UITicking = (Super) => class extends Super {
+    ticks=0;
+    flash_ticks=10;
+
+    is_tick_interval = () => (this.ticks % this.flash_ticks) == 0;
+    is_tick_major = () => this.ticks % (this.flash_ticks * 2) < this.flash_ticks;
+    increment_tick = () => (this.ticks = ++this.ticks % (this.flash_ticks * 2));
+
+    reset() {
+        this.ticks = 0;
+    }
+
+    tick() {
+        this.increment_tick();
+        if (this.is_tick_interval())
+            this.draw();        
+    }
+};
+
+class UIClock extends UITicking(UIText) {
+    draw() {
+        const now = new Date();
+
+        const dayStr = [
+            "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"
+        ][now.getDay()];
+
+        const dateStr = String(now.getDate());
+        const monthStr = String(now.getMonth()+1);
+        const combDateStr = `${monthStr}/${dateStr}`;
+        const hourStr = String(now.getHours()).padStart(2, '0');
+        const minuteStr = String(now.getMinutes()).padStart(2, '0');
+
+        this.clear();
+
+        this.cursor_x = this.get_left();
+        this.cursor_y = this.get_top();
+
+        this.draw_string_at_cursor(`${dayStr} ${combDateStr} ${hourStr}${this.is_tick_major() ? ':' : ' '}${minuteStr}`);
+    }
+};
 
 let ui = new UIRoot(body);
 let uitext = ui.appendChild(new UITextInput());
-uitext.set_size(0, 0, 64, 64);
+let uiclock = ui.appendChild(new UIClock());
+uitext.set_size(0, 16, 64, 64);
+uiclock.set_size(0, 0, 128, 12);
 ui.fire('load');
 ui.fire('reset');
 ui.fire('set_buffer_event', ui.buffer);
