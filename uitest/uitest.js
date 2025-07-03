@@ -207,7 +207,63 @@ class FontAtlas extends Atlas {
     }
 };
 
-const UIElement = (Super) => class extends (Super) {
+const UISize = (Super) => class extends (Super) {
+    offsetx;
+    offsety;
+    width;
+    height;
+
+    set_width = (width) => this.width = width;
+    set_height = (height) => this.height = height;
+    set_offsetx = (offsetx) => this.offsetx = offsetx;
+    set_offsety = (offsety) => this.offsety = offsety;
+    
+    set_left = (left) => this.set_offsetx(left);
+    set_right = (right) => this.set_width(right - this.get_offsetx());
+    set_top = (top) => this.set_offsety(top);
+    set_bottom = (bottom) => this.set_height(bottom - this.get_offsety());
+
+    set_size = (offsetx, offsety, width, height) => { this.set_offsetx(offsetx); this.set_offsety(offsety); this.set_width(width); this.set_height(height); };
+    set_box = (top, right, bottom, left) => { this.set_top(top); this.set_left(left); this.set_bottom(bottom); this.set_right(right); };
+
+    get_width = () => this.width;
+    get_height = () => this.height;
+    get_offsetx = () => this.offsetx;
+    get_offsety = () => this.offsety;
+
+    get_left = () => this.get_offsetx();
+    get_right = () => this.get_offsetx() + this.get_width();
+    get_top = () => this.get_offsety();
+    get_bottom = () => this.get_offsety() + this.get_height();
+
+    is_bound = (x, y) => x >= this.get_left() && x < this.get_right() && y >= this.get_top() && y < this.get_bottom();
+
+    get_absolute() {
+        return this;
+    }
+
+    get_relative(size) {
+        return UISize.make_size(this.get_offsetx() + size.get_offsetx(), this.get_offsety() + size.get_offsety(), this.get_width(), this.get_height());
+    }
+
+    static make() {
+        return new UISize(object);
+    }
+
+    static make_box(top, right, bottom, left) {
+        let ret = UISize.make();
+        ret.set_box(top, right, bottom, left);
+        return ret;
+    }
+
+    static make_size(offsetx, offsety, width, height) {
+        let ret = UISize.make();
+        ret.set_size(offsetx, offsety, width, height);
+        return ret;
+    }
+};
+
+const UIElement = (Super) => class extends UISize(Super) {
 
 };
 
@@ -264,13 +320,18 @@ class UIText {
             buffer.draw_sprite(x, y, font_sprite);
 
             x += this.font_atlas.sprite_width;
-            if (x > buffer.width) {
+            if (x + this.font_atlas.sprite_width > buffer.width) {
                 x = 0;
                 y += this.font_atlas.sprite_height;
             }
         }
 
         buffer.flush();
+    }
+
+    draw_text(buffer, text) {
+        this.text = text;
+        this.draw(buffer);
     }
 
     static async make(url='font.png', text=undefined) {
