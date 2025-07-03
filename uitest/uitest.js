@@ -369,31 +369,49 @@ class UIEventHandler {
         is_digit = () => this.key_code >= 48 && this.key_code <= 57;
         is_letter = () => this.key.toLowerCase() != this.key.toUpperCase();
         is_arrow_key = () => this.key_code >= 37 && this.key_code <= 40;
-        is_arrow_up = () => this.key_code == 38;
-        is_arrow_down = () => this.key_code == 40;
-        is_arrow_left = () => this.key_code == 37;
-        is_arrow_right = () => this.key_code == 39;
+        is_arrow_up_key = () => this.key_code == 38;
+        is_arrow_down_key = () => this.key_code == 40;
+        is_arrow_left_key = () => this.key_code == 37;
+        is_arrow_right_key = () => this.key_code == 39;
+        is_char = () => this.char_code != 0;
+        is_alt_key = () => this.key_code == 18;
+        is_ctrl_key = () => this.key_code == 17;
+        is_shift_key = () => this.key_code == 16;
+        is_backspace_key = () => this.key_code == 8;
+        is_enter_key = () => this.key_code == 13;
+        is_delete_key = () => this.key_code == 46;
+        is_escape_key = () => this.key_code == 27;
+        is_caps_lock_key = () => this.key_code == 20;
     };
 };
 
 const UIElementMixin = (Super) => class extends UISize(Super) {
     children = [];
     buffer;
+    parent;
 
-    appendChild = (ui_element) => this.children.push(ui_element);
-    removeChild = (ui_element) => this.children = this.children.filter(x => x != ui_element);
+    appendChild = (ui_element) => { this.children.push(ui_element); ui_element.buffer = this.buffer; ui_element.parent = this; return ui_element; }
+    removeChild = (ui_element) => { this.children = this.children.filter(x => x != ui_element); ui_element.parent = undefined; }
 
     set_buffer(buffer) {
         this.buffer = buffer;
         this.set_width(buffer.get_width());
         this.set_height(buffer.get_height());
     }
+
+    set_buffer_event(event) {
+        this.buffer = event.value;
+    }
+
+    clear() {
+        this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), Color.BLACK);
+    }
 };
 
 class UIElement extends UIElementMixin(object) {};
 
-class UIRoot extends UIElement {
-    constructor(element) {
+class UIRoot extends UIElementMixin(UIEventHandler) {
+    constructor(element, width=128, height=128) {
         super();
         this.element = document.createElement('div');
         this.element.id = 'container';
@@ -406,35 +424,31 @@ class UIRoot extends UIElement {
         this.set_buffer(buffer);
     }
 
+    listener_of(element) {
+        let _this = this;
+        element.addEventListener('keydown', (event) => {
+            _this.root_fire(UIEventHandler.UIKeyboardEvent.make(_this, event));
+        });
+    }
+
+    fire = (event_name, event_value) => this.fire_new_event(this, event_name, event_value);
+    root_fire = (event) => this.fire_event(this, event);
+
     reset() {
         this.buffer.clear(Color.BLACK);
         this.buffer.flush();
     }
 };
 
-class UIDisplay extends Texture {
-    constructor(element, width=128, height=128) {
-        super();
-        this.element = document.createElement('div');
-        this.element.id = 'container';
-        element.appendChild(this.element);
-
-        this.create_canvas(width, height);
-        this.canvas.id = 'canvas';
-        this.element.appendChild(this.canvas);
-
-        this.clear(Color.BLACK);
-        this.put_image_data();
-    }
-}
-
 class UIText extends UIElement {
-    constructor(url='font.png', font_width=8, font_height=12, text=undefined) {
+    constructor(url='font.png', font_width=8, font_height=12, text='') {
         this.font_atlas = new FontAtlas();
         this.text = text;
         this.font_width = font_width;
         this.font_height = font_height;
         this.url = url;
+        this.cursor_x = 0;
+        this.cursor_y = 0;
     }
 
     text;
@@ -442,6 +456,10 @@ class UIText extends UIElement {
     font_width;
     font_height;
     url;
+    draw_end_x;
+    draw_end_y;
+    cursor_x;
+    cursor_y;
 
     async load_resources() {
         await this.font_atlas.load_url(this.url);
@@ -452,34 +470,51 @@ class UIText extends UIElement {
         this.load_resources();
     }
 
-    draw(buffer) {
+    draw_character(x, y, character) {
+        const font_sprite = this.font_atlas.get_character(character);
+
+        this.buffer.draw_sprite(x, y, font_sprite);
+    }
+
+    draw_at_cursor = (character) => this.draw_character(this.cursor_x, this.cursor_y, character);
+
+    draw() {
         if (!this.text || this.text.length < 1)
             return;
 
-        let x = 0;
-        let y = 0;
+        this.cursor_x = this.get_left();
+        this.cursor_y = this.get_top();
 
         for (let i = 0; i < this.text.length; i++) {
             const character = this.text[i];
-            const font_sprite = this.font_atlas.get_character(character);
-            buffer.draw_sprite(x, y, font_sprite);
 
-            x += this.font_atlas.sprite_width;
-            if (x + this.font_atlas.sprite_width > buffer.width) {
-                x = 0;
-                y += this.font_atlas.sprite_height;
+            if (character == '\n') {
+                this.cursor_x = 0;
+                this.cursor_y += this.font_atlas.sprite_height;
+                continue;
+            }
+
+            this.draw_at_cursor(character);
+
+            this.cursor_x += this.font_atlas.sprite_width;
+            if (this.cursor_x + this.font_atlas.sprite_width > this.get_right()) {
+                this.cursor_x = 0;
+                this.cursor_y += this.font_atlas.sprite_height;
             }
         }
 
-        buffer.flush();
+        this.draw_end_x = this.cursor_x;
+        this.draw_end_y = this.cursor_y;
+
+        this.buffer.flush();
     }
 
-    draw_text(buffer, text) {
+    draw_text(text) {
         this.text = text;
-        this.draw(buffer);
+        this.draw();
     }
 
-    static async make(url='font.png', text=undefined) {
+    static async make(url='font.png', text='') {
         let ret = new UIText(url);
         ret.text = text;
         await ret.load_resources();
@@ -487,25 +522,62 @@ class UIText extends UIElement {
     }
 };
 
-class UITest {
-    constructor(element) {
-        this.element = element;
-        this.buffer = new UIDisplay(this.element);
-        this.fontatlas = new Atlas();
+class UITextInput extends UIText {
+    constructor() {
+        super();
     }
 
-    async load_resources() {
-        await this.fontatlas.load_url('font.png');
-        this.fontatlas.set_sprite_size(8, 12);
+    ticks=0;
+    flash_ticks=10;
+
+    keyboard(event) {
+        if (event.is_char())
+            this.text += event.key;
+        else
+        if (event.is_backspace_key())
+            if (this.text.length > 0)
+                this.text=this.text.slice(0, this.text.length-1);
+        else
+        if (event.is_enter_key())
+            this.text += '\n';
+        else
+            return;
+
+        this.draw();
     }
 
-    async test() {
-        await this.load_resources();
+    is_tick_interval = () => (this.ticks % this.flash_ticks) == 0;
 
-        this.buffer.draw_sprite(0, 0, this.fontatlas.get_sprite(0, 0));
-        this.buffer.put_image_data();
+    reset() {
+        this.ticks = 0;
+    }
+
+    draw() {
+        this.clear();
+
+        super.draw();
+
+        const is_flash = this.ticks % (this.flash_ticks * 2) < this.flash_ticks;
+
+        this.draw_at_cursor(is_flash ? '|' : ' ');
+
+        this.buffer.flush();
+    }
+
+    tick() {
+        this.ticks = ++this.ticks % (this.flash_ticks * 2);
+        if (this.is_tick_interval())
+            this.draw();
     }
 };
 
-ui = new UITest(body);
-ui.test();
+
+let ui = new UIRoot(body);
+let uitext = ui.appendChild(new UITextInput());
+uitext.set_size(0, 0, 64, 64);
+ui.fire('load');
+ui.fire('reset');
+ui.fire('set_buffer_event', ui.buffer);
+ui.listener_of(document.querySelector('body'));
+
+setInterval(() => ui.fire('tick'), 50);
