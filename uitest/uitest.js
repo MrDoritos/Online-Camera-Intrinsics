@@ -322,6 +322,23 @@ const UISize = (Super) => class extends (Super) {
     }
 };
 
+const KeyCodes = class {
+    BACKSPACE = 8;
+    ENTER = 13;
+    SHIFT = 16;
+    CTRL = 17;
+    ALT = 18;
+    CAPS = 20;
+    ESCAPE = 27;
+    ARROW_LEFT = 37;
+    ARROW_UP = 38;
+    ARROW_RIGHT = 39;
+    ARROW_DOWN = 40;
+    DELETE = 46;
+};
+
+Codes = new KeyCodes();
+
 class UIEventHandler {
     stopImmediatePropagation;
     stopPropagation;
@@ -405,28 +422,30 @@ class UIEventHandler {
         constructor(handler, key, key_code, char_code) {
             super(handler, 'keyboard');
             this.key = key;
-            this.key_code = key_code;
-            this.char_code = char_code;
+            this.key_code = this.is_extended() ? key_code : 0;
+            this.char_code = this.is_extended() ? 0 : key_code;
         }
 
         static make = (handler, event) => new UIEventHandler.UIKeyboardEvent(handler, event.key, event.keyCode, event.charCode);
 
-        is_digit = () => this.key_code >= 48 && this.key_code <= 57;
-        is_letter = () => this.key.toLowerCase() != this.key.toUpperCase();
+        is_extended = () => this.key.length > 1;
+        is_digit = () => this.char_code >= 48 && this.char_code <= 57;
+        is_letter = () => this.is_char() && this.key.toLowerCase() != this.key.toUpperCase();
         is_arrow_key = () => this.key_code >= 37 && this.key_code <= 40;
-        is_arrow_up_key = () => this.key_code == 38;
-        is_arrow_down_key = () => this.key_code == 40;
-        is_arrow_left_key = () => this.key_code == 37;
-        is_arrow_right_key = () => this.key_code == 39;
-        is_char = () => this.key_code > 31 && this.key_code < 127;
-        is_alt_key = () => this.key_code == 18;
-        is_ctrl_key = () => this.key_code == 17;
-        is_shift_key = () => this.key_code == 16;
-        is_backspace_key = () => this.key_code == 8;
-        is_enter_key = () => this.key_code == 13;
-        is_delete_key = () => this.key_code == 46;
-        is_escape_key = () => this.key_code == 27;
-        is_caps_lock_key = () => this.key_code == 20;
+        is_arrow_up_key = () => this.key_code == Codes.ARROW_UP;
+        is_arrow_down_key = () => this.key_code == Codes.ARROW_DOWN;
+        is_arrow_left_key = () => this.key_code == Codes.ARROW_LEFT;
+        is_arrow_right_key = () => this.key_code == Codes.ARROW_RIGHT;
+        is_char = () => this.char_code > 31 && this.char_code < 127;
+        is_alt_key = () => this.key_code == Codes.ALT;
+        is_ctrl_key = () => this.key_code == Codes.CTRL;
+        is_shift_key = () => this.key_code == Codes.SHIFT;
+        is_backspace_key = () => this.key_code == Codes.BACKSPACE;
+        is_enter_key = () => this.key_code == Codes.ENTER;
+        is_delete_key = () => this.key_code == Codes.DELETE;
+        is_escape_key = () => this.key_code == Codes.ESCAPE;
+        is_caps_lock_key = () => this.key_code == Codes.CAPS;
+
     };
 };
 
@@ -630,18 +649,21 @@ class UITextInput extends UIText {
         if (event.is_char()) {
             this.text += event.key;
             this.user_cursor_index++;
-        } else
-        if (event.is_backspace_key()) {
-            if (this.text.length > 0) {
-                this.text=this.text.slice(0, this.text.length-1);
-                this.user_cursor_index--;
-            }
-        } else
-        if (event.is_enter_key()) {
-            this.text += '\n';
-            this.user_cursor_index++;
         } else {
-            return;
+            switch (event.key_code) {
+                case Codes.BACKSPACE:
+                    if (this.text.length > 0) {
+                        this.text=this.text.slice(0, this.text.length-1);
+                        this.user_cursor_index--;
+                    }
+                    break;
+                case Codes.ENTER:
+                    this.text += '\n';
+                    this.user_cursor_index++;
+                    break;
+                default:
+                    return;
+            }
         }
 
         this.ticks = 0;
