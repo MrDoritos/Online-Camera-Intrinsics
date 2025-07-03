@@ -557,13 +557,18 @@ class UIText extends UIElement {
         this.cursor_y = rows * this.font_height + this.get_top();
     }
 
-    set_cursor_index(index) {
+    get_cursor_index(index) {
         const columns = index % this.get_columns();
         const rows = (index / this.get_columns()) | 0;
-        this.set_cursor_position(columns, rows);
+        return [columns, rows];
     }
 
-    set_cursor_wrap_index(index) {
+    set_cursor_index(index) {
+        const position = this.get_cursor_index(index);
+        this.set_cursor_position(position[0], position[1]);
+    }
+
+    get_cursor_wrap_index(index) {
         let row = 0;
         let column = 0;
         const columns = this.get_columns();
@@ -581,7 +586,12 @@ class UIText extends UIElement {
             }
         }
 
-        this.set_cursor_position(column, row);
+        return [column, row];
+    }
+
+    set_cursor_wrap_index(index) {
+        const position = this.get_cursor_wrap_index(index);
+        this.set_cursor_position(position[0], position[1]);
     }
 
     draw() {
@@ -624,8 +634,8 @@ class UIText extends UIElement {
         this.text = this.text.slice(0, i) + text + this.text.slice(i);
     }
 
-    remove_range(i, n) {
-        this.text = this.text.slice(0, i) + this.text.slice(i+n);
+    remove_range(i, n=1) {
+        this.text = this.text.slice(0, i-1) + this.text.slice(i+n-1);
     }
 
     static async make(url='font.png', text='') {
@@ -645,21 +655,89 @@ class UITextInput extends UIText {
     flash_ticks=10;
     user_cursor_index=0;
 
+    down_arrow() {
+        if (this.user_cursor_index >= this.text.length)
+            return;
+
+        const final = this.get_cursor_wrap_index(this.text.length-1);
+        const start = this.get_cursor_wrap_index(this.user_cursor_index);
+
+        if (final[1] == start[1]) {
+            this.user_cursor_index = this.text.length;
+            return;
+        }
+
+        let best_index = 0;
+
+        for (let i = this.user_cursor_index; i < this.text.length; i++) {
+            const position = this.get_cursor_wrap_index(i);
+
+            if (position[1] > start[1] + 1 || (position[0] > start[0] && position[1] > start[1]))
+                break;
+
+            best_index = i;
+        }
+
+        this.user_cursor_index = best_index;
+    }
+
+    up_arrow() {
+        const start = this.get_cursor_wrap_index(this.user_cursor_index);
+
+        if (start[1] < 1) {
+            this.user_cursor_index = 0;
+            return;
+        }
+
+        let best_index = 0;
+
+
+        for (let i = 0; i < this.user_cursor_index; i++) {
+            const position = this.get_cursor_wrap_index(i);
+
+            best_index = i;
+        
+            if (position[1] >= start[1] || (position[0] >= start[0] && position[1]+1 >= start[1]))
+                break;
+        }
+
+        this.user_cursor_index = best_index;
+    }
+
     keyboard(event) {
         if (event.is_char()) {
-            this.text += event.key;
+            this.insert_text(this.user_cursor_index, event.key);
             this.user_cursor_index++;
         } else {
             switch (event.key_code) {
                 case Codes.BACKSPACE:
                     if (this.text.length > 0) {
-                        this.text=this.text.slice(0, this.text.length-1);
+                        this.remove_range(this.user_cursor_index);
                         this.user_cursor_index--;
                     }
                     break;
+                case Codes.DELETE:
+                    if (this.text.length > 0 && this.user_cursor_index < this.text.length) {
+                        this.remove_range(this.user_cursor_index+1);
+                    }
+                    break;
                 case Codes.ENTER:
-                    this.text += '\n';
+                    this.insert_text(this.user_cursor_index, '\n');
                     this.user_cursor_index++;
+                    break;
+                case Codes.ARROW_LEFT:
+                    if (this.user_cursor_index > 0)
+                        this.user_cursor_index--;
+                    break;
+                case Codes.ARROW_RIGHT:
+                    if (this.user_cursor_index < this.text.length)
+                        this.user_cursor_index++;
+                    break;
+                case Codes.ARROW_UP:
+                    this.up_arrow();
+                    break;
+                case Codes.ARROW_DOWN:
+                    this.down_arrow();
                     break;
                 default:
                     return;
