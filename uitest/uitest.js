@@ -335,6 +335,19 @@ const KeyCodes = class {
     ARROW_RIGHT = 39;
     ARROW_DOWN = 40;
     DELETE = 46;
+    TAB = 9;
+    F1 = 112;
+    F2 = 113;
+    F3 = 114;
+    F4 = 115;
+    F5 = 116;
+    F6 = 117;
+    F7 = 118;
+    F8 = 119;
+    F9 = 120;
+    F10 = 121;
+    F11 = 122;
+    F12 = 123;
 };
 
 Codes = new KeyCodes();
@@ -343,15 +356,40 @@ class UIEventHandler {
     stopImmediatePropagation;
     stopPropagation;
     debug_events=false;
+    total_start_time = Date.now();
+    event_start_time;
+    ignore_log = ['tick'];
 
-    do_call(element, event) {
+    get_tree_str(element) {
+        return (element.parent ? this.get_tree_str(element.parent) : '') + 
+                `::${element.constructor.name}`;
+    }
+
+    log_event(element, event) {
+        if (!this.debug_events || this.ignore_log.includes(event.type))
+            return;
+
+        const callback = element[event.type];
+
+        const now = Date.now();
+        const total_time = `[${String(now - this.total_start_time).padStart(5, ' ')} ms]`;
+        const event_time = `[${String(now - this.event_start_time).padStart(5, ' ')} ms]`;
+        const type = event.type.padStart(20, ' ');
+        //const name = element.constructor.name;
+        const name = this.get_tree_str(element);
+        const hit = `-> ${callback ? 'hit': 'x'}`;
+
+        console.log(`${total_time} ${event_time} ${type} ${name} ${hit}`);
+    }
+
+    async do_call(element, event) {
         const callback = element[event.type];
 
         if (callback)
             callback.bind(element, event)();
 
         if (this.debug_events)
-            console.log(`${element.constructor.name} -> ${callback ? 'hit': 'x'}`);
+            this.log_event(element, event);
     }
 
     log_stop() {
@@ -359,11 +397,11 @@ class UIEventHandler {
             console.log(`${this.stopPropagation ? 'stopPropagation': ''} ${this.stopImmediatePropagation ? 'stopImmediatePropagation': ''}`.trim());
     }
 
-    handle(element, event) {
+    async handle(element, event) {
         if (!element)
             return;
 
-        this.do_call(element, event);
+        await this.do_call(element, event);
 
         if (this.stopPropagation || this.stopImmediatePropagation)
             return this.log_stop();
@@ -374,7 +412,7 @@ class UIEventHandler {
             return;
 
         for (const child of children) {
-            this.handle(child, event);
+            await this.handle(child, event);
             
             this.stopPropagation = false;
 
@@ -383,15 +421,16 @@ class UIEventHandler {
         }
     }
 
-    fire_event(element, event) {
+    async fire_event(element, event) {
         this.stopImmediatePropagation = false;
         this.stopPropagation = false;
-        this.handle(element, event);
+        this.event_start_time = Date.now();
+        await this.handle(element, event);
     }
 
-    fire_new_event(element, event_name, event_value) {
+    async fire_new_event(element, event_name, event_value) {
         const event = this.make_event(event_name, event_value);
-        this.fire_event(element, event);
+        await this.fire_event(element, event);
     }
 
     make_event(event_name, event_value=undefined) {
@@ -436,7 +475,8 @@ class UIEventHandler {
         is_arrow_down_key = () => this.key_code == Codes.ARROW_DOWN;
         is_arrow_left_key = () => this.key_code == Codes.ARROW_LEFT;
         is_arrow_right_key = () => this.key_code == Codes.ARROW_RIGHT;
-        is_char = () => this.char_code > 31 && this.char_code < 127;
+        //is_char = () => this.char_code > 31 && this.char_code < 127;
+        is_char = () => !this.is_extended();
         is_alt_key = () => this.key_code == Codes.ALT;
         is_ctrl_key = () => this.key_code == Codes.CTRL;
         is_shift_key = () => this.key_code == Codes.SHIFT;
@@ -491,12 +531,15 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
     listener_of(element) {
         let _this = this;
         element.addEventListener('keydown', (event) => {
-            _this.root_fire(UIEventHandler.UIKeyboardEvent.make(_this, event));
+            const uievent = UIEventHandler.UIKeyboardEvent.make(_this, event);
+            if (this.debug_events)
+                console.log('event', event, 'uievent', uievent);
+            _this.root_fire(uievent);
         });
     }
 
-    fire = (event_name, event_value) => this.fire_new_event(this, event_name, event_value);
-    root_fire = (event) => this.fire_event(this, event);
+    fire = async (event_name, event_value) => await this.fire_new_event(this, event_name, event_value);
+    root_fire = async (event) => await this.fire_event(this, event);
 
     reset() {
         this.buffer.clear(Color.BLACK);
@@ -533,8 +576,8 @@ class UIText extends UIElement {
         this.font_atlas.set_sprite_size(this.font_width, this.font_height);
     }
 
-    load() {
-        this.load_resources();
+    async load() {
+        await this.load_resources();
     }
 
     draw_character(x, y, character) {
@@ -848,14 +891,22 @@ class UIClock extends UITicking(UIText) {
     }
 };
 
-let ui = new UIRoot(body);
-let uitext = ui.appendChild(new UITextInput());
-let uiclock = ui.appendChild(new UIClock());
-uitext.set_size(8, 16, 112-1, 94);
-uiclock.set_size(0, 0, 128, 12);
-ui.fire('load');
-ui.fire('reset');
-ui.fire('set_buffer_event', ui.buffer);
-ui.listener_of(document.querySelector('body'));
+let ui = undefined, uitext = undefined, uiclock = undefined;
 
-setInterval(() => ui.fire('tick'), 50);
+async function page_load() {
+    ui = new UIRoot(body);
+    //ui.debug_events = true;
+    uitext = ui.appendChild(new UITextInput());
+    uiclock = ui.appendChild(new UIClock());
+    uitext.set_size(8, 16, 112-1, 94);
+    uiclock.set_size(0, 0, 128, 12);
+    await ui.fire('load');
+    await ui.fire('reset');
+    await ui.fire('set_buffer_event', ui.buffer);
+    await ui.fire('draw');
+    ui.listener_of(document.querySelector('body'));
+    
+    setInterval(() => ui.fire('tick'), 50);
+}
+
+page_load();
