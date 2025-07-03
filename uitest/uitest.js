@@ -246,6 +246,18 @@ const UISize = (Super) => class extends (Super) {
         return UISize.make_size(this.get_offsetx() + size.get_offsetx(), this.get_offsety() + size.get_offsety(), this.get_width(), this.get_height());
     }
 
+    set_relative_offset(size) {
+        this.set_offsetx(this.get_offsetx() + size.get_offsetx());
+        this.set_offsety(this.get_offsety() + size.get_offsety());
+    }
+
+    set_relative_padding(size, padding_horizontal, padding_vertical) {
+        this.set_offsetx(size.get_offsetx() + padding_horizontal);
+        this.set_offsety(size.get_offsety() + padding_vertical);
+        this.set_width(size.get_width() - padding_horizontal);
+        this.set_height(size.get_height() - padding_vertical);
+    }
+
     static make() {
         return new UISize(object);
     }
@@ -263,9 +275,85 @@ const UISize = (Super) => class extends (Super) {
     }
 };
 
-const UIElement = (Super) => class extends UISize(Super) {
+class UIEventHandler {
+    stopImmediatePropagation;
+    stopPropagation;
 
+    do_call(element, event) {
+        const callback = element[event.type];
+
+        if (callback)
+            callback(event);
+    }
+
+    handle(element, event) {
+        if (!element)
+            return;
+
+        this.do_call(element, event);
+
+        if (this.stopPropagation || this.stopImmediatePropagation)
+            return;
+
+        const children = element.children;
+
+        if (!children)
+            return;
+
+        for (const child of children) {
+            this.handle(child, event);
+            
+            this.stopPropagation = false;
+
+            if (this.stopImmediatePropagation)
+                return;
+        }
+    }
+
+    fire_event(element, event) {
+        this.stopImmediatePropagation = false;
+        this.stopPropagation = false;
+        this.handle(element, event);
+    }
+
+    fire_new_event(element, event_name, event_value) {
+        const event = this.make_event(event_name, event_value);
+        this.fire_event(element, event);
+    }
+
+    make_event(event_name, event_value=undefined) {
+        return new UIEventHandler.UIEvent(this, event_name, event_value);
+    }
+
+    static UIEvent = class {
+        constructor(handler, type, value=undefined) {
+            this.handler = handler;
+            this.type = type;
+            this.value = value;
+        }
+
+        handler;
+        type;
+        value;
+
+        stopPropagation() {
+            this.handler.stopPropagation = true;
+        }
+
+        stopImmediatePropagation() {
+            this.handler.stopImmediatePropagation = true;
+        }
+    };
 };
+
+const UIElementMixin = (Super) => class extends UISize(Super) {
+    children = [];
+
+    appendChild = (ui_element) => this.children.push(ui_element);
+    removeChild = (ui_element) => this.children = this.children.filter(x => x != ui_element);
+};
+
+class UIElement extends UIElementMixin(object) {};
 
 class UIDisplay extends Texture {
     constructor(element, width=128, height=128) {
@@ -283,7 +371,7 @@ class UIDisplay extends Texture {
     }
 }
 
-class UIText {
+class UIText extends UIElement {
     constructor(url='font.png', font_width=8, font_height=12, text=undefined) {
         this.font_atlas = new FontAtlas();
         this.text = text;
