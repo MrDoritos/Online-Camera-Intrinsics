@@ -488,6 +488,41 @@ class UIText extends UIElement {
 
     draw_at_cursor = (character) => this.draw_character(this.cursor_x, this.cursor_y, character);
 
+    get_columns = () => (this.get_width() / this.font_width) | 0;
+    get_rows = () => (this.get_height() / this.font_height) | 0;
+
+    set_cursor_position(columns, rows) {
+        this.cursor_x = columns * this.font_width + this.get_left();
+        this.cursor_y = rows * this.font_height + this.get_top();
+    }
+
+    set_cursor_index(index) {
+        const columns = index % this.get_columns();
+        const rows = (index / this.get_columns()) | 0;
+        this.set_cursor_position(columns, rows);
+    }
+
+    set_cursor_wrap_index(index) {
+        let row = 0;
+        let column = 0;
+        const columns = this.get_columns();
+
+        for (let i = 0; i < this.text.length && i < index; i++) {
+            if (this.text[i] == '\n') {
+                row++;
+                column = 0;
+            } else {
+                column++;
+            }
+            if (column >= columns) {
+                column = 0;
+                row++;
+            }
+        }
+
+        this.set_cursor_position(column, row);
+    }
+
     draw() {
         this.cursor_x = this.get_left();
         this.cursor_y = this.get_top();
@@ -547,17 +582,22 @@ class UITextInput extends UIText {
 
     ticks=0;
     flash_ticks=10;
+    user_cursor_index=0;
 
     keyboard(event) {
         if (event.is_char()) {
             this.text += event.key;
+            this.user_cursor_index++;
         } else
         if (event.is_backspace_key()) {
-            if (this.text.length > 0)
+            if (this.text.length > 0) {
                 this.text=this.text.slice(0, this.text.length-1);
+                this.user_cursor_index--;
+            }
         } else
         if (event.is_enter_key()) {
             this.text += '\n';
+            this.user_cursor_index++;
         } else {
             return;
         }
@@ -566,6 +606,8 @@ class UITextInput extends UIText {
 
         this.draw();
     }
+
+    //is_replace = () => this.user_cursor_index < this.text.length;
 
     is_tick_interval = () => (this.ticks % this.flash_ticks) == 0;
 
@@ -579,9 +621,12 @@ class UITextInput extends UIText {
         super.draw();
 
         const is_flash = this.ticks % (this.flash_ticks * 2) < this.flash_ticks;
-        
-        this.draw_at_cursor(is_flash ? '|' : ' ');
 
+        if (is_flash) {
+            this.set_cursor_wrap_index(this.user_cursor_index);
+            this.cursor_x -= this.font_width * .4;
+            this.draw_at_cursor('|');
+        }
         this.buffer.flush();
     }
 
