@@ -1196,7 +1196,7 @@ async function page_load() {
         await async_wait(1000);
         await uitext.reset();
     };
-    //welcome();
+    welcome();
 }
 
 page_load();
