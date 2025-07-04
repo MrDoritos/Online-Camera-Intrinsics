@@ -4,30 +4,38 @@
 }
 
 @media screen and not (max-aspect-ratio: 1/1) {
+    :root {
+        --inner-width: 48dvh;
+        --inner-height: 97vw;
+        --margin: 1vw;
+    }
+
+    #container.display {
+        margin: auto var(--margin) auto auto;
+    }
+
     #container.dpad {
-        transform: scale(0.75);
+        margin: auto auto auto var(--margin);
     }
 
-    #container {
-        #width: 50vw;
-        width: 50%;
-        align-content: center;
-    }
-
-    #container > * {
-        width: 100%;
+    #container canvas {
+        object-fit: contain;
+        display: block;
+        width: inherit;
+        max-width: inherit;
     }
 
     #container #inner {
-        transform: translate(0, 25%);
-        min-height: 100%;
+        max-width: var(--inner-width);
+        max-height: var(--inner-height);
+        width: var(--inner-height);
+        height: var(--inner-width);
+        margin: 0 auto;
     }
 
     #body {
         height: 100vh;
-        margin: 0 auto;
-        display: flex;
-        max-width: 50em;
+        align-content: center;
     }
 }
 
