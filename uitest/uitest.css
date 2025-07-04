@@ -99,11 +99,6 @@ body {
     position: fixed;
 }
 
-#rotation_0 { transform: rotate(0deg); }
-#rotation_1 { transform: rotate(90deg); }
-#rotation_2 { transform: rotate(180deg); }
-#rotation_3 { transform: rotate(270deg); }
-
-canvas[name=hover] {
+canvas#hover {
     filter: brightness(50%);
 }

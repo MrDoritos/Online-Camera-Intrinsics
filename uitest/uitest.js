@@ -37,6 +37,7 @@ class CanvasBuffer {
     image;
     width;
     height;
+    image_source;
 
     canvas_clear = () => this.context.clearRect(0, 0, this.width, this.height);
 
@@ -46,7 +47,11 @@ class CanvasBuffer {
 
     get_offset = (x, y) => Math.round(Math.round(y) * this.width + x) * 4;
 
-    get_sample_offset = (x, y) => this.get_offset(x * this.width, y * this.height);
+    get_sample_offset = (u, v) => this.get_offset(u * this.width, v * this.height);
+
+    get_sample_position = (u, v) => [u * this.width, v * this.height];
+
+    to_sample_position = (x, y) => [x / this.width, y / this.height];
 
     set_size(width, height) {
         this.width = width;
@@ -67,6 +72,39 @@ class CanvasBuffer {
         return x < this.width && y < this.height && x >= 0 && y >= 0;
     }
 
+    translate_abs(x, y) {
+        this.context.translate(x, y);
+    }
+
+    translate_rel(u, v) {
+        const [x, y] = this.get_sample_position(u, v);
+        this.translate_abs(x, y);
+    }
+
+    rotate_rad(rad) {
+        this.context.rotate(rad);
+    }
+
+    rotate_deg(deg) {
+        this.rotate_rad((deg * Math.PI) / 180);
+    }
+
+    rotate_around_abs_rad(x, y, rad) {
+        this.translate_abs(x, y);
+        this.rotate_rad(rad);
+        this.translate_abs(-x, -y);
+    }
+
+    rotate_around_rel_rad(u, v, rad) {
+        const [x, y] = this.get_sample_position(u, v);
+        this.rotate_around_abs_rad(x, y, rad);
+    }
+
+    rotate_around_abs_deg = (x, y, degrees) => this.rotate_around_abs_rad(x, y, get_radians(degrees));
+    rotate_around_rel_deg = (u, v, degrees) => this.rotate_around_rel_rad(u, v, get_radians(degrees));
+
+    reset_transform = () => this.context.resetTransform();
+
     set_smoothing_off() {
         this.context.imageSmoothingQuality = '';
         this.context.imageSmoothingEnabled = false;
@@ -75,6 +113,10 @@ class CanvasBuffer {
     create_canvas(width, height) {
         let canvas = document.createElement('canvas');
         this.load_canvas(canvas, width, height);
+    }
+
+    create_canvas_from_image_size(image) {
+        this.create_canvas(image.width, image.height);
     }
 
     load_canvas(canvas, width, height) {
@@ -90,26 +132,23 @@ class CanvasBuffer {
     }
 
     load_image(image) {
+        this.image_source = image;
         this.create_canvas(image.width, image.height);
         this.draw_image(0,0,image);
         this.image = this.get_image_data();
     }
 
+    push = () => this.context.save();
+
+    pop = () => this.context.restore();
+
     flush = () => this.put_image_data();
 
-    static async load_image_url(url) {
-        return new Promise((resolve, reject) => {
-            let image = new Image();
-            image.crossOrigin = "anonymous";
-            image.src = url;
-            image.onload = () => resolve(image);
-            image.onerror = () => reject(new Error("Could not load image"));
-        });
-    }
+    reload = () => this.image = this.get_image_data();
 
-    async load_url(url) {
-        this.load_image(await CanvasBuffer.load_image_url(url));
-    }
+    load_url = async (url) => this.load_image(await load_image_url(url));
+
+    draw_url = async (x, y, url) => this.draw_image(x, y, await load_image_url(url));
 };
 
 const TextureReader = (Super) => class extends Super {
@@ -533,6 +572,9 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
         this.set_buffer(buffer);
     }
 
+    interval_id=0;
+    interval_period=50;
+
     listener_of(element) {
         let _this = this;
         element.addEventListener('keydown', (event) => {
@@ -550,6 +592,20 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
         this.buffer.clear(Color.BLACK);
         this.buffer.flush();
     }
+
+    has_valid_interval = () => this.interval_id > 0;
+
+    make_interval = () => setInterval(() => this.fire('tick'), this.interval_period);
+
+    start_interval = () => { if (!this.has_valid_interval()) this.interval_id = this.make_interval(); };
+
+    stop_interval = () => { if (this.has_valid_interval()) clearInterval(this.interval_id); this.interval_id = 0; };
+
+    start = () => this.start_interval();
+
+    stop = () => this.stop_interval();
+
+    set_interval_period = (period_ms) => { this.stop_interval(); this.interval_period = period_ms; this.start_interval(); };
 };
 
 class UIText extends UIElement {
@@ -925,7 +981,7 @@ class DPad {
         //document.querySelector('body').addEventListener((event) => this.input_event.bind(this));
         DOMUtil.add_events(
             document.querySelector('body'),
-            ['mousedown', 'mouseup', 'mouseleave', 'mouseenter', 'mousemove', 'touchstart', 'touchend'],
+            ['mousedown', 'mouseup', 'mouseleave', 'mousemove', 'touchstart', 'touchend', 'touchmove', 'touchcancel'],
             this.input_event.bind(this)
         );
 
@@ -933,22 +989,31 @@ class DPad {
     }
 
     async get_canvasbuffer(element, url, id, className) {
-        //let node = document.createElement('div');
         let buffer = new Texture();
-        await buffer.load_url(url);
-        //node.appendChild(buffer.canvas);
-        //element.appendChild(node);
+        if (url?.length)
+            await buffer.load_url(url);
+        
         element.appendChild(buffer.canvas);
 
-        //node.id = id;
-        //node.className = className;
-        buffer.canvas.id = id;
+        buffer.id = id;
         buffer.canvas.className = className;
         return buffer;
     }
 
+    debug_element_positioning(element, event) {
+        console.log(event);
+        console.log(element);
+        for (const prep of ['offset', 'client', 'scroll'])
+            for (const prop of ['Left', 'Width', 'Top', 'Height'])
+                console.log(prep+prop, element.canvas[prep+prop]);
+        for (const prep of ['screen', 'page', 'client', 'layer'])
+            for (const prop of ['X', 'Y'])
+                console.log(prep+prop, event[prep+prop]);
+        console.log(element.canvas.getBoundingClientRect());
+    }
+
     button_click(element) {
-        console.log('click', element);
+        console.log('click', element.id, element);
     }
 
     is_in_element(element, x, y) {
@@ -971,47 +1036,74 @@ class DPad {
         return this.is_in_element(element, event.clientX, event.clientY);
     }
 
+    get_input_relative_position(input, element, rect = undefined) {
+        const pos = rect ?? element.getBoundingClientRect();
+        return [(input.clientX - pos.x) / pos.width, (input.clientY - pos.y) / pos.height];
+    }
+
+    is_input_over_opaque(input, buffer, rect = undefined) {
+        const [x, y] = this.get_input_relative_position(input, buffer.canvas, rect);
+        return (x >= 0 && y >= 0 && x <= 1 && y <=1 && buffer.get_sample(x, y)[3] > 64);
+    }
+
+    is_event_over_opaque(event, buffer) {
+        const rect = buffer.canvas.getBoundingClientRect();
+        if (event.changedTouches && event.changedTouches.length)
+            for (const touch of event.changedTouches)
+                if (this.is_input_over_opaque(touch, buffer, rect))
+                    return true;
+        return this.is_input_over_opaque(event, buffer, rect);
+    }
+
     input_event(event) {
         const nodes = [this.enter].concat(this.arrows);
-        const clearNames = (nodes) => nodes.forEach(x => x.canvas.setAttribute('name', ''));
+        const state = 'hover';
+        const setState = (node, state='') => { if (node) node.canvas.id = state; };
+        const setStates = (nodes, state='') => nodes.forEach(x => setState(x, state));
+        const checkHovering = (node) => node && this.is_event_over_opaque(event, node);
+        const checkActive = (node) => node && node.canvas.id == state;
+        const checkActivelyHovering = (node) => checkActive(node) && checkHovering(node);
+        const findHovering = () => nodes.find(checkHovering);
+        const findActive = () => nodes.find(checkActive);
+        const findActivelyHovering = () => nodes.find(checkActivelyHovering);
+        const activated = (node) => { if (node) this.button_click(node); setStates(nodes); };
+        const stateOne = (node, state) => { setStates(nodes); setState(node, state); return node; };
+        const verifyOne = () => stateOne(findActivelyHovering(), state);
+        const activateOne = () => activated(verifyOne());
+        const pressOne = () => stateOne(findHovering(), state);
 
-        const printInfo = () => {
-            nodes.forEach(x => console.log(x, x.canvas.offsetLeft, x.canvas.offsetWidth, x.canvas.offsetTop, x.canvas.offsetHeight));
-            console.log(event);
-        };
+        if (event.type == 'mousemove' || event.type == 'touchmove') { if (findActive()) return verifyOne(); if (event.buttons == 1 || event.type == 'touchmove') return pressOne(); }
 
-        if (event.type == 'mouseup' || event.type == 'mouseleave' || event.type == 'touchend') {
-            printInfo();
-            const hover = (nodes.find((x) => x.canvas.attributes.name == "hover"));
-            if (hover)
-                this.button_click(hover);
-            clearNames(nodes);
-            return;
-        }
+        if (event.type == 'mouseleave' || event.type == 'touchcancel') return setStates(nodes);
 
-        if (event.type == 'mousedown' || event.type == 'touchstart') {
-            printInfo();
-            console.log(event.type, nodes);
-            const innode = nodes.find((x) => this.is_event_in_element(x.canvas, event));
-            clearNames(nodes);
-            if (innode)
-                innode.canvas.setAttribute('name', 'hover');
-        }
+        if (event.type == 'mouseup' || event.type == 'touchend') return activateOne();
+
+        if (event.type == 'mousedown' || event.type == 'touchstart') return pressOne();
     }
  
     async get_enter(element, url) {
-        return await this.get_canvasbuffer(element, url, '', 'enter');
+        return await this.get_canvasbuffer(element, url, 4, 'enter');
     }
 
-    async get_arrow(element, url, id) {
-        return await this.get_canvasbuffer(element, url, id, 'arrow');
+    async get_arrow(element, url, rotation) {
+        let buffer = new Texture();
+        let image = await load_image_url(url);
+        buffer.image_source = image;
+        buffer.create_canvas_from_image_size(image);
+        buffer.rotate_around_rel_deg(0.5, 0.5, 90 * rotation);
+        buffer.draw_image(0, 0, image);
+        buffer.reload();
+        buffer.canvas.className = 'arrow';
+        buffer.id = rotation;
+        element.appendChild(buffer.canvas);
+        return buffer;
     }
 
     async get_dpad(element) {
         this.enter = await this.get_enter(element, this.dpad_enter_url);
         this.arrows = [];
         for (let i = 0; i < 4; i++)
-            this.arrows.push(await this.get_arrow(element, this.dpad_arrow_url, `rotation_${i}`));
+            this.arrows.push(await this.get_arrow(element, this.dpad_arrow_url, i));
     }
 };
 
@@ -1031,8 +1123,7 @@ async function page_load() {
     await ui.fire('set_buffer_event', ui.buffer);
     await ui.fire('draw');
     ui.listener_of(document.querySelector('body'));
-    
-    setInterval(() => ui.fire('tick'), 50);
+    ui.start_interval();
 
     let events = ['touchend', 'touchstart', 'touch', 'mousedown', 'click'];
 
@@ -1058,7 +1149,7 @@ async function page_load() {
         await async_wait(1000);
         await uitext.reset();
     };
-    welcome();
+    //welcome();
 }
 
 page_load();
