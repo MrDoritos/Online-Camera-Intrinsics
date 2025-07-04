@@ -904,32 +904,96 @@ class DPad {
         this.element.id = "inner";
         this.element.className = "dpad";
         element.appendChild(this.inner);
+        //document.querySelector('body').addEventListener((event) => this.input_event.bind(this));
+        DOMUtil.add_events(
+            document.querySelector('body'),
+            ['mousedown', 'mouseup', 'mouseleave', 'mouseenter', 'mousemove', 'touchstart', 'touchend'],
+            this.input_event.bind(this)
+        );
 
         this.get_dpad(this.element);
     }
 
-    get_enter(element, url) {
-        let node = document.createElement('img');
-        node.src = url;
-        node.crossOrigin = "anonymous";
-        node.className = "enter";
-        return element.appendChild(node);
+    async get_canvasbuffer(element, url, id, className) {
+        //let node = document.createElement('div');
+        let buffer = new Texture();
+        await buffer.load_url(url);
+        //node.appendChild(buffer.canvas);
+        //element.appendChild(node);
+        element.appendChild(buffer.canvas);
+
+        //node.id = id;
+        //node.className = className;
+        buffer.canvas.id = id;
+        buffer.canvas.className = className;
+        return buffer;
     }
 
-    get_arrow(element, url, id) {
-        let node = document.createElement('img');
-        node.src = url;
-        node.crossOrigin = "anonymous";
-        node.className = "arrow";
-        node.id = id;
-        return element.appendChild(node);
+    button_click(element) {
+        console.log('click', element);
     }
 
-    get_dpad(element) {
-        this.enter = this.get_enter(element, this.dpad_enter_url);
+    is_in_element(element, x, y) {
+        const left = element.offsetWidth;
+        const right = left + element.clientWidth;
+        const top = element.offsetTop;
+        const bottom = top + element.clientHeight;
+
+        return x >= element.offsetLeft && 
+               x < element.offsetWidth + element.offsetLeft &&  
+               y >= element.offsetTop && 
+               y < element.offsetHeight + element.offsetTop;
+    }
+
+    is_event_in_element(element, event) {
+        if (event.changedTouches && event.changedTouches.length)
+            for (const touch of event.changedTouches)
+                if (this.is_in_element(element, touch.clientX, touch.clientY))
+                    return true;
+        return this.is_in_element(element, event.clientX, event.clientY);
+    }
+
+    input_event(event) {
+        const nodes = [this.enter].concat(this.arrows);
+        const clearNames = (nodes) => nodes.forEach(x => x.canvas.setAttribute('name', ''));
+
+        const printInfo = () => {
+            nodes.forEach(x => console.log(x, x.canvas.offsetLeft, x.canvas.offsetWidth, x.canvas.offsetTop, x.canvas.offsetHeight));
+            console.log(event);
+        };
+
+        if (event.type == 'mouseup' || event.type == 'mouseleave' || event.type == 'touchend') {
+            printInfo();
+            const hover = (nodes.find((x) => x.canvas.attributes.name == "hover"));
+            if (hover)
+                this.button_click(hover);
+            clearNames(nodes);
+            return;
+        }
+
+        if (event.type == 'mousedown' || event.type == 'touchstart') {
+            printInfo();
+            console.log(event.type, nodes);
+            const innode = nodes.find((x) => this.is_event_in_element(x.canvas, event));
+            clearNames(nodes);
+            if (innode)
+                innode.canvas.setAttribute('name', 'hover');
+        }
+    }
+ 
+    async get_enter(element, url) {
+        return await this.get_canvasbuffer(element, url, '', 'enter');
+    }
+
+    async get_arrow(element, url, id) {
+        return await this.get_canvasbuffer(element, url, id, 'arrow');
+    }
+
+    async get_dpad(element) {
+        this.enter = await this.get_enter(element, this.dpad_enter_url);
         this.arrows = [];
         for (let i = 0; i < 4; i++)
-            this.arrows.push(this.get_arrow(element, this.dpad_arrow_url, `rotation_${i}`));
+            this.arrows.push(await this.get_arrow(element, this.dpad_arrow_url, `rotation_${i}`));
     }
 };
 

@@ -78,7 +78,7 @@
     #width: 50vw;
 }
 
-.dpad img {
+.dpad img, .dpad canvas {
     position: absolute;
     width: inherit;
     height: inherit;
@@ -99,3 +99,7 @@ body {
 #rotation_1 { transform: rotate(90deg); }
 #rotation_2 { transform: rotate(180deg); }
 #rotation_3 { transform: rotate(270deg); }
+
+canvas[name=hover] {
+    filter: brightness(50%);
+}
