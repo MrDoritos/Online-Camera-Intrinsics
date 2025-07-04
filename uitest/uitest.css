@@ -27,12 +27,23 @@
         height: 100vh;
         margin: 0 auto;
         display: flex;
+        max-width: 50em;
     }
 }
 
 @media screen and (max-aspect-ratio: 1/1) {
+    :root {
+        --inner-width: 97vw;
+        --inner-height: 48dvh;
+        #--margin-short: calc(4vw - 1dvh);
+        --margin-short: 1dvh;
+        --margin-tall: calc(1dvh - 1vw);
+        --margin-top: max(var(--margin-tall), var(--margin-short));
+    }
+
     #container {
-        margin-top:max(calc(5vw - 1vh),calc(1vh - 1vw));
+        #margin-top:max(calc(5vw - 1dvh),calc(1dvh - 1vw));
+        margin-top: var(--margin-top);
     }
 
     #container img, #container canvas {
@@ -43,11 +54,11 @@
     }
 
     #container #inner {
-        max-width: 95vw;
-        max-height: 45vh;
-        width: 45vh;
+        max-width: var(--inner-width);
+        max-height: var(--inner-height);
+        width: var(--inner-height);
         margin: 0 auto;
-        height: 95vw;
+        height: var(--inner-width);
     }
 
     #body {
@@ -67,17 +78,21 @@ canvas, img {
 #inner.dpad {
     background-color: black;
     border-radius: 50%;
+    border:outset;
+}
+
+#inner.display {
+    border: outset;
 }
 
 #body {
     display: flex;
-    max-width: 50em;
 }
 
 body {
     overflow: hidden;
-    width:100vw;
-    height:100vh;
+    width:100dvw;
+    height:100dvh;
     background-color: gray;
     overscroll-behavior: none;
     touch-action: none;

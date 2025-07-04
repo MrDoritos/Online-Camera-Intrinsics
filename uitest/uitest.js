@@ -581,6 +581,14 @@ class UIText extends UIElement {
         this.font_atlas.set_sprite_size(this.font_width, this.font_height);
     }
 
+    reset_uitext() {
+        this.text = '';
+    }
+
+    reset() {
+        this.reset_uitext();
+    }
+
     async load() {
         await this.load_resources();
     }
@@ -813,8 +821,14 @@ class UITextInput extends UIText {
 
     is_tick_interval = () => (this.ticks % this.flash_ticks) == 0;
 
-    reset() {
+    reset_uitextinput() {
         this.ticks = 0;
+        this.user_cursor_index = 0;
+    }
+
+    reset() {
+        this.reset_uitextinput();
+        super.reset();
     }
 
     draw() {
@@ -1027,6 +1041,24 @@ async function page_load() {
             console.log('touch');
             document.querySelector('#textinput.dummy').focus();
         });
+
+    const welcome = async () => {
+        const writetext = async (text, millis) => {
+            for (const char of text) {
+                await async_wait(millis);
+                await ui.root_fire(new UIEventHandler.UIKeyboardEvent(ui, char, 0, 0));
+            }
+        };
+        await writetext("Welcome!", 200);
+        await writetext("\n\n", 500);
+        await writetext("NASA\n\tinternship\n\tproject", 200);
+        await async_wait(1000);
+        await uitext.reset();
+        await writetext("\n\nStart typing...", 200);
+        await async_wait(1000);
+        await uitext.reset();
+    };
+    welcome();
 }
 
 page_load();
