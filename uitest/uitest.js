@@ -431,16 +431,21 @@ class UIEventHandler {
             this.log_event(element, event);
     }
 
+    get_root_node = () => undefined;
+
     log_stop() {
         if (this.debug_events)
             console.log(`${this.stopPropagation ? 'stopPropagation': ''} ${this.stopImmediatePropagation ? 'stopImmediatePropagation': ''}`.trim());
     }
 
-    async handle(element, event) {
+    log = async (...args) => await this.fire_event(this.get_root_node(), this.make_event('log', args), true);
+
+    async handle(element, event, skip_root=false) {
         if (!element)
             return;
 
-        await this.do_call(element, event);
+        if (!skip_root)
+            await this.do_call(element, event);
 
         if (this.stopPropagation || this.stopImmediatePropagation)
             return this.log_stop();
@@ -460,16 +465,20 @@ class UIEventHandler {
         }
     }
 
-    async fire_event(element, event) {
+    reset_handler() {
         this.stopImmediatePropagation = false;
         this.stopPropagation = false;
-        this.event_start_time = Date.now();
-        await this.handle(element, event);
     }
 
-    async fire_new_event(element, event_name, event_value) {
+    async fire_event(element, event, skip_root=false) {
+        this.reset_handler();
+        this.event_start_time = Date.now();
+        await this.handle(element, event, skip_root);
+    }
+
+    async fire_new_event(element, event_name, event_value, skip_root=false) {
         const event = this.make_event(event_name, event_value);
-        await this.fire_event(element, event);
+        await this.fire_event(element, event, skip_root);
     }
 
     make_event(event_name, event_value=undefined) {
@@ -584,6 +593,8 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
             _this.root_fire(uievent);
         });
     }
+
+    get_root_node = () => this;
 
     fire = async (event_name, event_value) => await this.fire_new_event(this, event_name, event_value);
     root_fire = async (event) => await this.fire_event(this, event);
@@ -748,13 +759,20 @@ class UIText extends UIElement {
 
         this.draw_end_x = this.cursor_x;
         this.draw_end_y = this.cursor_y;
+    }
 
+    async log(event) {
+        this.append_text(event.value.map(String).join(' '));
+        this.clear();
+        this.draw();
     }
 
     draw_text(text) {
         this.text = text;
         this.draw();
     }
+
+    append_text = (text) => this.text += text;
 
     insert_text(i, text) {
         this.text = this.text.slice(0, i) + text + this.text.slice(i);
@@ -985,7 +1003,8 @@ class DPad {
         //document.querySelector('body').addEventListener((event) => this.input_event.bind(this));
         DOMUtil.add_events(
             document.querySelector('body'),
-            ['mousedown', 'mouseup', 'mouseleave', 'mousemove', 'touchstart', 'touchend', 'touchmove', 'touchcancel'],
+            //['mousedown', 'mouseup', 'mouseleave', 'mousemove', 'touchstart', 'touchend', 'touchmove', 'touchcancel'],
+            ['pointerdown', 'pointerup', 'pointermove', 'pointerleave'],
             this.input_event.bind(this)
         );
 
@@ -1016,10 +1035,22 @@ class DPad {
         console.log(element.canvas.getBoundingClientRect());
     }
 
+    debug_mode = false;
+
     button_click(element) {
-        console.log(element.id);
         const key_code = element.id != 4 ? element.id + Codes.ARROW_LEFT : Codes.ENTER;
-        this.handler.fire_keyboard_event({key_code});
+
+        if (this.debug_mode)
+            this.handler.log(`${element.id}-`);    
+    
+        if (element.id == 4) {
+            this.debug_mode = !this.debug_mode;
+            this.handler.fire('reset');
+            return;
+        }
+
+        if (!this.debug_mode)
+            this.handler.fire_keyboard_event({key_code});
     }
 
     is_in_element(element, x, y) {
@@ -1077,14 +1108,17 @@ class DPad {
         const verifyOne = () => stateOne(findActivelyHovering(), state);
         const activateOne = () => activated(verifyOne());
         const pressOne = () => stateOne(findHovering(), state);
-        console.log(event);
-        if (event.type == 'mousemove' || event.type == 'touchmove') { if (findActive()) return verifyOne(); if (event.buttons == 1 || event.type == 'touchmove') return pressOne(); }
+        
+        if (this.debug_mode)
+            this.handler.log(`${event.type.slice(7)},`);
 
-        if (event.type == 'mouseleave' || event.type == 'touchcancel') return setStates(nodes);
+        if (event.type == 'mousemove' || event.type == 'touchmove' || event.type == 'pointermove') { if (findActive()) return verifyOne(); if (event.buttons == 1 || event.type == 'touchmove') return pressOne(); }
 
-        if (event.type == 'mouseup') return activateOne();
+        if (event.type == 'mouseleave' || event.type == 'touchcancel' || event.type == 'pointerleave') return setStates(nodes);
 
-        if (event.type == 'mousedown' || event.type == 'touchstart') return pressOne();
+        if (event.type == 'mouseup' || event.type == 'pointerup') return activateOne();
+
+        if (event.type == 'mousedown' || event.type == 'touchstart' || event.type == 'pointerdown') return pressOne();
     }
  
     async get_enter(element, url) {
