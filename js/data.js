@@ -54,6 +54,16 @@ async function load_text_url(url) {
     });
 }
 
+async function load_image_url(url) {
+    return new Promise((resolve, reject) => {
+        let image = new Image();
+        image.crossOrigin = "anonymous";
+        image.src = url;
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("Could not load image"));
+    });
+}
+
 async function load_json_inputform(input_element, object_prototype) {
     return new Promise((resolve, reject) => {
         load_text_inputform(input_element).then(

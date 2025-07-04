@@ -519,6 +519,7 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
         super();
         this.element = document.createElement('div');
         this.element.id = 'container';
+        this.element.className = 'display';
         element.appendChild(this.element);
 
         let buffer = new Texture();
@@ -891,10 +892,53 @@ class UIClock extends UITicking(UIText) {
     }
 };
 
-let ui = undefined, uitext = undefined, uiclock = undefined;
+class DPad {
+    dpad_enter_url = 'dpad_enter.png';
+    dpad_arrow_url = 'dpad_arrow.png';
+
+    constructor(element) {
+        this.inner = document.createElement('div');
+        this.inner.id = "container";
+        this.inner.className = "dpad";
+        this.element = this.inner.appendChild(document.createElement('div'));
+        this.element.id = "inner";
+        this.element.className = "dpad";
+        element.appendChild(this.inner);
+
+        this.get_dpad(this.element);
+    }
+
+    get_enter(element, url) {
+        let node = document.createElement('img');
+        node.src = url;
+        node.crossOrigin = "anonymous";
+        node.className = "enter";
+        return element.appendChild(node);
+    }
+
+    get_arrow(element, url, id) {
+        let node = document.createElement('img');
+        node.src = url;
+        node.crossOrigin = "anonymous";
+        node.className = "arrow";
+        node.id = id;
+        return element.appendChild(node);
+    }
+
+    get_dpad(element) {
+        this.enter = this.get_enter(element, this.dpad_enter_url);
+        this.arrows = [];
+        for (let i = 0; i < 4; i++)
+            this.arrows.push(this.get_arrow(element, this.dpad_arrow_url, `rotation_${i}`));
+    }
+};
+
+let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container;
 
 async function page_load() {
-    ui = new UIRoot(body);
+    container = document.querySelector('#body');
+    ui = new UIRoot(container);
+    dpad = new DPad(container);
     //ui.debug_events = true;
     uitext = ui.appendChild(new UITextInput());
     uiclock = ui.appendChild(new UIClock());
@@ -907,6 +951,14 @@ async function page_load() {
     ui.listener_of(document.querySelector('body'));
     
     setInterval(() => ui.fire('tick'), 50);
+
+    let events = ['touchend', 'touchstart', 'touch', 'mousedown', 'click'];
+
+    for (const event of events)
+        ui.buffer.canvas.addEventListener(event, () => {
+            console.log('touch');
+            document.querySelector('#textinput.dummy').focus();
+        });
 }
 
 page_load();
