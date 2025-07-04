@@ -506,7 +506,7 @@ class UIEventHandler {
 
         static make = (handler, event) => new UIEventHandler.UIKeyboardEvent(handler, event.key, event.keyCode, event.charCode);
 
-        is_extended = () => this.key.length > 1;
+        is_extended = () => !this.key || this.key.length > 1;
         is_digit = () => this.char_code >= 48 && this.char_code <= 57;
         is_letter = () => this.is_char() && this.key.toLowerCase() != this.key.toUpperCase();
         is_arrow_key = () => this.key_code >= 37 && this.key_code <= 40;
@@ -587,6 +587,8 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 
     fire = async (event_name, event_value) => await this.fire_new_event(this, event_name, event_value);
     root_fire = async (event) => await this.fire_event(this, event);
+
+    fire_keyboard_event = async ({key=undefined, char_code=0, key_code=0}) => await this.root_fire(new UIEventHandler.UIKeyboardEvent(this, key, key_code, char_code));
 
     reset() {
         this.buffer.clear(Color.BLACK);
@@ -970,7 +972,9 @@ class DPad {
     dpad_enter_url = 'dpad_enter.png';
     dpad_arrow_url = 'dpad_arrow.png';
 
-    constructor(element) {
+    constructor(element, handler) {
+        this.handler = handler;
+
         this.inner = document.createElement('div');
         this.inner.id = "container";
         this.inner.className = "dpad";
@@ -1013,7 +1017,9 @@ class DPad {
     }
 
     button_click(element) {
-        console.log('click', element.id, element);
+        console.log(element.id);
+        const key_code = element.id != 4 ? element.id + Codes.ARROW_LEFT : Codes.ENTER;
+        this.handler.fire_keyboard_event({key_code});
     }
 
     is_in_element(element, x, y) {
@@ -1066,17 +1072,17 @@ class DPad {
         const findHovering = () => nodes.find(checkHovering);
         const findActive = () => nodes.find(checkActive);
         const findActivelyHovering = () => nodes.find(checkActivelyHovering);
-        const activated = (node) => { if (node) this.button_click(node); setStates(nodes); };
+        const activated = (node) => { setStates(nodes); if (node) this.button_click(node); };
         const stateOne = (node, state) => { setStates(nodes); setState(node, state); return node; };
         const verifyOne = () => stateOne(findActivelyHovering(), state);
         const activateOne = () => activated(verifyOne());
         const pressOne = () => stateOne(findHovering(), state);
-
+        console.log(event);
         if (event.type == 'mousemove' || event.type == 'touchmove') { if (findActive()) return verifyOne(); if (event.buttons == 1 || event.type == 'touchmove') return pressOne(); }
 
         if (event.type == 'mouseleave' || event.type == 'touchcancel') return setStates(nodes);
 
-        if (event.type == 'mouseup' || event.type == 'touchend') return activateOne();
+        if (event.type == 'mouseup') return activateOne();
 
         if (event.type == 'mousedown' || event.type == 'touchstart') return pressOne();
     }
@@ -1090,7 +1096,7 @@ class DPad {
         let image = await load_image_url(url);
         buffer.image_source = image;
         buffer.create_canvas_from_image_size(image);
-        buffer.rotate_around_rel_deg(0.5, 0.5, 90 * rotation);
+        buffer.rotate_around_rel_deg(0.5, 0.5, 90 * rotation - 180);
         buffer.draw_image(0, 0, image);
         buffer.reload();
         buffer.canvas.className = 'arrow';
@@ -1100,10 +1106,17 @@ class DPad {
     }
 
     async get_dpad(element) {
-        this.enter = await this.get_enter(element, this.dpad_enter_url);
-        this.arrows = [];
+        let promises = [];
+
         for (let i = 0; i < 4; i++)
-            this.arrows.push(await this.get_arrow(element, this.dpad_arrow_url, i));
+            promises.push(new Promise((resolve) => resolve(this.get_arrow(element, this.dpad_arrow_url, i))));
+
+        promises.push(new Promise((resolve) => resolve(this.get_enter(element, this.dpad_enter_url))));
+        
+        let nodes = await Promise.all(promises);
+
+        this.enter = nodes.pop();
+        this.arrows = nodes;
     }
 };
 
@@ -1112,7 +1125,7 @@ let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container;
 async function page_load() {
     container = document.querySelector('#body');
     ui = new UIRoot(container);
-    dpad = new DPad(container);
+    dpad = new DPad(container, ui);
     //ui.debug_events = true;
     uitext = ui.appendChild(new UITextInput());
     uiclock = ui.appendChild(new UIClock());
