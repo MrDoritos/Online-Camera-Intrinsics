@@ -517,10 +517,14 @@ class UIElement extends UIElementMixin(Object) {};
 class UIRoot extends UIElementMixin(UIEventHandler) {
     constructor(element, width=128, height=128) {
         super();
+        this.container = document.createElement('div');
+        this.container.id = 'container';
+        this.container.className = 'display';
+        element.appendChild(this.container);
         this.element = document.createElement('div');
-        this.element.id = 'container';
+        this.element.id = 'inner';
         this.element.className = 'display';
-        element.appendChild(this.element);
+        this.container.appendChild(this.element);
 
         let buffer = new Texture();
         buffer.create_canvas(width, height);
