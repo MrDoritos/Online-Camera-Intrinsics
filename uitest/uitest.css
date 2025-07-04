@@ -110,3 +110,12 @@ body {
 canvas#hover {
     filter: brightness(50%);
 }
+
+.dummy {
+    display: fixed;
+    top: 0;
+    width: 0;
+    height: 0;
+    border: none;
+    border-style: none;
+}
