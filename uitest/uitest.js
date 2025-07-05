@@ -571,17 +571,17 @@ class UIStyle {
 
     try_compute_size = (element) => [this.try_compute_width(element), this.try_compute_height(element)];
 
-    try_change_width = (width) => this.is_width_variable() ? this.get_valminmax(width, this.computed_width, this.min_width, this.max_width) : this.width;
+    try_change_width = (width) => this.is_width_variable() ? this.get_valminmax(width, this.computed_width, this.min_width, this.max_width) : this.try_get_width();
 
-    try_change_height = (height) => this.is_height_variable() ? this.get_valminmax(height, this.computed_height, this.min_height, this.max_height) : this.height;
+    try_change_height = (height) => this.is_height_variable() ? this.get_valminmax(height, this.computed_height, this.min_height, this.max_height) : this.try_get_height();
 
     try_change_size = (width, height) => [this.try_change_width(width), this.try_change_height(height)];
 
     update_element_size(element, width, height) {
-        if (!this.is_value_variable(width)) element.set_width(width);
-        if (!this.is_value_variable(height)) element.set_height(height);
-        this.computed_width = width;
-        this.computed_height = height;
+        if (!this.is_value_variable(width)) { element.set_width(width); this.computed_width = width; }
+        if (!this.is_value_variable(height)) { element.set_height(height); this.computed_height = height; }
+        //this.computed_width = width;
+        //this.computed_height = height;
     }
 
     clear_computed() {
@@ -589,12 +589,23 @@ class UIStyle {
         this.computed_height = undefined;
     }
 
-    log_debug(name, element) {
+    log_debug(name, element, ...params) {
         if (!UIStyle.debug_mode)
             return;
 
-        const [ox, oy, sx, sy] = element.get_size();
-        console.log(name, 'offset_x:', ox, 'offset_y:', oy, 'width:', sx, 'height:', sy, element, this);
+        const [offset_x, offset_y, width, height] = element.get_size();
+
+        let db = {
+            'client':{offset_x, offset_y, width, height},
+            'computed':{width:this.computed_width, height:this.computed_height},
+            'styling':{min_width:this.min_width, width: this.width, max_width: this.max_width, min_height:this.min_height, height: this.height, max_height:this.max_height},
+            'source_elem':element,
+            'style':element.style,
+        };
+
+        console.log(name, ...params);
+        for (const [key, value] of Object.entries(db))
+            console.log(key.padStart(11), value);
     }
 
     //from top
@@ -623,6 +634,7 @@ class UIStyle {
     set_offsets_pre(element, child, offsetx, offsety) {
         const cstyle = child.get_style();
         const position = cstyle.position;
+        this.log_debug('offset_pre', child);
 
         if (position == 'static' || position == 'relative' || position == 'absolute') {
             child.set_offset(offsetx, offsety);
@@ -638,6 +650,7 @@ class UIStyle {
         const position = cstyle.position;
         const display = cstyle.display;
         const [width, height] = child.get_length();
+        this.log_debug('offset_post', child);
 
         if (position == 'relative' || position == 'absolute' || position == 'fixed')
             return [offsetx, offsety];
@@ -663,9 +676,10 @@ class UIStyle {
             [offsetx, offsety] = this.set_offsets_post(element, child, offsetx, offsety);
         }
 
+        this.log_debug('offsets_post_children', element);
         const [width, height] = this.try_change_size(offsetx-Poffsetx,offsety-Poffsety);
         this.update_element_size(element, width, height);
-        this.log_debug('offsets', element);
+        this.log_debug('offsets', element, Poffsetx, Poffsety, offsetx, offsety, width, height, this.is_height_variable(), this.is_width_variable());
     }
 
     canvas_debug_r(element) {
