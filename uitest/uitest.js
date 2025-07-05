@@ -376,164 +376,77 @@ const UISize = (Super) => class extends (Super) {
     }
 };
 
-const KeyCodes = class {
-    BACKSPACE = 8;
-    ENTER = 13;
-    SHIFT = 16;
-    CTRL = 17;
-    ALT = 18;
-    CAPS = 20;
-    ESCAPE = 27;
-    ARROW_LEFT = 37;
-    ARROW_UP = 38;
-    ARROW_RIGHT = 39;
-    ARROW_DOWN = 40;
-    DELETE = 46;
-    TAB = 9;
-    F1 = 112;
-    F2 = 113;
-    F3 = 114;
-    F4 = 115;
-    F5 = 116;
-    F6 = 117;
-    F7 = 118;
-    F8 = 119;
-    F9 = 120;
-    F10 = 121;
-    F11 = 122;
-    F12 = 123;
+const Codes = {
+    BACKSPACE : 8,
+    ENTER : 13,
+    SHIFT : 16,
+    CTRL : 17,
+    ALT : 18,
+    CAPS : 20,
+    ESCAPE : 27,
+    ARROW_LEFT : 37,
+    ARROW_UP : 38,
+    ARROW_RIGHT : 39,
+    ARROW_DOWN : 40,
+    DELETE : 46,
+    TAB : 9,
+    F1 : 112,
+    F2 : 113,
+    F3 : 114,
+    F4 : 115,
+    F5 : 116,
+    F6 : 117,
+    F7 : 118,
+    F8 : 119,
+    F9 : 120,
+    F10 : 121,
+    F11 : 122,
+    F12 : 123,
 };
 
-Codes = new KeyCodes();
-
-class UIEventHandler {
-    stopImmediatePropagation;
-    stopPropagation;
-    debug_events=false;
-    total_start_time = Date.now();
-    event_start_time;
-    ignore_log = ['tick'];
-
-    get_tree_str(element) {
-        return (element.parent ? this.get_tree_str(element.parent) : '') + 
-                `::${element.constructor.name}`;
-    }
-
-    log_event(element, event) {
-        if (!this.debug_events || this.ignore_log.includes(event.type))
-            return;
-
-        const callback = element[event.type];
-
-        const now = Date.now();
-        const total_time = `[${String(now - this.total_start_time).padStart(5, ' ')} ms]`;
-        const event_time = `[${String(now - this.event_start_time).padStart(5, ' ')} ms]`;
-        const type = event.type.padStart(20, ' ');
-        //const name = element.constructor.name;
-        const name = this.get_tree_str(element);
-        const hit = `-> ${callback ? 'hit': 'x'}`;
-
-        console.log(`${total_time} ${event_time} ${type} ${name} ${hit}`);
-    }
-
-    async do_call(element, event) {
-        const callback = element[event.type];
-
-        if (callback)
-            callback.bind(element, event)();
-
-        if (this.debug_events)
-            this.log_event(element, event);
-    }
-
-    get_root_node = () => undefined;
-
-    log_stop() {
-        if (this.debug_events)
-            console.log(`${this.stopPropagation ? 'stopPropagation': ''} ${this.stopImmediatePropagation ? 'stopImmediatePropagation': ''}`.trim());
-    }
-
-    log = async (...args) => await this.fire_event(this.get_root_node(), this.make_event('log', args), true);
-
-    async handle(element, event, skip_root=false) {
-        if (!element)
-            return;
-
-        if (!skip_root)
-            await this.do_call(element, event);
-
-        if (this.stopPropagation || this.stopImmediatePropagation)
-            return this.log_stop();
-
-        const children = element.children;
-
-        if (!children)
-            return;
-
-        for (const child of children) {
-            await this.handle(child, event);
-            
-            this.stopPropagation = false;
-
-            if (this.stopImmediatePropagation)
-                return this.log_stop();
-        }
-    }
-
-    reset_handler() {
-        this.stopImmediatePropagation = false;
-        this.stopPropagation = false;
-    }
-
-    async fire_event(element, event, skip_root=false) {
-        this.reset_handler();
-        this.event_start_time = Date.now();
-        await this.handle(element, event, skip_root);
-    }
-
-    async fire_new_event(element, event_name, event_value, skip_root=false) {
-        const event = this.make_event(event_name, event_value);
-        await this.fire_event(element, event, skip_root);
-    }
-
-    make_event(event_name, event_value=undefined) {
-        return new UIEventHandler.UIEvent(this, event_name, event_value);
-    }
+class UIEvents {
+    static debug=true;
 
     static UIEvent = class {
-        constructor(handler, type, value=undefined) {
-            this.handler = handler;
+        constructor(type, value=undefined) {
             this.type = type;
             this.value = value;
+            this.prevent_default = false;
+            this.reset_propagation();
+            this.start_time = Date.now();
         }
 
-        handler;
         type;
         value;
-        prevent_default=false;
+        prevent_default;
+        stop_propagation;
+        stop_immediate_propagation;
+        start_time;
 
-        stopPropagation() {
-            this.handler.stopPropagation = true;
-        }
+        reset_propagation = () => this.stop_propagation = this.stop_immediate_propagation = false;
+        is_stop_any = () => this.stop_propagation || this.stop_immediate_propagation;
+        is_stop_propagation = () => this.stop_propagation;
+        is_stop_immediate = () => this.stop_immediate_propagation;
+        handle = (element) => { if (element[this.type]) element[this.type].bind(element, this)(); };
 
-        stopImmediatePropagation() {
-            this.handler.stopImmediatePropagation = true;
-        }
+        handle_log(element) {
+            const callback = element[this.type];
+            const start_time = `[${String(Date.now() - this.start_time).padStart(5)}ms]`;
+            const type = element.type.padStart(20);
+            const name = element.get_tree_str();
+            const hit = `-> ${callback ? 'hit' : 'x'}`;
 
-        preventDefault() {
-            this.preventDefault = true;
+            console.log(`${start_time} ${type} ${name} ${hit}`);
         }
     };
 
-    static UIKeyboardEvent = class extends UIEventHandler.UIEvent {
-        constructor(handler, key, key_code, char_code) {
-            super(handler, 'keyboard');
+    static UIKeyboardEvent = class extends UIEvents.UIEvent {
+        constructor(values={key, key_code, char_code}) {
+            super('keyboard');
             this.key = key;
             this.key_code = this.is_extended() ? key_code : 0;
             this.char_code = this.is_extended() ? 0 : key_code;
         }
-
-        static make = (handler, event) => new UIEventHandler.UIKeyboardEvent(handler, event.key, event.keyCode, event.charCode);
 
         is_extended = () => !this.key || this.key.length > 1;
         is_digit = () => this.char_code >= 48 && this.char_code <= 57;
@@ -543,7 +456,6 @@ class UIEventHandler {
         is_arrow_down_key = () => this.key_code == Codes.ARROW_DOWN;
         is_arrow_left_key = () => this.key_code == Codes.ARROW_LEFT;
         is_arrow_right_key = () => this.key_code == Codes.ARROW_RIGHT;
-        //is_char = () => this.char_code > 31 && this.char_code < 127;
         is_char = () => !this.is_extended();
         is_alt_key = () => this.key_code == Codes.ALT;
         is_ctrl_key = () => this.key_code == Codes.CTRL;
@@ -553,7 +465,6 @@ class UIEventHandler {
         is_delete_key = () => this.key_code == Codes.DELETE;
         is_escape_key = () => this.key_code == Codes.ESCAPE;
         is_caps_lock_key = () => this.key_code == Codes.CAPS;
-
     };
 };
 
@@ -579,19 +490,45 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), Color.BLACK);
     }
 
-    handle_event = (event) => { if (this[event.type]) this[event.type].bind(this, event)(); };
+    get_tree_str = () => (this.parent ? this.parent.get_tree_str() : '') + `::${this.constructor.name}`;
+    
+    dispatch_event(event, event_action='bubble', skip_source=true) {
+        if (event.is_stop_any()) return;
 
-    dispatch_event(event, bubbling=true, skip_source=true) {
-        if (!skip_source && bubbling)
-            this.do_event_call(event, this);
-
-        for (const child of this.children) {
-            child.dispatch_event(event, bubbling);
+        if (event_action == 'bubble') {
+            if (!skip_source)
+                event.handle(this);
+            if (this.parent)
+                this.parent.dispatch_event(event, event_action);
+            return;
         }
 
-        if (!skip_source && !bubbling)
-            this.do_event_call(event, this);
+        if (event_action == 'capture') {
+            for (const child of this.children) {
+                child.dispatch_event(event, event_action);
+
+                if (event.is_stop_immediate()) return;
+
+                event.reset_propagation();
+            }
+
+            if (!skip_source)
+                event.handle(this);
+            return;
+        }
+
+        if (event_action == 'broadcast') {
+            this.dispatch_event(event, 'capture', true);
+            this.dispatch_event(event, 'bubble', true);
+            if (!skip_source)
+                event.handle(this);
+            return;
+        }
     }
+
+    dispatch = (event_type, event_action='bubble', skip_source=true) => this.dispatch_event(new UIEvents.UIEvent(event_type), event_action, skip_source);
+
+    dispatch_keyboard_event = (values={key:undefined, char_code:0, key_code:0}, event_action='bubble', skip_source=true) => this.dispatch_event(new UIEvents.UIKeyboardEvent(this, values), event_action, skip_source);
 };
 
 class UIElement extends UIElementMixin(Object) {};
@@ -619,21 +556,9 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
     interval_period=50;
 
     listener_of(element) {
-        let _this = this;
-        element.addEventListener('keydown', (event) => {
-            const uievent = UIEventHandler.UIKeyboardEvent.make(_this, event);
-            if (this.debug_events)
-                console.log('event', event, 'uievent', uievent);
-            _this.root_fire(uievent);
-        });
+        element.addEventListener('keydown', event => 
+            this.dispatch_keyboard_event({key:event?.key,key_code:event?.key_code,char_code:event?.char_code}, 'capture'));
     }
-
-    get_root_node = () => this;
-
-    fire = async (event_name, event_value) => await this.fire_new_event(this, event_name, event_value);
-    root_fire = async (event) => await this.fire_event(this, event);
-
-    fire_keyboard_event = async ({key=undefined, char_code=0, key_code=0}) => await this.root_fire(new UIEventHandler.UIKeyboardEvent(this, key, key_code, char_code));
 
     reset() {
         this.buffer.clear(Color.BLACK);
@@ -642,7 +567,7 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 
     has_valid_interval = () => this.interval_id > 0;
 
-    make_interval = () => setInterval(() => this.fire('tick'), this.interval_period);
+    make_interval = () => setInterval(() => this.dispatch('fire', 'capture'), this.interval_period);
 
     start_interval = () => { if (!this.has_valid_interval()) this.interval_id = this.make_interval(); };
 
@@ -878,6 +803,9 @@ class UITextInput extends UIText {
         this.user_cursor_index = best_index;
     }
 
+    right_arrow = () => this.user_cursor_index < this.text.length ? this.user_cursor_index++ : this.user_cursor_index;
+    left_arrow = () => this.user_cursor_index > 0 ? this.user_cursor_index-- : 0;
+
     keyboard(event) {
         if (event.is_char()) {
             this.insert_text(this.user_cursor_index, event.key);
@@ -900,12 +828,10 @@ class UITextInput extends UIText {
                     this.user_cursor_index++;
                     break;
                 case Codes.ARROW_LEFT:
-                    if (this.user_cursor_index > 0)
-                        this.user_cursor_index--;
+                    this.left_arrow();
                     break;
                 case Codes.ARROW_RIGHT:
-                    if (this.user_cursor_index < this.text.length)
-                        this.user_cursor_index++;
+                    this.right_arrow();
                     break;
                 case Codes.ARROW_UP:
                     this.up_arrow();
@@ -1033,10 +959,8 @@ class DPad {
         this.element.id = "inner";
         this.element.className = "dpad";
         element.appendChild(this.inner);
-        //document.querySelector('body').addEventListener((event) => this.input_event.bind(this));
         DOMUtil.add_events(
             document.querySelector('body'),
-            //['mousedown', 'mouseup', 'mouseleave', 'mousemove', 'touchstart', 'touchend', 'touchmove', 'touchcancel'],
             ['pointerdown', 'pointerup', 'pointermove', 'pointerleave'],
             this.input_event.bind(this)
         );
@@ -1093,12 +1017,12 @@ class DPad {
     
         if (element.id == 4) {
             this.debug_mode = !this.debug_mode;
-            this.handler.fire('reset');
+            this.handler.dispatch('reset', 'broadcast');
             return;
         }
 
         if (!this.debug_mode)
-            this.handler.fire_keyboard_event({key_code});
+            this.handler.dispatch_keyboard_event({key_code}, 'broadcast');
     }
 
     is_in_element(element, x, y) {
@@ -1243,10 +1167,10 @@ async function page_load() {
     uiclock = ui.appendChild(new UIClock());
     uitext.set_size(8, 16, 112-1, 94);
     uiclock.set_size(0, 1, 128, 12);
-    await ui.fire('load');
-    await ui.fire('reset');
-    await ui.fire('set_buffer_event', ui.buffer);
-    await ui.fire('draw');
+    ui.dispatch('load', 'capture');
+    ui.dispatch('reset', 'capture');
+    ui.dispatch({type:'set_buffer_event',value:ui.buffer}, 'capture');
+    ui.dispatch('draw', 'capture');
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
 
@@ -1262,7 +1186,7 @@ async function page_load() {
         const writetext = async (text, millis) => {
             for (const char of text) {
                 await async_wait(millis);
-                await ui.root_fire(new UIEventHandler.UIKeyboardEvent(ui, char, 0, 0));
+                ui.dispatch_keyboard_event({char}, 'capture');
             }
         };
         await writetext("Welcome!", 200);
