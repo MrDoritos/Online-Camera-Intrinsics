@@ -510,49 +510,95 @@ class UIStyle {
     margin = new UIBoxModel();
     padding = new UIBoxModel();
 
-    is_width_variable = () => this.width == undefined || this.width instanceof String;
-    is_height_variable = () => this.height == undefined || this.height instanceof String;
+    computed_width;
+    computed_height;
 
-    get_static_size(element) {
-        if (!element)
-            return [0,0];
+    is_value_variable = (value) => value == undefined || value instanceof String;
+    is_width_variable = () => this.is_value_variable(this.width);
+    is_height_variable = () => this.is_value_variable(this.height);
+    any_variable = (...values) => { for (const value of values) { if (this.is_value_variable(value)) return true; } return false; };
 
-        const style = element.get_style();
-        let [width, height] = [undefined,undefined];
-
-        if (!style.is_width_variable())
-            width = style.width;
-
-        if (!style.is_height_variable())
-            height = style.height;
-
-        if (width == undefined || height == undefined) {
-            const [pwidth, pheight] = this.get_static_size(element?.parent);
-            return [width ?? pwidth ?? 0, height ?? pheight ?? 0];
+    get_comp = (func, ...value) => {
+        let min = undefined;
+        for (const val of value) {
+            if (!this.is_value_variable(val) && this.is_value_variable(min))
+                min = val;
+            else if (this.is_value_variable(val))
+                continue;
+            else if (func(min, val))
+                min = val;
         }
-        
-        return [width, height];
+        return min;
+    };
+    get_min = (...value) => this.get_comp((a,b) => a > b, value);
+    get_max = (...value) => this.get_comp((a,b) => a < b, value);
+    get_minmax = (a, min, max) => this.get_min(this.get_max(a, min), max);
+    get_valminmax = (a, val, min, max) => val ?? this.get_minmax(a, min, max);
+
+    get_min_width = () => this.get_max(this.min_width, this.width);
+    get_min_height = () => this.get_max(this.min_height, this.height);
+    get_max_width = () => this.get_min(this.max_width, this.width);
+    get_max_height = () => this.get_min(this.max_height, this.height);
+    try_get_width = () => this.get_minmax(this.width, this.min_width, this.max_width);
+    try_get_height = () => this.get_minmax(this.height, this.min_height, this.max_height);
+    try_get_size = () => [this.try_get_width(), this.try_get_height()];
+
+    to_abs = (src, str) => {
+        if (!this.is_value_variable(str))
+            return str;
+        let rel = Number(str)*0.01;
+        return src * rel;
+    };
+
+    try_dynamic(p_size, src, min, max) {
+        return this.get_minmax(this.to_abs(p_size, src), this.to_abs(p_size, min), this.to_abs(p_size, max));
+    }
+
+    //from top
+    try_dynamic_width = (element) => this.try_dynamic(element.parent.get_width(), this.width, this.min_width, this.max_width);
+
+    try_dynamic_height = (element) => this.try_dynamic(element.parent.get_height(), this.height, this.min_height, this.max_height);
+
+    try_dynamic_size = (element) => [this.computed_width ?? this.try_dynamic_width(element), this.computed_height ?? this.try_dynamic_height(element)];
+
+    //self static
+    try_compute_width = (element) => this.try_get_width() ?? element.get_width();
+
+    try_compute_height = (element) => this.try_get_height() ?? element.get_height();
+
+    try_compute_size = (element) => [this.try_compute_width(element), this.try_compute_height(element)];
+
+    update_element_size(element, width, height) {
+        if (!this.is_value_variable(width)) element.set_width(width);
+        if (!this.is_value_variable(height)) element.set_height(height);
+        this.computed_width = width;
+        this.computed_height = height;
+    }
+
+    //from top
+    set_static_sizes(element) {
+        for (const child of element.children) {
+            child.get_style().set_static_sizes(child);
+        }
+
+        const [width, height] = this.try_get_size(element);
+        this.update_element_size(element, width, height);
+    }
+
+    set_dynamic_sizes(element) {
+        const [width, height] = this.try_dynamic_size(element);
+        this.update_element_size(element, width, height);
+
+        for (const child of element.children) {
+            child.get_style().set_dynamic_sizes(child);
+        }
     }
 
     compute_layout(element) {
-        const get_comp = (func, ...value) => {
-            let min = undefined;
-            for (const val of value) {
-                if (val != undefined && min == undefined)
-                    min = val;
-                else if (val == undefined)
-                    continue;
-                else if (func(min, val))
-                    min = val;
-            }
-            return min;
-        };
-        const get_min = (...value) => get_comp((a,b) => a > b, value);
-        const get_max = (...value) => get_comp((a,b) => a < b, value);
-        const get_minmax = (a, min, max) => get_max(get_min(a, min), max);
-        const get_valminmax = (a, val, min, max) => val ?? get_minmax(a, min, max);
+        this.set_static_sizes(element);
+        this.set_dynamic_sizes(element);
 
-        const [pox, poy] = element.get_offset();
+        const [pox, poy, psx, psy] = element.get_size();
         const pstyle = element.get_style();
         let cox = pox, coy = poy;
 
