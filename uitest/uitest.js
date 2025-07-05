@@ -29,6 +29,7 @@ const Pixel = class {
 const Color = class {
     static WHITE = Pixel.grayf(1);
     static BLACK = Pixel.grayf(0);
+    static get_random = (range=128,min=64) => Pixel.pixel((Math.random()*range+min)|0,(Math.random()*range+min)|0,(Math.random()*range+min)|0);
 };
 
 class CanvasBuffer {
@@ -513,6 +514,8 @@ class UIStyle {
     computed_width;
     computed_height;
 
+    static debug_mode = true;
+
     is_value_variable = (value) => value == undefined || value instanceof String;
     is_width_variable = () => this.is_value_variable(this.width);
     is_height_variable = () => this.is_value_variable(this.height);
@@ -530,8 +533,8 @@ class UIStyle {
         }
         return min;
     };
-    get_min = (...value) => this.get_comp((a,b) => a > b, value);
-    get_max = (...value) => this.get_comp((a,b) => a < b, value);
+    get_min = (...value) => this.get_comp((a,b) => a > b, ...value);
+    get_max = (...value) => this.get_comp((a,b) => a < b, ...value);
     get_minmax = (a, min, max) => this.get_min(this.get_max(a, min), max);
     get_valminmax = (a, val, min, max) => val ?? this.get_minmax(a, min, max);
 
@@ -581,19 +584,28 @@ class UIStyle {
         this.computed_height = height;
     }
 
+    clear_computed() {
+        this.computed_width = undefined;
+        this.computed_height = undefined;
+    }
+
     //from top
     set_static_sizes(element) {
+        this.clear_computed();
+
         for (const child of element.children) {
             child.get_style().set_static_sizes(child);
         }
 
         const [width, height] = this.try_get_size(element);
         this.update_element_size(element, width, height);
+        if (UIStyle.debug_mode) console.log('static', width, height, element);
     }
 
     set_dynamic_sizes(element) {
         const [width, height] = this.try_dynamic_size(element);
         this.update_element_size(element, width, height);
+        if (UIStyle.debug_mode) console.log('dynamic', width, height, element);
 
         for (const child of element.children) {
             child.get_style().set_dynamic_sizes(child);
@@ -645,12 +657,25 @@ class UIStyle {
 
         const [width, height] = this.try_change_size(offsetx-Poffsetx,offsety-Poffsety);
         this.update_element_size(element, width, height);
+        if (UIStyle.debug_mode) console.log('offsets', width, height, element);
+    }
+
+    debug(element) {
+        element.clear(Color.get_random());
+
+        for (const child of element.get_children()) {
+            this.debug(child);
+        }
     }
 
     compute_layout(element) {
         this.set_static_sizes(element);
         this.set_dynamic_sizes(element);
         this.set_offsets(element);
+        if (UIStyle.debug_mode) {
+            this.debug(element);
+            element.buffer.flush();
+        }
     }
 };
 
@@ -679,8 +704,8 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         this.buffer = event.value;
     }
 
-    clear() {
-        this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), Color.BLACK);
+    clear(color=Color.BLACK) {
+        this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), color);
     }
 
     log = (...params) => this.dispatch_value('log_event', params, 'broadcast');
@@ -763,6 +788,8 @@ class UIRoot extends UIElement {
         this.buffer.clear(Color.BLACK);
         this.buffer.flush();
     }
+
+    layout = () => this.style.compute_layout(this);
 
     has_valid_interval = () => this.interval_id > 0;
 
@@ -1372,10 +1399,11 @@ async function page_load() {
     uitext.style.height = 94;
     uiclock.style.width = 128;
     uiclock.style.height = 12;
-    ui.style.compute_layout(ui);
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
+    ui.style.compute_layout(ui);
+    await async_wait(10000);
     ui.dispatch('draw', 'capture');
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
