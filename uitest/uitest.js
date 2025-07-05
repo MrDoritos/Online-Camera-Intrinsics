@@ -589,6 +589,14 @@ class UIStyle {
         this.computed_height = undefined;
     }
 
+    log_debug(name, element) {
+        if (!UIStyle.debug_mode)
+            return;
+
+        const [ox, oy, sx, sy] = element.get_size();
+        console.log(name, 'offset_x:', ox, 'offset_y:', oy, 'width:', sx, 'height:', sy, element, this);
+    }
+
     //from top
     set_static_sizes(element) {
         this.clear_computed();
@@ -599,13 +607,13 @@ class UIStyle {
 
         const [width, height] = this.try_get_size(element);
         this.update_element_size(element, width, height);
-        if (UIStyle.debug_mode) console.log('static', width, height, element);
+        this.log_debug('static', element);
     }
 
     set_dynamic_sizes(element) {
         const [width, height] = this.try_dynamic_size(element);
         this.update_element_size(element, width, height);
-        if (UIStyle.debug_mode) console.log('dynamic', width, height, element);
+        this.log_debug('dynamic', element);
 
         for (const child of element.children) {
             child.get_style().set_dynamic_sizes(child);
@@ -657,25 +665,29 @@ class UIStyle {
 
         const [width, height] = this.try_change_size(offsetx-Poffsetx,offsety-Poffsety);
         this.update_element_size(element, width, height);
-        if (UIStyle.debug_mode) console.log('offsets', width, height, element);
+        this.log_debug('offsets', element);
     }
 
-    debug(element) {
+    canvas_debug_r(element) {
         element.clear(Color.get_random());
 
-        for (const child of element.get_children()) {
-            this.debug(child);
-        }
+        for (const child of element.get_children())
+            this.canvas_debug_r(child);
+    }
+
+    canvas_debug(element) {
+        if (!UIStyle.debug_mode)
+            return;
+
+        this.canvas_debug_r(element);
+        element.buffer.flush();
     }
 
     compute_layout(element) {
         this.set_static_sizes(element);
         this.set_dynamic_sizes(element);
         this.set_offsets(element);
-        if (UIStyle.debug_mode) {
-            this.debug(element);
-            element.buffer.flush();
-        }
+        this.canvas_debug(element);
     }
 };
 
@@ -1403,7 +1415,7 @@ async function page_load() {
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
     ui.style.compute_layout(ui);
-    await async_wait(10000);
+    await async_wait(2000);
     ui.dispatch('draw', 'capture');
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
@@ -1432,7 +1444,8 @@ async function page_load() {
         await async_wait(1000);
         await uitext.reset();
     };
-    welcome();
+    if (!UIStyle.debug_mode)
+        welcome();
 }
 
 page_load();
