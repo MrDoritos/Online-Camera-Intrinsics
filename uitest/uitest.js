@@ -417,7 +417,7 @@ const Codes = {
 };
 
 class UIEvents {
-    static debug=true;
+    static debug=false;
     static debug_ignore=['tick'];
 
     static UIEvent = class {
@@ -514,9 +514,9 @@ class UIStyle {
     computed_width;
     computed_height;
 
-    static debug_mode = true;
+    static debug_mode = false;
 
-    is_value_variable = (value) => value == undefined || value instanceof String;
+    is_value_variable = (value) => value == undefined || value instanceof String || isNaN(value) || !isFinite(value);
     is_width_variable = () => this.is_value_variable(this.width);
     is_height_variable = () => this.is_value_variable(this.height);
     any_variable = (...values) => { for (const value of values) { if (this.is_value_variable(value)) return true; } return false; };
@@ -603,7 +603,7 @@ class UIStyle {
             'style':element.style,
         };
 
-        console.log(name, ...params);
+        console.log(name, element.get_tree_str(), ...params);
         for (const [key, value] of Object.entries(db))
             console.log(key.padStart(11), value);
     }
@@ -631,13 +631,18 @@ class UIStyle {
         }
     }
 
-    set_offsets_pre(element, child, offsetx, offsety) {
+    set_offsets_pre(element, child, offsetx, offsety, inlinew, inlineh) {
         const cstyle = child.get_style();
         const position = cstyle.position;
+        const display = cstyle.display;
         this.log_debug('offset_pre', child);
 
         if (position == 'static' || position == 'relative' || position == 'absolute') {
             child.set_offset(offsetx, offsety);
+            if (display == 'inline-block')
+                child.set_offset(offsetx, offsety-inlineh);
+            if (display == 'block')
+                child.set_offset(element.get_offsetx(), offsety /*+ inlineh*/);
         }
 
         if (position == 'sticky') {
@@ -649,6 +654,7 @@ class UIStyle {
         const cstyle = child.get_style();
         const position = cstyle.position;
         const display = cstyle.display;
+        const overflow_x = cstyle.overflow_x, overflow_y = cstyle.overflow_y;
         const [width, height] = child.get_length();
         this.log_debug('offset_post', child);
 
@@ -656,12 +662,15 @@ class UIStyle {
             return [offsetx, offsety];
 
         if (display == 'block') {
-            offsety += height;
+            //offsety += height;
+            //offsetx = element.get_offsetx();
         }
 
         if (display == 'inline-block') {
-            offsetx += width;
-        }        
+            //offsetx += width;
+            //offsety = element.get_offsety();
+        }     
+        [offsetx,offsety] = [child.get_right(),child.get_bottom()];   
 
         return [offsetx, offsety];
     }
@@ -671,7 +680,7 @@ class UIStyle {
         let [offsetx, offsety] = [Poffsetx, Poffsety];
 
         for (const child of element.get_children()) {
-            this.set_offsets_pre(element, child, offsetx, offsety);
+            this.set_offsets_pre(element, child, offsetx, offsety, offsetx-Poffsetx, offsety-Poffsety);
             child.get_style().set_offsets(child);
             [offsetx, offsety] = this.set_offsets_post(element, child, offsetx, offsety);
         }
@@ -679,7 +688,7 @@ class UIStyle {
         this.log_debug('offsets_post_children', element);
         const [width, height] = this.try_change_size(offsetx-Poffsetx,offsety-Poffsety);
         this.update_element_size(element, width, height);
-        this.log_debug('offsets', element, Poffsetx, Poffsety, offsetx, offsety, width, height, this.is_height_variable(), this.is_width_variable());
+        this.log_debug('offsets', element, Poffsetx, Poffsety, offsetx, offsety, width, height, this.is_width_variable(), this.is_height_variable());
     }
 
     canvas_debug_r(element) {
@@ -1378,7 +1387,7 @@ class DPad {
     }
 };
 
-let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container;
+let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy;
 
 async function load_additional_fonts() {
     const font_list = [
@@ -1415,21 +1424,27 @@ async function page_load() {
     await load_additional_fonts();
 
     //ui.debug_events = true;
+    
+    uidummy = ui.appendChild(new UIElement());
     uiclock = ui.appendChild(new UIClock());
     uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
     ui.style.width = 128;
     ui.style.height = 128;
-    uitext.style.width = 112-1;
+    uitext.style.width = 128;
     uitext.style.height = 94;
-    uiclock.style.width = 128;
+    uiclock.style.width = 112;
     uiclock.style.height = 12;
+    uidummy.style.width = 16;
+    uiclock.style.display = 'inline-block';
+    uidummy.style.display = 'inline-block';
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
     ui.style.compute_layout(ui);
-    await async_wait(2000);
+    if (UIStyle.debug_mode)
+        await async_wait(2000);
     ui.dispatch('draw', 'capture');
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
