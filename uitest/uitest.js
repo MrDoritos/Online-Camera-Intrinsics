@@ -246,9 +246,9 @@ class Atlas extends Texture {
         this.atlas_height = this.get_atlas_height();
     }
 
-    get_atlas_width = () => this.width / this.sprite_width;
+    get_atlas_width = () => (this.width / this.sprite_width) | 0;
 
-    get_atlas_height = () => this.height / this.sprite_height;
+    get_atlas_height = () => (this.height / this.sprite_height) | 0;
 
     get_sprite_position(x, y, xn=1, yn=1) {
         return [
@@ -277,12 +277,27 @@ class Atlas extends Texture {
 };
 
 class FontAtlas extends Atlas {
+    async load(font_url, font_width, font_height) {
+        this.url = font_url;
+        await this.load_url(font_url);
+        this.set_sprite_size(font_width, font_height);
+    }
+ 
     get_character(char) {
         const code = char.charCodeAt(0);
         const x = code % this.atlas_width;
         const y = (code / this.atlas_width) | 0;
         return this.get_sprite(x, y);
     }
+
+    static async make(font_url, font_width, font_height) {
+        let obj = new FontAtlas();
+        await obj.load(font_url, font_width, font_height);
+        return obj;
+    }
+
+    static DEFAULT;
+    static fonts = [];
 };
 
 const UISize = (Super) => class extends (Super) {
@@ -622,13 +637,10 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 };
 
 class UIText extends UIElement {
-    constructor(url='font.png', font_width=8, font_height=12, text='', alpha_blend=true, alpha_fast=true) {
+    constructor(text='', font=FontAtlas.DEFAULT, alpha_blend=true, alpha_fast=true) {
         super();
-        this.font_atlas = new FontAtlas();
+        this.font_atlas = font;
         this.text = text;
-        this.font_width = font_width;
-        this.font_height = font_height;
-        this.url = url;
         this.cursor_x = 0;
         this.cursor_y = 0;
         this.alpha_blend = alpha_blend;
@@ -637,17 +649,17 @@ class UIText extends UIElement {
 
     text;
     font_atlas;
-    font_width;
-    font_height;
-    url;
     draw_end_x;
     draw_end_y;
     cursor_x;
     cursor_y;
 
-    async load_resources() {
-        await this.font_atlas.load_url(this.url);
-        this.font_atlas.set_sprite_size(this.font_width, this.font_height);
+    get_font_width = () => this.font_atlas.sprite_width;
+    get_font_height = () => this.font_atlas.sprite_height;
+    get_font_size = () => [this.get_font_width(), this.get_font_height()];
+
+    set_font(font) {
+        this.font_atlas = font;
     }
 
     reset_uitext() {
@@ -658,9 +670,7 @@ class UIText extends UIElement {
         this.reset_uitext();
     }
 
-    async load() {
-        await this.load_resources();
-    }
+    is_char_bound = (x, y) => (x >= this.get_left() && x + this.get_font_width() < this.get_right() && y >= this.get_top() && y + this.get_font_height() < this.get_bottom());
 
     draw_character(x, y, character) {
         const font_sprite = this.font_atlas.get_character(character);
@@ -673,13 +683,14 @@ class UIText extends UIElement {
     }
 
     draw_at_cursor = (character) => this.draw_character(this.cursor_x, this.cursor_y, character);
+    draw_at_cursor_bound = (character) => { if (this.is_char_bound(this.cursor_x, this.cursor_y)) this.draw_at_cursor(character); };
 
-    get_columns = () => (this.get_width() / this.font_width) | 0;
-    get_rows = () => (this.get_height() / this.font_height) | 0;
+    get_columns = () => (this.get_width() / this.get_font_width()) | 0;
+    get_rows = () => (this.get_height() / this.get_font_height()) | 0;
 
     set_cursor_position(columns, rows) {
-        this.cursor_x = columns * this.font_width + this.get_left();
-        this.cursor_y = rows * this.font_height + this.get_top();
+        this.cursor_x = columns * this.get_font_width() + this.get_left();
+        this.cursor_y = rows * this.get_font_height() + this.get_top();
     }
 
     get_cursor_index(index) {
@@ -723,26 +734,29 @@ class UIText extends UIElement {
     }
 
     draw_string_at_cursor(text) {
+        const [font_width, font_height] = this.get_font_size();
         for (let i = 0; i < text.length; i++) {
             const character = text[i];
 
             if (character == '\n') {
                 this.cursor_x = this.get_left();
-                this.cursor_y += this.font_height;
+                this.cursor_y += font_height;
                 continue;
             }
 
             if (character == '\t') {
-                this.cursor_x += this.font_width;
+                this.cursor_x += font_width;
             } else {
                 this.draw_at_cursor(character);
             }
 
-            this.cursor_x += this.font_width;
-            if (this.cursor_x + this.font_width > this.get_right()) {
+            this.cursor_x += font_width;
+            if (this.cursor_x + font_width > this.get_right()) {
                 this.cursor_x = this.get_left();
-                this.cursor_y += this.font_height;
+                this.cursor_y += font_height;
             }
+            if (this.cursor_y + font_height > this.get_bottom())
+                break;
         }
 
         this.buffer.flush();
@@ -782,11 +796,8 @@ class UIText extends UIElement {
         this.text = this.text.slice(0, i-1) + this.text.slice(i+n-1);
     }
 
-    static async make(url='font.png', text='') {
-        let ret = new UIText(url);
-        ret.text = text;
-        await ret.load_resources();
-        return ret;
+    static async make(font, text='') {
+        return new UIText(text, font);
     }
 };
 
@@ -916,8 +927,8 @@ class UITextInput extends UIText {
 
         if (is_flash) {
             this.set_cursor_wrap_index(this.user_cursor_index);
-            this.cursor_x -= this.font_width * .4;
-            this.draw_at_cursor('|');
+            this.cursor_x -= this.get_font_width() * .4;
+            this.draw_at_cursor_bound('|');
         }
         this.buffer.flush();
     }
@@ -964,23 +975,25 @@ class UIClock extends UITicking(UIText) {
 
         this.clear();
 
-        this.cursor_x = this.get_right() - this.font_width * 12.5;
+        const [font_width, font_height] = this.get_font_size();
+
+        this.cursor_x = this.get_right() - font_width * 12.5;
         this.cursor_y = this.get_top();
 
         this.draw_string_at_cursor(dayStr);
         //this.cursor_x = this.get_right() - this.font_width * 10.2;
-        this.cursor_x = this.get_right() - this.font_width * 7.8 - (combDateStr.length * .5 * this.font_width);
+        this.cursor_x = this.get_right() - font_width * 7.8 - (combDateStr.length * .5 * font_width);
         this.draw_string_at_cursor(combDateStr);
 
         //this.draw_string_at_cursor(`${dayStr} ${combDateStr}`);
 
         `${hourStr}${this.is_tick_major() ? ':' : ' '}${minuteStr}`;
-        this.cursor_x = this.get_right() - this.font_width * 2;
+        this.cursor_x = this.get_right() - font_width * 2;
         this.draw_string_at_cursor(minuteStr);
         this.cursor_y = this.get_top();
-        this.cursor_x = this.get_right() - this.font_width * 4.5;
+        this.cursor_x = this.get_right() - font_width * 4.5;
         this.draw_string_at_cursor(hourStr);
-        this.cursor_x = this.get_right() - this.font_width * 2.6;
+        this.cursor_x = this.get_right() - font_width * 2.7;
         if (this.is_tick_major())
             this.draw_string_at_cursor(':');
     }
@@ -989,6 +1002,7 @@ class UIClock extends UITicking(UIText) {
 class DPad {
     dpad_enter_url = 'dpad_enter.png';
     dpad_arrow_url = 'dpad_arrow.png';
+    curfont=0;
 
     constructor(element, handler) {
         this.handler = handler;
@@ -1040,8 +1054,23 @@ class DPad {
     button_click(element) {
         const key_code = element.id != 4 ? element.id + Codes.ARROW_LEFT : Codes.ENTER;
 
-        if (this.debug_mode)
-            this.handler.log(`${element.id}-`);    
+        if (this.debug_mode) {
+            this.handler.log(`${element.id}-`);
+            const prev = this.curfont;
+            if (element.id == 1)
+                this.curfont++;
+            else
+            if (element.id == 3)
+                this.curfont=FontAtlas.fonts.length+this.curfont-1;
+            this.curfont %= FontAtlas.fonts.length;
+            if (prev != this.curfont) {
+                const font = FontAtlas.fonts[this.curfont];
+                uitext.set_font(font);
+                uitext.reset();
+                this.handler.log(font.url);
+                console.log(font.url, font.sprite_width, font.sprite_height);
+            }
+        }
     
         if (element.id == 4) {
             this.debug_mode = !this.debug_mode;
@@ -1156,15 +1185,45 @@ class DPad {
 
 let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container;
 
+async function load_additional_fonts() {
+    const font_list = [
+        ['font_8x12.png', 8, 12],
+        ['IBM_BIOS_8x8.png', 8, 8],
+        ['IBM_CGA_8x8.png', 8, 8],
+        ['IBM_CGAthin_8x8.png', 8, 8],
+        ['IBM_Model3x_Alt1_8x14.png', 8, 14],
+        ['IBM_VGA_8x16.png', 8, 16],
+        ['DOS_VGA_8x16.png', 8, 16],
+        ['DOS_JPN12_6x12.png', 6, 12],
+        ['fixedsys_8x14.png', 8, 14],
+    ];
+
+    const font = font_list[1];
+
+    //FontAtlas.fonts = [FontAtlas.DEFAULT];
+    FontAtlas.DEFAULT = await FontAtlas.make(font[0], font[1], font[2]);
+
+    const promises = font_list.map(x => new Promise(resolve => FontAtlas.make(x[0], x[1], x[2]).then(resolve)));
+    
+    Promise.allSettled(promises)
+        .then(fulfilled => {
+            for (const promise of fulfilled)
+                if (promise?.value)
+                    FontAtlas.fonts.push(promise?.value);
+        });
+}
+
 async function page_load() {
     container = document.querySelector('#body');
     ui = new UIRoot(container);
     dpad = new DPad(container, ui);
+    await load_additional_fonts();
+    
     //ui.debug_events = true;
     uitext = ui.appendChild(new UITextInput());
     uiclock = ui.appendChild(new UIClock());
     uitext.set_size(8, 16, 112-1, 94);
-    uiclock.set_size(0, 0, 128, 12);
+    uiclock.set_size(0, 1, 128, 12);
     await ui.fire('load');
     await ui.fire('reset');
     await ui.fire('set_buffer_event', ui.buffer);
@@ -1172,7 +1231,7 @@ async function page_load() {
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
 
-    let events = ['touchend', 'touchstart', 'touch', 'mousedown', 'click'];
+    let events = ['pointerdown'];
 
     for (const event of events)
         ui.buffer.canvas.addEventListener(event, () => {
