@@ -406,6 +406,7 @@ const Codes = {
 
 class UIEvents {
     static debug=true;
+    static debug_ignore=['tick'];
 
     static UIEvent = class {
         constructor(type, value=undefined) {
@@ -427,12 +428,13 @@ class UIEvents {
         is_stop_any = () => this.stop_propagation || this.stop_immediate_propagation;
         is_stop_propagation = () => this.stop_propagation;
         is_stop_immediate = () => this.stop_immediate_propagation;
-        handle = (element) => { if (element[this.type]) element[this.type].bind(element, this)(); };
+        handle = (element) => { if (element[this.type]) { element[this.type].bind(element, this)(); if (UIEvents.debug) this.handle_log(element); } };
 
         handle_log(element) {
+            if (UIEvents.debug_ignore.includes(this.type)) return;
             const callback = element[this.type];
             const start_time = `[${String(Date.now() - this.start_time).padStart(5)}ms]`;
-            const type = element.type.padStart(20);
+            const type = this.type.padStart(20);
             const name = element.get_tree_str();
             const hit = `-> ${callback ? 'hit' : 'x'}`;
 
@@ -441,7 +443,7 @@ class UIEvents {
     };
 
     static UIKeyboardEvent = class extends UIEvents.UIEvent {
-        constructor(values={key, key_code, char_code}) {
+        constructor({key, key_code, char_code}) {
             super('keyboard');
             this.key = key;
             this.key_code = this.is_extended() ? key_code : 0;
@@ -490,10 +492,12 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), Color.BLACK);
     }
 
+    log = (...params) => this.dispatch_value('log_event', params, 'broadcast');
+
     get_tree_str = () => (this.parent ? this.parent.get_tree_str() : '') + `::${this.constructor.name}`;
     
-    dispatch_event(event, event_action='bubble', skip_source=true) {
-        if (event.is_stop_any()) return;
+    dispatch_event(event, event_action='bubble', skip_source=false) {
+        if (!this || event.is_stop_any()) return;
 
         if (event_action == 'bubble') {
             if (!skip_source)
@@ -504,12 +508,14 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         }
 
         if (event_action == 'capture') {
-            for (const child of this.children) {
-                child.dispatch_event(event, event_action);
+            if (this.children) {
+                for (const child of this.children) {
+                    child.dispatch_event(event, event_action);
 
-                if (event.is_stop_immediate()) return;
+                    if (event.is_stop_immediate()) return;
 
-                event.reset_propagation();
+                    event.reset_propagation();
+                }
             }
 
             if (!skip_source)
@@ -526,14 +532,16 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         }
     }
 
-    dispatch = (event_type, event_action='bubble', skip_source=true) => this.dispatch_event(new UIEvents.UIEvent(event_type), event_action, skip_source);
+    dispatch_value = (event_type, event_value, event_action='bubble', skip_source=false) => this.dispatch_event(new UIEvents.UIEvent(event_type, event_value), event_action, skip_source);
 
-    dispatch_keyboard_event = (values={key:undefined, char_code:0, key_code:0}, event_action='bubble', skip_source=true) => this.dispatch_event(new UIEvents.UIKeyboardEvent(this, values), event_action, skip_source);
+    dispatch = (event_type, event_action='bubble', skip_source=false) => this.dispatch_event(new UIEvents.UIEvent(event_type), event_action, skip_source);
+
+    dispatch_keyboard_event = ({key=undefined, char_code=0, key_code=0}, event_action='bubble', skip_source=false) => this.dispatch_event(new UIEvents.UIKeyboardEvent({key, key_code, char_code}), event_action, skip_source);
 };
 
 class UIElement extends UIElementMixin(Object) {};
 
-class UIRoot extends UIElementMixin(UIEventHandler) {
+class UIRoot extends UIElement {
     constructor(element, width=128, height=128) {
         super();
         this.container = document.createElement('div');
@@ -557,7 +565,7 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 
     listener_of(element) {
         element.addEventListener('keydown', event => 
-            this.dispatch_keyboard_event({key:event?.key,key_code:event?.key_code,char_code:event?.char_code}, 'capture'));
+            this.dispatch_keyboard_event({key:event?.key,key_code:event?.keyCode,char_code:event?.charCode}, 'capture'));
     }
 
     reset() {
@@ -567,7 +575,7 @@ class UIRoot extends UIElementMixin(UIEventHandler) {
 
     has_valid_interval = () => this.interval_id > 0;
 
-    make_interval = () => setInterval(() => this.dispatch('fire', 'capture'), this.interval_period);
+    make_interval = () => setInterval(() => this.dispatch('tick', 'capture'), this.interval_period);
 
     start_interval = () => { if (!this.has_valid_interval()) this.interval_id = this.make_interval(); };
 
@@ -719,7 +727,7 @@ class UIText extends UIElement {
         this.draw_end_y = this.cursor_y;
     }
 
-    async log(event) {
+    async log_event(event) {
         this.append_text(event.value.map(String).join(' '));
         this.clear();
         this.draw();
@@ -1169,7 +1177,7 @@ async function page_load() {
     uiclock.set_size(0, 1, 128, 12);
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
-    ui.dispatch({type:'set_buffer_event',value:ui.buffer}, 'capture');
+    ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
     ui.dispatch('draw', 'capture');
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
@@ -1184,9 +1192,9 @@ async function page_load() {
 
     const welcome = async () => {
         const writetext = async (text, millis) => {
-            for (const char of text) {
+            for (const key of text) {
                 await async_wait(millis);
-                ui.dispatch_keyboard_event({char}, 'capture');
+                ui.dispatch_keyboard_event({key}, 'capture');
             }
         };
         await writetext("Welcome!", 200);
