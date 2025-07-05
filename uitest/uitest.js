@@ -510,6 +510,7 @@ class UIEventHandler {
         handler;
         type;
         value;
+        prevent_default=false;
 
         stopPropagation() {
             this.handler.stopPropagation = true;
@@ -517,6 +518,10 @@ class UIEventHandler {
 
         stopImmediatePropagation() {
             this.handler.stopImmediatePropagation = true;
+        }
+
+        preventDefault() {
+            this.preventDefault = true;
         }
     };
 
@@ -572,6 +577,20 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
 
     clear() {
         this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), Color.BLACK);
+    }
+
+    handle_event = (event) => { if (this[event.type]) this[event.type].bind(this, event)(); };
+
+    dispatch_event(event, bubbling=true, skip_source=true) {
+        if (!skip_source && bubbling)
+            this.do_event_call(event, this);
+
+        for (const child of this.children) {
+            child.dispatch_event(event, bubbling);
+        }
+
+        if (!skip_source && !bubbling)
+            this.do_event_call(event, this);
     }
 };
 
