@@ -568,6 +568,12 @@ class UIStyle {
 
     try_compute_size = (element) => [this.try_compute_width(element), this.try_compute_height(element)];
 
+    try_change_width = (width) => this.is_width_variable() ? this.get_valminmax(width, this.computed_width, this.min_width, this.max_width) : this.width;
+
+    try_change_height = (height) => this.is_height_variable() ? this.get_valminmax(height, this.computed_height, this.min_height, this.max_height) : this.height;
+
+    try_change_size = (width, height) => [this.try_change_width(width), this.try_change_height(height)];
+
     update_element_size(element, width, height) {
         if (!this.is_value_variable(width)) element.set_width(width);
         if (!this.is_value_variable(height)) element.set_height(height);
@@ -594,58 +600,57 @@ class UIStyle {
         }
     }
 
+    set_offsets_pre(element, child, offsetx, offsety) {
+        const cstyle = child.get_style();
+        const position = cstyle.position;
+
+        if (position == 'static' || position == 'relative' || position == 'absolute') {
+            child.set_offset(offsetx, offsety);
+        }
+
+        if (position == 'sticky') {
+            child.set_offset(element.get_offsetx(), element.get_offsety());
+        }
+    }
+
+    set_offsets_post(element, child, offsetx, offsety) {
+        const cstyle = child.get_style();
+        const position = cstyle.position;
+        const display = cstyle.display;
+        const [width, height] = child.get_length();
+
+        if (position == 'relative' || position == 'absolute' || position == 'fixed')
+            return [offsetx, offsety];
+
+        if (display == 'block') {
+            offsety += height;
+        }
+
+        if (display == 'inline-block') {
+            offsetx += width;
+        }        
+
+        return [offsetx, offsety];
+    }
+
+    set_offsets(element) {
+        const [Poffsetx, Poffsety] = element.get_offset();
+        let [offsetx, offsety] = [Poffsetx, Poffsety];
+
+        for (const child of element.get_children()) {
+            this.set_offsets_pre(element, child, offsetx, offsety);
+            child.get_style().set_offsets(child);
+            [offsetx, offsety] = this.set_offsets_post(element, child, offsetx, offsety);
+        }
+
+        const [width, height] = this.try_change_size(offsetx-Poffsetx,offsety-Poffsety);
+        this.update_element_size(element, width, height);
+    }
+
     compute_layout(element) {
         this.set_static_sizes(element);
         this.set_dynamic_sizes(element);
-
-        const [pox, poy, psx, psy] = element.get_size();
-        const pstyle = element.get_style();
-        let cox = pox, coy = poy;
-
-        const set_position_pre = (child) => {
-            const cstyle = child.get_style();
-            const position = cstyle.position;
-
-            if (position == 'static' || position == 'relative' || position == 'absolute') {
-                child.set_offset(cox, coy);
-            }
-
-            if (position == 'sticky') {
-                child.set_offset(pox, poy);
-            }
-        };
-
-        const set_position_post = (child) => {
-            const cstyle = child.get_style();
-            const position = cstyle.position;
-            const display = cstyle.display;
-            const [width, height] = child.get_length();
-
-            if (position == 'relative' || position == 'absolute' || position == 'fixed')
-                return;
-
-            if (display == 'block') {
-                coy += height;
-            }
-
-            if (display == 'inline-block') {
-                cox += width;
-            }
-        };
-
-        for (const child of element.get_children()) {
-            set_position_pre(child);
-            this.compute_layout(child);
-            set_position_post(child);
-        }
-
-        let cow = cox - pox, coh = coy - poy;
-
-        cow = get_valminmax(cow, this.width, this.min_width, this.max_width);
-        coh = get_valminmax(coh, this.height, this.min_height, this.max_height);
-
-        element.set_length(cow, coh);
-
+        this.set_offsets(element);
     }
 };
 
@@ -1357,13 +1362,17 @@ async function page_load() {
     await load_additional_fonts();
 
     //ui.debug_events = true;
-    uitext = ui.appendChild(new UITextInput());
     uiclock = ui.appendChild(new UIClock());
+    uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
     ui.style.width = 128;
     ui.style.height = 128;
-    uitext.style;
+    uitext.style.width = 112-1;
+    uitext.style.height = 94;
+    uiclock.style.width = 128;
+    uiclock.style.height = 12;
+    ui.style.compute_layout(ui);
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
