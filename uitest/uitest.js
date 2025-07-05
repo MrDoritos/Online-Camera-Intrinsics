@@ -324,6 +324,8 @@ const UISize = (Super) => class extends (Super) {
     set_top = (top) => this.set_offsety(top);
     set_bottom = (bottom) => this.set_height(bottom - this.get_offsety());
 
+    set_offset = (offsetx, offsety) => { this.set_offsetx(offsetx); this.set_offsety(offsety); };
+    set_length = (width, height) => { this.set_width(width); this.set_height(height); };
     set_size = (offsetx, offsety, width, height) => { this.set_offsetx(offsetx); this.set_offsety(offsety); this.set_width(width); this.set_height(height); };
     set_box = (top, right, bottom, left) => { this.set_top(top); this.set_left(left); this.set_bottom(bottom); this.set_right(right); };
 
@@ -347,6 +349,11 @@ const UISize = (Super) => class extends (Super) {
         return UISize.make_size(this.get_offsetx() + size.get_offsetx(), this.get_offsety() + size.get_offsety(), this.get_width(), this.get_height());
     }
 
+    get_offset = () => [this.get_offsetx(), this.get_offsety()];
+    get_size = () => [this.get_offsetx(), this.get_offsety(), this.get_width(), this.get_height()];
+    get_box = () => [this.get_top(), this.get_right(), this.get_bottom(), this.get_left()];
+    get_length = () => [this.get_width(), this.get_height()];
+
     set_relative_offset(size) {
         this.set_offsetx(this.get_offsetx() + size.get_offsetx());
         this.set_offsety(this.get_offsety() + size.get_offsety());
@@ -358,6 +365,10 @@ const UISize = (Super) => class extends (Super) {
         this.set_width(size.get_width() - padding_horizontal);
         this.set_height(size.get_height() - padding_vertical);
     }
+
+    add_length = (ox, oy) => [ox + this.get_width(), oy + this.get_height()];
+    add_offset = (x, y) => [x + this.get_offsetx(), y + this.get_offsety()];
+    add_size = (x, y) => [x + this.get_right(), y + this.get_bottom()];
 
     static make() {
         return new UISize(object);
@@ -470,10 +481,133 @@ class UIEvents {
     };
 };
 
+class UIBoxModel {
+    top = 0;
+    right = 0;
+    bottom = 0;
+    left = 0;
+    value;
+};
+
+class UIStyle {
+    position = "static";
+    display = "block";
+    top; //undefined == auto
+    right;
+    bottom;
+    left;
+    min_width;
+    width;
+    max_width;
+    min_height;
+    height;
+    max_height;
+    text_wrap = "wrap";
+    text_align = "left";
+    overflow_x = "hidden";
+    overflow_y = "hidden";
+
+    margin = new UIBoxModel();
+    padding = new UIBoxModel();
+
+    is_width_variable = () => this.width == undefined || this.width instanceof String;
+    is_height_variable = () => this.height == undefined || this.height instanceof String;
+
+    get_static_size(element) {
+        if (!element)
+            return [0,0];
+
+        const style = element.get_style();
+        let [width, height] = [undefined,undefined];
+
+        if (!style.is_width_variable())
+            width = style.width;
+
+        if (!style.is_height_variable())
+            height = style.height;
+
+        if (width == undefined || height == undefined) {
+            const [pwidth, pheight] = this.get_static_size(element?.parent);
+            return [width ?? pwidth ?? 0, height ?? pheight ?? 0];
+        }
+        
+        return [width, height];
+    }
+
+    compute_layout(element) {
+        const get_comp = (func, ...value) => {
+            let min = undefined;
+            for (const val of value) {
+                if (val != undefined && min == undefined)
+                    min = val;
+                else if (val == undefined)
+                    continue;
+                else if (func(min, val))
+                    min = val;
+            }
+            return min;
+        };
+        const get_min = (...value) => get_comp((a,b) => a > b, value);
+        const get_max = (...value) => get_comp((a,b) => a < b, value);
+        const get_minmax = (a, min, max) => get_max(get_min(a, min), max);
+        const get_valminmax = (a, val, min, max) => val ?? get_minmax(a, min, max);
+
+        const [pox, poy] = element.get_offset();
+        const pstyle = element.get_style();
+        let cox = pox, coy = poy;
+
+        const set_position_pre = (child) => {
+            const cstyle = child.get_style();
+            const position = cstyle.position;
+
+            if (position == 'static' || position == 'relative' || position == 'absolute') {
+                child.set_offset(cox, coy);
+            }
+
+            if (position == 'sticky') {
+                child.set_offset(pox, poy);
+            }
+        };
+
+        const set_position_post = (child) => {
+            const cstyle = child.get_style();
+            const position = cstyle.position;
+            const display = cstyle.display;
+            const [width, height] = child.get_length();
+
+            if (position == 'relative' || position == 'absolute' || position == 'fixed')
+                return;
+
+            if (display == 'block') {
+                coy += height;
+            }
+
+            if (display == 'inline-block') {
+                cox += width;
+            }
+        };
+
+        for (const child of element.get_children()) {
+            set_position_pre(child);
+            this.compute_layout(child);
+            set_position_post(child);
+        }
+
+        let cow = cox - pox, coh = coy - poy;
+
+        cow = get_valminmax(cow, this.width, this.min_width, this.max_width);
+        coh = get_valminmax(coh, this.height, this.min_height, this.max_height);
+
+        element.set_length(cow, coh);
+
+    }
+};
+
 const UIElementMixin = (Super) => class extends UISize(Super) {
     children = [];
     buffer;
     parent;
+    style = new UIStyle();
 
     appendChild = (ui_element) => { this.children.push(ui_element); ui_element.buffer = this.buffer; ui_element.parent = this; return ui_element; }
     removeChild = (ui_element) => { this.children = this.children.filter(x => x != ui_element); ui_element.parent = undefined; }
@@ -483,6 +617,12 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         this.set_width(buffer.get_width());
         this.set_height(buffer.get_height());
     }
+
+    set_style = (style) => this.style = style;
+
+    get_style = () => this.style;
+
+    get_children = () => this.children;
 
     set_buffer_event(event) {
         this.buffer = event.value;
@@ -1169,12 +1309,15 @@ async function page_load() {
     ui = new UIRoot(container);
     dpad = new DPad(container, ui);
     await load_additional_fonts();
-    
+
     //ui.debug_events = true;
     uitext = ui.appendChild(new UITextInput());
     uiclock = ui.appendChild(new UIClock());
-    uitext.set_size(8, 16, 112-1, 94);
-    uiclock.set_size(0, 1, 128, 12);
+    //uitext.set_size(8, 16, 112-1, 94);
+    //uiclock.set_size(0, 1, 128, 12);
+    ui.style.width = 128;
+    ui.style.height = 128;
+    uitext.style;
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
