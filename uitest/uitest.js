@@ -519,7 +519,7 @@ class UIStyle {
     content_width;
     content_height;
 
-    static debug_mode = false;
+    static debug_mode = true;
 
     is_value_relative = (value) => value != undefined && value instanceof String;
     is_value_variable = (value) => value == undefined || value instanceof String || isNaN(value) || !isFinite(value);
@@ -602,14 +602,16 @@ class UIStyle {
         const [offset_x, offset_y, width, height] = element.get_size();
 
         let db = {
-            'client':{offset_x, offset_y, width, height},
-            'computed':{width:this.computed_width, height:this.computed_height},
             'styling':{min_width:this.min_width, width: this.width, max_width: this.max_width, min_height:this.min_height, height: this.height, max_height:this.max_height},
-            'source_elem':element,
-            'style':element.style,
+            'content':{width:this.content_width, height:this.content_height},
+            'computed':{width:this.computed_width, height:this.computed_height},
+            'used':{width:this.used_width, height:this.used_height},
+            'client':{offset_x, offset_y, width, height},
+            //'source_elem':element,
+            //'style':element.style,
         };
-
-        console.log(name, element.get_tree_str(), ...params);
+        
+        console.log('\n', name, element.get_tree_str(), ...params);
         for (const [key, value] of Object.entries(db))
             console.log(key.padStart(11), value);
     }
@@ -739,31 +741,54 @@ class UIStyle {
     */
     get_actual_values(element, poffsetx=0, poffsety=0) {
         let [offset_x, offset_y] = [poffsetx, poffsety];
+        let [inline_w, inline_h] = [0,0];
+        let ctxp = 'block';
         for (const child of element.get_children()) {
             const style = child.get_style();
             const display = style.display;
-            style.get_actual_values(child, offset_x, offset_y);
-            const [used_width, used_height] = style.get_used();
+
+            if (display == 'block') {
+                //inline_w = 0;
+                //inline_h
+                offset_y += inline_h;
+                offset_x = poffsetx;
+                inline_h = 0;
+                inline_w = 0;
+            }
+
             if (display == 'inline-block') {
-                offset_x += used_width;
+                inline_h = 0;
+            }
+
+            style.get_actual_values(child, offset_x + inline_w, offset_y + inline_h, inline_w, inline_h);
+            const [used_width, used_height] = style.get_used();
+
+            if (display == 'inline-block') {
+                //offset_x += used_width;
+                inline_w += used_width;
+                inline_h = used_height;
             }
             if (display == 'block') {
                 offset_x = poffsetx;
                 offset_y += used_height;
+                inline_w = 0;
+                inline_h = 0;
             }
+            ctxp = display;
         }
 
-        const [width, height] = this.get_used();
+        let [width, height] = this.get_used();
 
-        element.set_offset(poffsetx, poffsety);
-        element.set_size(width, height);
+        element.set_size(poffsetx, poffsety, width, height);
+
+        this.log_debug('after actual', element);
     }
 
     static Context = class {
         context = [[0,0]];
         inline_block(style) {
             const [width, height] = style.get_used_or_default();
-            const end = this.context.length;
+            const end = this.context.length-1;
             const [w, h] = this.context[end];
             this.context[end] = [width + w, (height > h) ? height : h];
         }
@@ -829,6 +854,8 @@ class UIStyle {
         this.set_used(used_width, used_height);
 
         parent_context.append(this);
+
+        this.log_debug('after used', element);
     }
 
     get_computed_value(container, value, min, max) {
@@ -844,6 +871,7 @@ class UIStyle {
     get_computed_values(element) {
         const pelement = element?.parent;
         const pstyle = pelement?.get_style();
+        const display = this.display;
 
         if (!pstyle) {
             // root element
@@ -859,14 +887,19 @@ class UIStyle {
             ];
 
             // use our styling or find relative to container
-            const [computed_width, computed_height] = [
+            let [computed_width, computed_height] = [
                 this.get_computed_value(container_width, self_width, this.min_width, this.max_width),
                 this.get_computed_value(container_height, self_height, this.min_height, this.max_height),
             ];
 
             // computed or initial
-            this.set_computed(computed_width ?? container_width, computed_height ?? container_width);
+            //this.set_computed(computed_width ?? container_width, computed_height ?? container_width);
+            if (display == 'block' && computed_width == undefined) computed_width = container_width;
+
+            this.set_computed(computed_width, computed_height);
         }
+
+        this.log_debug('after computed', element);
 
         for (const child of element.get_children())
             child.get_style().get_computed_values(child);
