@@ -227,12 +227,14 @@ class Texture extends TextureReader(TextureWriter(CanvasBuffer)) {
         this.put_pixel(x, y, pixel);
     }
 
-    draw_sprite_alpha_blend(x, y, sprite, fast=false, fast_alpha_threshold=64) {
+    draw_sprite_alpha_blend(x, y, sprite, fast=false, fast_alpha_threshold=64, w=undefined, h=undefined) {
+        w = w ?? sprite.get_width();
+        h = h ?? sprite.get_height();
+
         const put_func = fast ? this.put_pixel_alpha_fast.bind(this) : this.put_pixel_alpha_blend.bind(this);
-        for (let i = sprite.x0, k = x; i < sprite.x1; i++, k++) {
-            for (let j = sprite.y0, l = y; j < sprite.y1; j++, l++) {
-                const pixel = sprite.atlas.get_pixel(i, j);
-                put_func(k, l, pixel);
+        for (let i = 0, k = x; i < w; i++, k++) {
+            for (let j = 0, l = y; j < h; j++, l++) {
+                put_func(k, l, sprite.atlas.get_pixel(i + sprite.x0, j + sprite.y0));
             }
         }
     }
@@ -586,6 +588,7 @@ class UIStyle {
     text_align = "left";
     overflow_x = "hidden"; // 'auto'/undefined
     overflow_y = "hidden";
+    alpha_threshold = 64;
 
     margin = new UIBoxModel();
     padding = new UIBoxModel();
@@ -597,7 +600,7 @@ class UIStyle {
     content_width;
     content_height;
 
-    static debug_mode = true;
+    static debug_mode = false;
 
     is_value_relative = (value) => value != undefined && (typeof value == 'string' || value instanceof String);
     is_value_variable = (value) => value == undefined || typeof value == 'string' || value instanceof String || isNaN(value) || !isFinite(value);
@@ -818,13 +821,40 @@ class UIStyle {
     /*
         Fills in missing values after layout and sets offsets
     */
-    get_actual_values(element, poffsetx=0, poffsety=0) {
+    get_actual_values(element, poffsetx=0, poffsety=0, container_w=0, container_h=0) {
         let [offset_x, offset_y] = [poffsetx, poffsety];
+        let [soffset_x, soffset_y] = [offset_x, offset_y];
         let [inline_w, inline_h] = [0,0];
+        let [width, height] = this.get_used();
+
+
+        if (this.position == 'absolute') {
+            if (this.bottom != undefined)
+                offset_y = container_h - this.to_abs(container_h, this.bottom) - height;
+            if (this.right != undefined)
+                offset_x = container_w - this.to_abs(container_w, this.right) - width;
+            if (this.left != undefined)
+                offset_x += this.to_abs(container_w, this.left);
+            if (this.top != undefined)
+                offset_y += this.to_abs(container_h, this.top);
+            [soffset_x, soffset_y] = [offset_x, offset_y];
+            inline_w += width;
+            inline_h += height;
+            [poffsetx, poffsety] = [offset_x, offset_y];
+        }
+
+
         let ctxp = 'block';
+        
         for (const child of element.get_children()) {
             const style = child.get_style();
             const display = style.display;
+            const position = style.position;
+
+            if (position == 'absolute') {
+                style.get_actual_values(child, soffset_x, soffset_y, width, height);
+                continue;
+            }
 
             if (display == 'block') {
                 //inline_w = 0;
@@ -839,7 +869,7 @@ class UIStyle {
                 inline_h = 0;
             }
 
-            style.get_actual_values(child, offset_x + inline_w, offset_y + inline_h, inline_w, inline_h);
+            style.get_actual_values(child, offset_x + inline_w, offset_y + inline_h, width, height);
             const [used_width, used_height] = style.get_used();
 
             if (display == 'inline-block') {
@@ -856,9 +886,9 @@ class UIStyle {
             ctxp = display;
         }
 
-        let [width, height] = this.get_used();
+        [offset_x, offset_y] = [soffset_x, soffset_y];
 
-        element.set_size(poffsetx, poffsety, width, height);
+        element.set_size(offset_x, offset_y, width, height);
 
         this.log_debug('after actual', element);
     }
@@ -932,7 +962,8 @@ class UIStyle {
 
         this.set_used(used_width, used_height);
 
-        parent_context.append(this);
+        if (this.position == 'static')
+            parent_context.append(this);
 
         this.log_debug('after used', element);
     }
@@ -1144,7 +1175,7 @@ class UIText extends UIElement {
         let line_width = 0, line_height = 0;
 
         for (const character of this.text) {
-            const sprite = this.font_atlas.get_font_sprite(character);
+            const sprite = this.get_font_sprite(character);
             const [w, h] = sprite.get_size();
 
             if (h > line_height) line_height = h;
@@ -1184,7 +1215,7 @@ class UIText extends UIElement {
         this.reset_uitext();
     }
 
-    is_char_bound = (x, y) => (x >= this.get_left() && x + this.get_font_width() < this.get_right() && y >= this.get_top() && y + this.get_font_height() < this.get_bottom());
+    is_char_bound = (x, y) => (x >= this.get_left() && x + this.get_font_width() <= this.get_right() && y >= this.get_top() && y + this.get_font_height() <= this.get_bottom());
 
     draw_character(x, y, character) {
         const font_sprite = this.get_font_sprite(character);
@@ -1442,8 +1473,8 @@ class UITextInput extends UIText {
 
         if (is_flash) {
             this.set_cursor_wrap_index(this.user_cursor_index);
-            this.cursor_x -= this.get_font_width() * .4;
-            this.draw_at_cursor_bound('|');
+            this.cursor_x -= this.get_font_width() * .2;
+            this.draw_at_cursor('|');
         }
         this.buffer.flush();
     }
@@ -1530,12 +1561,19 @@ class UISprite extends UIElement {
 
     draw_sprite(sprite) {
         const [offsetx, offsety, width, height] = this.get_size();
-        this.buffer.draw_sprite(offsetx, offsety, sprite, width, height);
+        if (this.style.alpha_threshold == undefined) {
+            this.buffer.draw_sprite(offsetx, offsety, sprite, width, height);
+            return;
+        }
+
+        this.buffer.draw_sprite_alpha_blend(offsetx, offsety, sprite, true, this.style.alpha_threshold)
     }
 
     draw() {
         if (!this.sprite)
             return;
+
+        this.clear();
 
         this.draw_sprite(this.sprite);
 
@@ -1623,6 +1661,7 @@ class DPad {
         if (element.id == 4) {
             this.debug_mode = !this.debug_mode;
             this.handler.dispatch('reset', 'broadcast');
+            this.handler.dispatch('draw', 'broadcast');
             return;
         }
 
@@ -1770,9 +1809,10 @@ async function page_load() {
     await textures.load_url('textures.png');
 
     //ui.debug_events = true;
-    
-    uidummy = ui.appendChild(new UISprite(textures.get_sprite('battery')));
-    uiclock = ui.appendChild(new UIClock());
+    let uidiv = ui.appendChild(new UIElement());
+    uidummy = uidiv.appendChild(new UISprite(textures.get_sprite('battery')));
+    let batl = uidummy.appendChild(new UIText('', FontAtlas.fonts[7]));
+    uiclock = uidiv.appendChild(new UIClock());
     uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
@@ -1782,12 +1822,21 @@ async function page_load() {
     uitext.style.height = 94;
     uiclock.style.width = 112;
     uiclock.style.height = 12;
+    uiclock.style.position = 'absolute';
+    uiclock.style.top = 1;
+    uiclock.style.right = 1;
+    uidummy.style.position = 'absolute';
+    uidummy.style.left = 1;
+    uidummy.style.top = 1;
+    uidiv.style.height = 14;
     //uidummy.style.width = "50";
+    batl.style.display = 'inline-block';
     uiclock.style.display = 'inline-block';
     uidummy.style.display = 'inline-block';
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
+    //batl.text = '0%';
     ui.dispatch('content_size', 'capture');
     ui.layout();
     if (UIStyle.debug_mode)
