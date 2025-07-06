@@ -521,8 +521,8 @@ class UIStyle {
 
     static debug_mode = true;
 
-    is_value_relative = (value) => value != undefined && value instanceof String;
-    is_value_variable = (value) => value == undefined || value instanceof String || isNaN(value) || !isFinite(value);
+    is_value_relative = (value) => value != undefined && (typeof value == 'string' || value instanceof String);
+    is_value_variable = (value) => value == undefined || typeof value == 'string' || value instanceof String || isNaN(value) || !isFinite(value);
     is_width_variable = () => this.is_value_variable(this.width);
     is_height_variable = () => this.is_value_variable(this.height);
     any_variable = (...values) => { for (const value of values) { if (this.is_value_variable(value)) return true; } return false; };
@@ -553,7 +553,8 @@ class UIStyle {
     try_get_size = () => [this.try_get_width(), this.try_get_height()];
 
     to_abs = (src, str) => {
-        if (!this.is_value_variable(str))
+        //if (!this.is_value_variable(str))
+        if (!this.is_value_relative(str))
             return str;
         let rel = Number(str)*0.01;
         return src * rel;
@@ -872,13 +873,14 @@ class UIStyle {
         const pelement = element?.parent;
         const pstyle = pelement?.get_style();
         const display = this.display;
+        let [container_width, container_height] = [0,0];
 
         if (!pstyle) {
             // root element
             this.set_all(this.try_get_width(), this.try_get_height());
         } else {
             // initial container size
-            const [container_width, container_height] = pstyle.get_computed();
+            [container_width, container_height] = pstyle.get_computed();
 
             // our size or generated size (from text or image)
             const [self_width, self_height] = [
@@ -899,7 +901,7 @@ class UIStyle {
             this.set_computed(computed_width, computed_height);
         }
 
-        this.log_debug('after computed', element);
+        this.log_debug('after computed', element, container_width, container_height, this.is_value_variable(container_width), this.is_value_variable(container_height));
 
         for (const child of element.get_children())
             child.get_style().get_computed_values(child);
@@ -1628,7 +1630,7 @@ async function page_load() {
     uitext.style.height = 94;
     uiclock.style.width = 112;
     uiclock.style.height = 12;
-    uidummy.style.width = 16;
+    uidummy.style.width = "50";
     uiclock.style.display = 'inline-block';
     uidummy.style.display = 'inline-block';
     ui.dispatch('load', 'capture');
