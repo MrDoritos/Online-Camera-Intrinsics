@@ -130,6 +130,7 @@ class CanvasBuffer {
 
     draw_image(x, y, image) {
         this.context.drawImage(image, x, y);
+        this.image = this.get_image_data();
     }
 
     load_image(image) {
@@ -711,6 +712,14 @@ class UIStyle {
         this.set_dynamic_sizes(element);
         this.set_offsets(element);
         this.canvas_debug(element);
+    }
+
+    block_formatting(element) {
+
+    }
+
+    inline_formatting(element) {
+        
     }
 };
 
