@@ -506,7 +506,7 @@ class UIStyle {
     max_height;
     text_wrap = "wrap";
     text_align = "left";
-    overflow_x = "hidden";
+    overflow_x = "hidden"; // 'auto'/undefined
     overflow_y = "hidden";
 
     margin = new UIBoxModel();
@@ -514,9 +514,14 @@ class UIStyle {
 
     computed_width;
     computed_height;
+    used_width;
+    used_height;
+    content_width;
+    content_height;
 
     static debug_mode = false;
 
+    is_value_relative = (value) => value != undefined && value instanceof String;
     is_value_variable = (value) => value == undefined || value instanceof String || isNaN(value) || !isFinite(value);
     is_width_variable = () => this.is_value_variable(this.width);
     is_height_variable = () => this.is_value_variable(this.height);
@@ -714,12 +719,157 @@ class UIStyle {
         this.canvas_debug(element);
     }
 
-    block_formatting(element) {
+    set_computed = (width, height) => { this.computed_width = width; this.computed_height = height; };
+    set_used = (width, height) => {this.used_width = width; this.used_height = height; };
+    get_used = () => [this.used_width, this.used_height];
+    get_used_or_default = (def=0) => [this.used_width ?? def, this.used_height ?? def];
+    get_computed = () => [this.computed_width, this.computed_height];
+    get_computed_or_default = (def=0) => [this.computed_width ?? def, this.computed_height ?? def];
+    set_all = (width, height) => { this.set_computed(width, height); this.set_used(width, height); };
 
+    compute_layout_2(element) {
+        this.get_computed_values(element);
+        this.get_used_values(element, new UIStyle.Context());
+        this.get_actual_values(element);
+        this.canvas_debug(element);
     }
 
-    inline_formatting(element) {
-        
+    /*
+        Fills in missing values after layout and sets offsets
+    */
+    get_actual_values(element, poffsetx=0, poffsety=0) {
+        let [offset_x, offset_y] = [poffsetx, poffsety];
+        for (const child of element.get_children()) {
+            const style = child.get_style();
+            const display = style.display;
+            style.get_actual_values(child, offset_x, offset_y);
+            const [used_width, used_height] = style.get_used();
+            if (display == 'inline-block') {
+                offset_x += used_width;
+            }
+            if (display == 'block') {
+                offset_x = poffsetx;
+                offset_y += used_height;
+            }
+        }
+
+        const [width, height] = this.get_used();
+
+        element.set_offset(poffsetx, poffsety);
+        element.set_size(width, height);
+    }
+
+    static Context = class {
+        context = [[0,0]];
+        inline_block(style) {
+            const [width, height] = style.get_used_or_default();
+            const end = this.context.length;
+            const [w, h] = this.context[end];
+            this.context[end] = [width + w, (height > h) ? height : h];
+        }
+
+        block(style) {
+            const used = style.get_used_or_default();
+            this.context.push(used);
+        }
+
+        get_sum(i) {
+            let sum = 0;
+            for (const val of this.context)
+                sum += val[i];
+            return sum;
+        }
+
+        get_max(i) {
+            let max = 0;
+            for (const val of this.context)
+                if (max < val[i])
+                    max = val[i];
+            return max;
+        }
+
+        get_width = () => this.get_max(0);
+        get_height = () => this.get_sum(1);
+        get_size = () => [this.get_width(), this.get_height()];
+
+        append(style) {
+            const display = style.display;
+
+            if (display == 'inline-block') this.inline_block(style);
+            if (display == 'block') this.block(style);
+        }
+    };
+
+    /*
+        Finds values after layout
+    */
+    get_used_values(element, parent_context) {
+        const display = this.display;
+        let context = new UIStyle.Context();
+
+        for (const child of element.get_children()) {
+            child.get_style().get_used_values(child, context);
+        }
+
+        const [context_width, context_height] = context.get_size();
+        const [computed_width, computed_height] = this.get_computed();
+
+        let [used_width, used_height] = [context_width,context_height];
+
+        /*
+            Overflow styling?
+        */
+
+        if (this.overflow_x == 'hidden') used_width = computed_width ?? context_width;
+        if (this.overflow_y == 'hidden') used_height = computed_height ?? context_height;
+
+        if (this.overflow_x == 'auto' || !this.overflow_x) used_width = context_width ?? computed_width;
+        if (this.overflow_y == 'auto' || !this.overflow_y) used_height = context_height ?? computed_height;
+
+        this.set_used(used_width, used_height);
+
+        parent_context.append(this);
+    }
+
+    get_computed_value(container, value, min, max) {
+        if (this.is_value_variable(container))
+            return this.get_minmax(value, min, max);
+
+        return this.try_dynamic(container, value, min, max);
+    }
+
+    /*
+        Distributes initial values and finds computed sizes before layout
+    */
+    get_computed_values(element) {
+        const pelement = element?.parent;
+        const pstyle = pelement?.get_style();
+
+        if (!pstyle) {
+            // root element
+            this.set_all(this.try_get_width(), this.try_get_height());
+        } else {
+            // initial container size
+            const [container_width, container_height] = pstyle.get_computed();
+
+            // our size or generated size (from text or image)
+            const [self_width, self_height] = [
+                this.width ?? this.content_width,
+                this.height ?? this.content_height,
+            ];
+
+            // use our styling or find relative to container
+            const [computed_width, computed_height] = [
+                this.get_computed_value(container_width, self_width, this.min_width, this.max_width),
+                this.get_computed_value(container_height, self_height, this.min_height, this.max_height),
+            ];
+
+            // computed or initial
+            this.set_computed(computed_width ?? container_width, computed_height ?? container_width);
+        }
+
+        for (const child of element.get_children())
+            child.get_style().get_computed_values(child);
     }
 };
 
@@ -833,7 +983,7 @@ class UIRoot extends UIElement {
         this.buffer.flush();
     }
 
-    layout = () => this.style.compute_layout(this);
+    layout = () => this.style.compute_layout_2(this);
 
     has_valid_interval = () => this.interval_id > 0;
 
@@ -1451,7 +1601,7 @@ async function page_load() {
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
-    ui.style.compute_layout(ui);
+    ui.layout();
     if (UIStyle.debug_mode)
         await async_wait(2000);
     ui.dispatch('draw', 'capture');
