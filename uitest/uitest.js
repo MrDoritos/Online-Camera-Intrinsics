@@ -275,6 +275,10 @@ class Atlas extends Texture {
             this.x1 = x1;
             this.y1 = y1;
         }
+
+        get_width = () => (this.x1 - this.x0);
+        get_height = () => (this.y1 - this.y0);
+        get_size = () => [this.get_width(), this.get_height()];
     };
 };
 
@@ -1056,6 +1060,43 @@ class UIText extends UIElement {
     get_font_width = () => this.font_atlas.sprite_width;
     get_font_height = () => this.font_atlas.sprite_height;
     get_font_size = () => [this.get_font_width(), this.get_font_height()];
+    get_font_sprite = (character) => this.font_atlas.get_character(character);
+
+    content_size() {
+        const style = this.get_style();
+
+        const [clientHeight, clientWidth] = this.get_length();
+        let width = 0, height = 0;
+        let line_width = 0, line_height = 0;
+
+        for (const character of this.text) {
+            const sprite = this.font_atlas.get_font_sprite(character);
+            const [w, h] = sprite.get_size();
+
+            if (h > line_height) line_height = h;
+            line_width += w;
+
+            if (style.text_wrap == 'wrap') {
+                if (clientWidth) {
+                    if (line_width > clientWidth) {
+                        height += line_height;
+                        line_width = 0;
+                    }
+                }
+            }
+        }
+
+        if (style.text_wrap == 'wrap') {
+            height = height;
+            width = width == 0 ? line_width : width;
+        } else {
+            width = line_width;
+            height = line_height;
+        }
+
+        style.content_width = width == 0 ? undefined : width;
+        style.content_height = height == 0 ? undefined : height;
+    }
 
     set_font(font) {
         this.font_atlas = font;
@@ -1072,7 +1113,7 @@ class UIText extends UIElement {
     is_char_bound = (x, y) => (x >= this.get_left() && x + this.get_font_width() < this.get_right() && y >= this.get_top() && y + this.get_font_height() < this.get_bottom());
 
     draw_character(x, y, character) {
-        const font_sprite = this.font_atlas.get_character(character);
+        const font_sprite = this.get_font_sprite(character);
 
         if (this.alpha_blend) {
             this.buffer.draw_sprite_alpha_blend(x, y, font_sprite, this.alpha_fast);
@@ -1636,6 +1677,7 @@ async function page_load() {
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
+    ui.dispatch('content_size', 'capture');
     ui.layout();
     if (UIStyle.debug_mode)
         await async_wait(2000);
