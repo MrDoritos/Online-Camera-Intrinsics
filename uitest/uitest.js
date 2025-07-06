@@ -201,11 +201,14 @@ const TextureWriter = (Super) => class extends Super {
         }
     }
 
-    draw_sprite(x, y, sprite) {
-        for (let i = sprite.x0, k = x; i < sprite.x1; i++, k++) {
-            for (let j = sprite.y0, l = y; j < sprite.y1; j++, l++) {
-                const pixel = sprite.atlas.get_pixel(i, j);
-                this.put_pixel(k, l, sprite.atlas.get_pixel(i, j));
+    draw_sprite(x, y, sprite, w=undefined, h=undefined) {
+        w = w ?? sprite.get_width();
+        h = h ?? sprite.get_height();
+
+        for (let i = 0, k = x; i < w; i++, k++) {
+            for (let j = 0, l = y; j < h; j++, l++) {
+                //const pixel = sprite.atlas.get_pixel(i + sprite.x0, j + sprite.y0);
+                this.put_pixel(k, l, sprite.atlas.get_pixel(i + sprite.x0, j + sprite.y0));
             }
         }
     }
@@ -266,9 +269,8 @@ class Atlas extends Texture {
         return new Atlas.Sprite(this, pos[0], pos[1], pos[2], pos[3]);
     }
 
-    static Sprite = class extends Texture {
+    static Sprite = class {
         constructor(atlas, x0, y0, x1, y1) {
-            super();
             this.atlas = atlas;
             this.x0 = x0;
             this.y0 = y0;
@@ -304,6 +306,78 @@ class FontAtlas extends Atlas {
 
     static DEFAULT;
     static fonts = [];
+};
+
+class SpriteSheet extends Texture {
+    constructor(sprites={}) {
+        super();
+        this.append_sprites(sprites);
+    }
+
+    append_sprites(sprites) {
+        for (const [key, sprite] of Object.entries(sprites)) {
+            if (sprite instanceof Array)
+                this.sprites[key] = new Atlas.Sprite(this, sprite[0], sprite[1], sprite[2]+sprite[0], sprite[3]+sprite[1]);
+            if (sprite instanceof Atlas.Sprite)
+                this.sprites[key] = sprite;
+            if (typeof sprite == 'string' || sprite instanceof String)
+                this.sprites[key] = this.sprites[sprite];
+        }
+    }
+
+    sprites = {};
+
+    static TEXTURES = {
+        'battery_4x8': [0, 10, 4, 8],
+        'battery_5x10': [0, 18, 5, 10],
+        'battery_13x6': [5, 11, 13, 6],
+        'battery': 'battery_5x10',
+
+        'heart_large': [20, 12, 10, 10],
+        'heart_small': [32, 13, 8, 7],
+        'heart': 'heart_small',
+    };
+
+    static TEXT_3x5 = {
+        '0': [0,0,3,5],
+        '1': [3,0,3,5],
+        '2': [6,0,3,5],
+        '3': [9,0,3,5],
+        '4': [12,0,3,5],
+        '5': [15,0,3,5],
+        '6': [18,0,3,5],
+        '7': [21,0,3,5],
+        '8': [24,0,3,5],
+        '9': [27,0,3,5],
+        '%': [0,5,3,5],
+        'A': [71,0,3,5],
+        'B': [75,0,3,5],
+        'C': [79,0,3,5],
+        'D': [83,0,3,5],
+        'E': [87,0,3,5],
+        'F': [91,0,3,5],
+        'G': [95,0,3,5],
+        'H': [99,0,3,5],
+        'I': [103,0,3,5],
+        'J': [107,0,3,5],
+        'K': [111,0,3,5],
+        'L': [115,0,3,5],
+        'O': [127,0,3,5],
+        'P': [131,0,3,5],
+        'Q': [135,0,3,5],
+        'R': [139,0,3,5],
+        'S': [143,0,3,5],
+        'T': [147,0,3,5],
+        'U': [151,0,3,5],
+        'V': [155,0,3,5],
+        //'W': [159,0,3,5],
+        'X': [163,0,3,5],
+        'Y': [167,0,3,5],
+        'Z': [171,0,3,5],
+        
+    };
+
+    get_sprite = (sprite_id) => this.sprites[sprite_id] ?? new Atlas.Sprite(this,0,0,0,0);
 };
 
 const UISize = (Super) => class extends (Super) {
@@ -1440,6 +1514,41 @@ class UIClock extends UITicking(UIText) {
     }
 };
 
+class UISprite extends UIElement {
+    constructor(sprite=undefined) {
+        super();
+        this.set_sprite(sprite);
+    }
+
+    content_size() {
+        if (this.sprite) {
+            const [width, height] = this.sprite.get_size();
+            this.style.content_width = width;
+            this.style.content_height = height;
+        }
+    }
+
+    draw_sprite(sprite) {
+        const [offsetx, offsety, width, height] = this.get_size();
+        this.buffer.draw_sprite(offsetx, offsety, sprite, width, height);
+    }
+
+    draw() {
+        if (!this.sprite)
+            return;
+
+        this.draw_sprite(this.sprite);
+
+        this.buffer.flush();
+    }
+
+    set_sprite(sprite) {
+        this.sprite = sprite;
+    }
+
+    sprite;
+};
+
 class DPad {
     dpad_enter_url = 'dpad_enter.png';
     dpad_arrow_url = 'dpad_arrow.png';
@@ -1622,7 +1731,7 @@ class DPad {
     }
 };
 
-let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy;
+let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures;
 
 async function load_additional_fonts() {
     const font_list = [
@@ -1656,11 +1765,13 @@ async function page_load() {
     container = document.querySelector('#body');
     ui = new UIRoot(container);
     dpad = new DPad(container, ui);
+    textures = new SpriteSheet(SpriteSheet.TEXTURES);
     await load_additional_fonts();
+    await textures.load_url('textures.png');
 
     //ui.debug_events = true;
     
-    uidummy = ui.appendChild(new UIElement());
+    uidummy = ui.appendChild(new UISprite(textures.get_sprite('battery')));
     uiclock = ui.appendChild(new UIClock());
     uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
@@ -1671,7 +1782,7 @@ async function page_load() {
     uitext.style.height = 94;
     uiclock.style.width = 112;
     uiclock.style.height = 12;
-    uidummy.style.width = "50";
+    //uidummy.style.width = "50";
     uiclock.style.display = 'inline-block';
     uidummy.style.display = 'inline-block';
     ui.dispatch('load', 'capture');
