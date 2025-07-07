@@ -587,6 +587,8 @@ class UIBoxModel {
 class UIStyle {
     position = "static";
     display = "block";
+    horizontal_align;
+    vertical_align;
     top; //undefined == auto
     right;
     bottom;
@@ -834,7 +836,7 @@ class UIStyle {
     /*
         Fills in missing values after layout and sets offsets
     */
-    get_actual_values(element, poffsetx=0, poffsety=0, container_w=0, container_h=0) {
+    get_actual_values(element, poffsetx=0, poffsety=0, container_w=0, container_h=0, container_x=0,container_y=0) {
         let [offset_x, offset_y] = [poffsetx, poffsety];
         let [soffset_x, soffset_y] = [offset_x, offset_y];
         let [inline_w, inline_h] = [0,0];
@@ -844,7 +846,35 @@ class UIStyle {
         //width -= this.padding.get_width();
         //height -= this.padding.get_height();
         //width += this.margin.get_
+        if (this.horizontal_align || this.vertical_align) {
+            if (UIStyle.debug_mode) console.log(soffset_x, soffset_y, container_w, container_h, width, height, container_x, container_y);
+            if (this.horizontal_align == 'center') {
+                soffset_x += (container_w * .5) - (width * .5);
+            }
+            if (this.horizontal_align == 'right') {
+                soffset_x = container_x + container_w - width;
+            }
+            if (this.horizontal_align == 'left') {
+                soffset_x = container_x;
+            }
+            if (this.vertical_align == 'bottom') {
+                soffset_y = container_y + container_h - height;
+            }
+            if (this.vertical_align == 'top') {
+                soffset_y = container_y;
+            }
+            if (this.vertical_align == 'center') {
+                soffset_y += (container_h * .5) - (height * .5);
+            }
+            if (UIStyle.debug_mode) console.log(soffset_x, soffset_y, container_w * .5, container_h * .5, width * .5, height * .5);
+        }
+        
+
         const [s_width, s_height] = [width, height];
+        width -= this.padding.get_width() + this.margin.get_width();
+        height -= this.padding.get_height() + this.margin.get_height();
+        //width -= this.margin.get_width();
+        //height -= this.margin.get_height();
 
         soffset_x += this.margin.get_left();
         soffset_y += this.margin.get_top();
@@ -877,7 +907,7 @@ class UIStyle {
             const position = style.position;
 
             if (position == 'absolute') {
-                style.get_actual_values(child, inner_offset_x, inner_offset_y, width, height);
+                style.get_actual_values(child, inner_offset_x, inner_offset_y, width, height, inner_offset_x, inner_offset_y);
                 continue;
             }
 
@@ -895,9 +925,9 @@ class UIStyle {
                 inline_h = 0;
             }
 
-            style.get_actual_values(child, offset_x + inline_w, offset_y + inline_h, width, height);
-            //const [used_width, used_height] = style.get_used();
-            const [used_width, used_height] = child.get_length();
+            style.get_actual_values(child, offset_x + inline_w, offset_y + inline_h, width, height, inner_offset_x, inner_offset_y);
+            const [used_width, used_height] = style.get_used();
+            //const [used_width, used_height] = child.get_length();
 
             if (display == 'inline-block') {
                 //offset_x += used_width;
@@ -915,8 +945,12 @@ class UIStyle {
         }
 
         [offset_x, offset_y] = [soffset_x, soffset_y];
+        let [final_width, final_height] = [s_width, s_height];
+        //final_width -= this.margin.get_right();// + this.padding.get_width();
+        //final_height -= this.margin.get_bottom();// + this.padding.get_height();
 
-        element.set_size(offset_x, offset_y, s_width, s_height);
+        element.set_size(offset_x, offset_y, final_width, final_height);
+        this.set_used(s_width + this.margin.get_width(), s_height + this.margin.get_height());
 
         this.log_debug('after actual', element);
     }
@@ -981,8 +1015,10 @@ class UIStyle {
         }
 
         let [context_width, context_height] = context.get_size();
-        context_width += this.margin.get_width() + this.padding.get_width();
-        context_height += this.margin.get_height() + this.padding.get_height();
+        //context_width += this.margin.get_width() + this.padding.get_width();
+        //context_height += this.margin.get_height() + this.padding.get_height();
+        context_width += this.padding.get_width();
+        context_height += this.padding.get_height();
 
         const [computed_width, computed_height] = this.get_computed();
 
@@ -1050,6 +1086,11 @@ class UIStyle {
             // computed or initial
             //this.set_computed(computed_width ?? container_width, computed_height ?? container_width);
             if (display == 'block' && computed_width == undefined) computed_width = container_width;
+
+            if (computed_width)
+                computed_width -= this.margin.get_width();// + this.padding.get_width();
+            if (computed_height)
+                computed_height -= this.margin.get_height();// + this.padding.get_height();
 
             this.set_computed(computed_width, computed_height);
         }
@@ -1272,7 +1313,7 @@ class UIText extends UIElement {
     }
 
     reset() {
-        this.reset_uitext();
+        //this.reset_uitext();
     }
 
     is_char_bound = (x, y) => (x >= this.get_left() && x + this.get_font_width() <= this.get_right() && y >= this.get_top() && y + this.get_font_height() <= this.get_bottom());
@@ -1621,6 +1662,11 @@ const make_styled = (obj, style, ...cons) => {
 };
 
 class UIClock extends UITicking(UIText) {
+    content_size() {
+        this.style.height = this.get_font_height();
+        this.style.width = this.get_font_width() * 12.5;
+    }
+
     draw() {
         const now = new Date();
 
@@ -1924,31 +1970,40 @@ async function page_load() {
     await textures.load_url('textures.png');
 
     //ui.debug_events = true;
-    let uidiv = ui.appendChild(new UIElement());
+    let uidiv = ui.appendChild(new UIBorderBox());
     uidummy = uidiv.appendChild(new UISprite(textures.get_sprite('battery')));
     let batl = uidummy.appendChild(new UIText('', FontAtlas.fonts[7]));
     uiclock = uidiv.appendChild(new UIClock());
     //let border = ui.appendChild(new UIStyleMixin(new UIBorderBox(), {width:10,height:10}));
     let border = ui.appendChild(new UIBorderBox());
-    border.appendChild(new UISprite(textures.get_sprite('heart')));
+    border.appendChild(new UISprite(textures.get_sprite('heart'))).style.horizontal_align='center';
     uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
     ui.style.width = 128;
     ui.style.height = 128;
-    uitext.style.width = 128;
+    border.style.margin.top = 1;
+    //uitext.style.width = 128;
     uitext.style.height = 94;
+    uitext.style.margin.value = 1;
     uiclock.style.width = 112;
     uiclock.style.height = 12;
-    uiclock.style.position = 'absolute';
-    uiclock.style.top = 1;
-    uiclock.style.right = 1;
-    uidummy.style.position = 'absolute';
-    uidummy.style.left = 1;
-    uidummy.style.top = 1;
-    uidiv.style.height = 14;
+    uiclock.style.horizontal_align = 'right';
+    uiclock.style.vertical_align = 'center';
+    uidummy.style.vertical_align = 'center';
+    //uiclock.style.position = 'absolute';
+    //uiclock.style.top = 1;
+    //uiclock.style.right = 1;
+    //uidummy.style.position = 'absolute';
+    //uidummy.style.left = 1;
+    //uidummy.style.top = 1;
+    //uidiv.style.height = 14;
     //uidummy.style.width = "50";
     batl.style.display = 'inline-block';
+    uidiv.style.min_height = 15;
+    uidiv.set_border({bottom:1});
+    
+    //batl.style.vertical_align = 'center';
     uiclock.style.display = 'inline-block';
     uidummy.style.display = 'inline-block';
     UIEvents.debug = UIStyle.debug_mode;
