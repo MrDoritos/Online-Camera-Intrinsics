@@ -615,7 +615,7 @@ class UIStyle {
     content_width;
     content_height;
 
-    static debug_mode = true;
+    static debug_mode = false;
 
     is_value_relative = (value) => value != undefined && (typeof value == 'string' || value instanceof String);
     is_value_variable = (value) => value == undefined || typeof value == 'string' || value instanceof String || isNaN(value) || !isFinite(value);
@@ -1071,6 +1071,11 @@ class UIStyle {
             // initial container size
             [container_width, container_height] = pstyle.get_computed();
 
+            if (container_width)
+                container_width -= this.margin.get_width();
+            if (container_height)
+                container_height -= this.margin.get_height();
+
             // our size or generated size (from text or image)
             const [self_width, self_height] = [
                 this.width ?? this.content_width,
@@ -1087,10 +1092,12 @@ class UIStyle {
             //this.set_computed(computed_width ?? container_width, computed_height ?? container_width);
             if (display == 'block' && computed_width == undefined) computed_width = container_width;
 
+            /*
             if (computed_width)
                 computed_width -= this.margin.get_width();// + this.padding.get_width();
             if (computed_height)
                 computed_height -= this.margin.get_height();// + this.padding.get_height();
+            */
 
             this.set_computed(computed_width, computed_height);
         }
@@ -1127,7 +1134,7 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
         this.buffer = event.value;
     }
 
-    clear(color=Color.BLACK) {
+    clear(event=undefined, color=Color.BLACK) {
         this.buffer.fillrect(this.get_left(), this.get_top(), this.get_right(), this.get_bottom(), color);
     }
 
@@ -1293,7 +1300,7 @@ class UIText extends UIElement {
         }
 
         if (style.text_wrap == 'wrap') {
-            height = height;
+            height = height == 0 ? line_height : height;
             width = width == 0 ? line_width : width;
         } else {
             width = line_width;
@@ -1626,7 +1633,7 @@ const UIBorderBoxMixin = (Super) => class extends Super {
         this.style.padding.right = this.border_right;
         this.style.padding.bottom = this.border_bottom;
 
-        this.dispatch('layout', 'bubble', true);
+        //this.dispatch('layout', 'bubble', true);
     }
 
     draw() {
@@ -1813,7 +1820,7 @@ class DPad {
             if (prev != this.curfont) {
                 const font = FontAtlas.fonts[this.curfont];
                 uitext.set_font(font);
-                uitext.reset();
+                uitext.reset_uitext();
                 this.handler.log(font.url);
                 console.log(font.url, font.sprite_width, font.sprite_height);
             }
@@ -1821,7 +1828,8 @@ class DPad {
     
         if (element.id == 4) {
             this.debug_mode = !this.debug_mode;
-            this.handler.dispatch('reset', 'broadcast');
+            //this.handler.dispatch('reset', 'broadcast');
+            uitext.reset_uitext();
             this.handler.dispatch('draw', 'broadcast');
             return;
         }
@@ -1931,7 +1939,7 @@ class DPad {
     }
 };
 
-let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures;
+let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures, bottom_label, uidiv;
 
 async function load_additional_fonts() {
     const font_list = [
@@ -1970,25 +1978,30 @@ async function page_load() {
     await textures.load_url('textures.png');
 
     //ui.debug_events = true;
-    let uidiv = ui.appendChild(new UIBorderBox());
+    uidiv = ui.appendChild(new UIBorderBox());
     uidummy = uidiv.appendChild(new UISprite(textures.get_sprite('battery')));
-    let batl = uidummy.appendChild(new UIText('', FontAtlas.fonts[7]));
+    let batl = uidiv.appendChild(new UIText('0%', FontAtlas.fonts[7]));
     uiclock = uidiv.appendChild(new UIClock());
     //let border = ui.appendChild(new UIStyleMixin(new UIBorderBox(), {width:10,height:10}));
-    let border = ui.appendChild(new UIBorderBox());
+    let border = new UIBorderBox();//ui.appendChild(new UIBorderBox());
     border.appendChild(new UISprite(textures.get_sprite('heart'))).style.horizontal_align='center';
     uitext = ui.appendChild(new UITextInput());
+    let bottom_div = ui.appendChild(new UIBorderBox());
+    bottom_label = bottom_div.appendChild(new UIText('UI Test Demo', FontAtlas.fonts[7]));
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
     ui.style.width = 128;
     ui.style.height = 128;
     border.style.margin.top = 1;
     //uitext.style.width = 128;
-    uitext.style.height = 94;
+    uitext.style.height = 90 + 8;
+    //uitext.style.margin.left = 1;
+    //uitext.style.margin.right = 1;
     uitext.style.margin.value = 1;
-    uiclock.style.width = 112;
-    uiclock.style.height = 12;
+    //uiclock.style.width = 112;
+    //uiclock.style.height = 12;
     uiclock.style.horizontal_align = 'right';
+    uiclock.set_font(FontAtlas.fonts[7]);
     uiclock.style.vertical_align = 'center';
     uidummy.style.vertical_align = 'center';
     //uiclock.style.position = 'absolute';
@@ -2000,9 +2013,16 @@ async function page_load() {
     //uidiv.style.height = 14;
     //uidummy.style.width = "50";
     batl.style.display = 'inline-block';
+    batl.style.vertical_align = 'center';
+    uidummy.style.margin.left=1;
+    batl.style.margin.left=1;
     uidiv.style.min_height = 15;
     uidiv.set_border({bottom:1});
+    bottom_div.set_border({top:1});
+    bottom_label.style.horizontal_align = 'center';
+    bottom_div.style.vertical_align = 'bottom';
     
+    uidiv.style.padding.right = 1;
     //batl.style.vertical_align = 'center';
     uiclock.style.display = 'inline-block';
     uidummy.style.display = 'inline-block';
@@ -2039,10 +2059,12 @@ async function page_load() {
         await writetext("\n\n", 500);
         await writetext("NASA\n\tinternship\n\tproject", 200);
         await async_wait(1000);
-        await uitext.reset();
+        //await uitext.reset();
+        uitext.reset_uitext();
         await writetext("\n\nStart typing...", 200);
         await async_wait(1000);
-        await uitext.reset();
+        //await uitext.reset();
+        uitext.reset_uitext();
     };
     if (!UIStyle.debug_mode)
         welcome();
