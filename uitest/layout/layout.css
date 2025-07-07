@@ -3,7 +3,7 @@
     padding:0;
 }
 
-:root {
+html {
     --size: min(95dvh, 95dvw);
     --pix: calc(var(--size) / 128);
     --font-size: calc(var(--pix) * 10);
@@ -105,4 +105,70 @@ p {
 #header #border {
     box-sizing: border-box;
     border: var(--pix) solid;
+}
+
+#userdrag {
+    position: absolute;
+    z-index: 9;
+    background-color: silver;
+    border: 1px solid black;
+    top:0;
+    width:12em;
+}
+
+#userdrag #text {
+    cursor: move;
+    z-index: 10;
+    background-color:cornflowerblue;
+}
+
+#userdrag #text div {
+    #width: 85%;
+    display: inline-block;
+}
+
+#userdrag #text a {
+    width: 1em;
+    display: inline-block;
+    text-align: center;
+}
+
+#userdrag #input {
+    display: flex;
+    flex-direction: column;
+    visibility: visible;
+}
+
+#userdrag #input div {
+    text-wrap:nowrap;
+    display: flex;
+    flex-direction: row;
+}
+
+#userdrag #input input {
+    min-width:0;
+    width:60%;
+    margin-left: auto;
+}
+
+#expand::before {
+    content:"▼";
+}
+
+#screen_size {
+    margin: 0.2em;
+    float:right;
+}
+
+#checkbox_expand:checked ~ #text #expand::before {
+    content:"⏵";
+    display: contents;
+}
+
+#checkbox_expand:checked ~ #input {
+    visibility: collapse;
+}
+
+#checkbox_expand {
+    display: none;
 }

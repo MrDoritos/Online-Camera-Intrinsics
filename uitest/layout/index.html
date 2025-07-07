@@ -10,7 +10,7 @@
         <title>UI Layout Test</title>
         <link rel="stylesheet" href="layout.css">
     </head>
-    <body>    
+    <body id="body">    
         <div id="main">
             <div id="header">
                 <div id="battery">
@@ -41,5 +41,18 @@
                 <p>Settings</p>
             </div>
         </div>
+        <div id="userdrag">
+            <input type="checkbox" id="checkbox_expand" />
+            <div id="text"><a onclick="checkbox_expand.click()" id="expand"></a><div>Screen Size</div><!--<input type="checkbox" id="screen_size" />--></div>
+            <div id="input">
+                <div>X Px<input type="number" id="screen_width_px" /></div>
+                <div>Y Px<input type="number" id="screen_height_px" /></div>
+                <div>Width<input type="number" id="screen_width" /></div>
+                <div>Height<input type="number" id="screen_height" /></div>
+                <div>DP/u<input type="number" id="screen_density" /></div>
+                <div>Imperial<input type="checkbox" id="imperial" /></div>
+            </div>
+        </div>
     </body>
+    <script src="layout.js"></script>
 </html>
