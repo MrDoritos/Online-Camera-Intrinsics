@@ -41,6 +41,9 @@ let elems = {};
 elem_ids.map(x => (elems[x] = document.getElementById(x)).addEventListener('input', docalc));
 
 function setsize(density) {
+    let imp = elems['imperial'].checked;
+    density = imp ? density / 25.4 : density;
+
     let root = document.documentElement;
     //let rsize = density * 128;
     let cwidth = body.clientWidth;
@@ -61,31 +64,20 @@ function docalc() {
     let sw = Number(elems['screen_width'].value);
     let sh = Number(elems['screen_height'].value);
     let d = Number(elems['screen_density'].value);
-    let imp = elems['imperial'].checked;
 
-    if (d) return setsize(imp ? d / 25.4 : d);
+    if (d) return setsize(d);
 
     let dw,dh;
     dw = dh = undefined;
 
+    if (wpx && sw) return setsize(wpx/sw);
+    if (hpx && sh) return setsize(hpx/sh);
+
     wpx = wpx == 0 ? window.screen.width : wpx;
     hpx = hpx == 0 ? window.screen.height : hpx;
 
-    if (wpx && sw) {
-        dw = wpx / sw;
-    }
-
-    if (hpx && sh) {
-        dh = hpx / sh;
-    }
-
-    if (dw || dh) {
-        d = dw ?? dh;
-    }
-
-    if (!d)return;
-
-    setsize(imp ? d / 25.4 : d);
+    if (wpx && sw) return setsize(wpx/sw);
+    if (hpx && sh) return setsize(hpx/sh);
 }
 
 window.onresize = docalc;

@@ -600,7 +600,7 @@ class UIStyle {
     content_width;
     content_height;
 
-    static debug_mode = false;
+    static debug_mode = true;
 
     is_value_relative = (value) => value != undefined && (typeof value == 'string' || value instanceof String);
     is_value_variable = (value) => value == undefined || typeof value == 'string' || value instanceof String || isNaN(value) || !isFinite(value);
@@ -1053,15 +1053,25 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
     dispatch_event(event, event_action='bubble', skip_source=false) {
         if (!this || event.is_stop_any()) return;
 
-        if (event_action == 'bubble') {
+        const self_handle = () => {
             if (!skip_source)
                 event.handle(this);
+        };
+
+        const self_first = event_action.endsWith('_selffirst');
+        const action = self_first ? event_action.replace('_selffirst', '') : event_action;
+
+        if (action == 'bubble') {
+            if (self_first) self_handle();
             if (this.parent)
                 this.parent.dispatch_event(event, event_action);
+            if (!self_first) self_handle();
             return;
         }
 
-        if (event_action == 'capture') {
+        if (action == 'capture') {
+            if (self_first) self_handle();
+
             if (this.children) {
                 for (const child of this.children) {
                     child.dispatch_event(event, event_action);
@@ -1072,16 +1082,16 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
                 }
             }
 
-            if (!skip_source)
-                event.handle(this);
+            if (!self_first) self_handle();
             return;
         }
 
-        if (event_action == 'broadcast') {
-            this.dispatch_event(event, 'capture', true);
-            this.dispatch_event(event, 'bubble', true);
-            if (!skip_source)
-                event.handle(this);
+        if (action == 'broadcast') {
+            if (self_first) self_handle();
+            const app = self_first ? '_selffirst' : '';
+            this.dispatch_event(event, 'capture' + app, true);
+            this.dispatch_event(event, 'bubble' + app, true);
+            if (!self_first) self_handle();
             return;
         }
     }
@@ -1505,6 +1515,48 @@ const UITicking = (Super) => class extends Super {
     }
 };
 
+const UIBorderBoxMixin = (Super) => class extends Super {
+    border_left = 0;
+    border_right = 0;
+    border_top = 0;
+    border_bottom = 0;
+
+    set_border(border) {
+        this.border_top = this.border_right = this.border_bottom = this.border_left = border;
+    }
+
+    draw() {
+        const [top, right, bottom, left] = this.get_box();
+        const [btop,bright,bbottom,bleft] = [this.border_top,this.border_right,this.border_bottom,this.border_left];
+        const pixel = Color.WHITE;
+
+        if (btop)
+            this.buffer.fillrect(left, top, right, top+btop, pixel);
+        if (bright)
+            this.buffer.fillrect(right-bright,top,right,bottom,pixel);
+        if (bbottom)
+            this.buffer.fillrect(left, bottom-bbottom, right, bottom, pixel);
+        if (bleft)
+            this.buffer.fillrect(left, top, left+bleft, bottom, pixel);
+
+        this.buffer.flush();
+    }
+};
+
+class UIBorderBox extends UIBorderBoxMixin(UIElement) {};
+
+const UIStyleMixin = (Super) => class extends Super {
+    constructor(style={}, ...cons) {
+        super(...cons);
+        Object.assign(this.style, style);
+    }
+};
+
+const make_styled = (obj, style, ...cons) => {
+    let ret = UIStyleMixin(obj);
+    return new ret(style, ...cons);
+};
+
 class UIClock extends UITicking(UIText) {
     draw() {
         const now = new Date();
@@ -1813,6 +1865,10 @@ async function page_load() {
     uidummy = uidiv.appendChild(new UISprite(textures.get_sprite('battery')));
     let batl = uidummy.appendChild(new UIText('', FontAtlas.fonts[7]));
     uiclock = uidiv.appendChild(new UIClock());
+    //let border = ui.appendChild(new UIStyleMixin(new UIBorderBox(), {width:10,height:10}));
+    let border = ui.appendChild(make_styled(UIBorderBox, {width:10,height:10}));
+    border.set_border(1);
+    border.appendChild(make_styled(UISprite, {width:8,height:8}, textures.get_sprite('heart')));
     uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
