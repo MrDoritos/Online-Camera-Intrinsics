@@ -336,7 +336,7 @@ class SpriteSheet extends Texture {
         'battery': 'battery_5x10',
 
         'heart_large': [20, 12, 10, 10],
-        'heart_small': [32, 13, 8, 7],
+        'heart_small': [32, 13, 9, 8],
         'heart': 'heart_small',
     };
 
@@ -532,6 +532,11 @@ class UIEvents {
             const hit = `-> ${callback ? 'hit' : 'x'}`;
 
             console.log(`${start_time} ${type} ${name} ${hit}`);
+
+            if (hit) {
+                //const end = Date.now() + 50;
+                //while (Date.now() < end) continue;
+            }
         }
     };
 
@@ -564,11 +569,19 @@ class UIEvents {
 };
 
 class UIBoxModel {
-    top = 0;
-    right = 0;
-    bottom = 0;
-    left = 0;
+    top;
+    right;
+    bottom;
+    left;
     value;
+
+    get_value = () => this.value ?? 0;
+    get_left = () => this.left ?? this.get_value();
+    get_right = () => this.right ?? this.get_value();
+    get_bottom = () => this.bottom ?? this.get_value();
+    get_top = () => this.top ?? this.get_value();
+    get_width = () => this.get_left() + this.get_right();
+    get_height = () => this.get_top() + this.get_bottom();
 };
 
 class UIStyle {
@@ -826,7 +839,19 @@ class UIStyle {
         let [soffset_x, soffset_y] = [offset_x, offset_y];
         let [inline_w, inline_h] = [0,0];
         let [width, height] = this.get_used();
+        //width -= this.margin.get_width();
+        //height -= this.margin.get_height();
+        //width -= this.padding.get_width();
+        //height -= this.padding.get_height();
+        //width += this.margin.get_
+        const [s_width, s_height] = [width, height];
 
+        soffset_x += this.margin.get_left();
+        soffset_y += this.margin.get_top();
+        [offset_x, offset_y] = [soffset_x, soffset_y];
+        offset_x += this.padding.get_left();
+        offset_y += this.padding.get_top();
+        const [inner_offset_x, inner_offset_y] = [offset_x, offset_y];
 
         if (this.position == 'absolute') {
             if (this.bottom != undefined)
@@ -852,7 +877,7 @@ class UIStyle {
             const position = style.position;
 
             if (position == 'absolute') {
-                style.get_actual_values(child, soffset_x, soffset_y, width, height);
+                style.get_actual_values(child, inner_offset_x, inner_offset_y, width, height);
                 continue;
             }
 
@@ -860,7 +885,8 @@ class UIStyle {
                 //inline_w = 0;
                 //inline_h
                 offset_y += inline_h;
-                offset_x = poffsetx;
+                //offset_x = poffsetx;
+                offset_x = inner_offset_x;
                 inline_h = 0;
                 inline_w = 0;
             }
@@ -870,7 +896,8 @@ class UIStyle {
             }
 
             style.get_actual_values(child, offset_x + inline_w, offset_y + inline_h, width, height);
-            const [used_width, used_height] = style.get_used();
+            //const [used_width, used_height] = style.get_used();
+            const [used_width, used_height] = child.get_length();
 
             if (display == 'inline-block') {
                 //offset_x += used_width;
@@ -878,7 +905,8 @@ class UIStyle {
                 inline_h = used_height;
             }
             if (display == 'block') {
-                offset_x = poffsetx;
+                //offset_x = poffsetx;
+                offset_x = inner_offset_x;
                 offset_y += used_height;
                 inline_w = 0;
                 inline_h = 0;
@@ -888,23 +916,30 @@ class UIStyle {
 
         [offset_x, offset_y] = [soffset_x, soffset_y];
 
-        element.set_size(offset_x, offset_y, width, height);
+        element.set_size(offset_x, offset_y, s_width, s_height);
 
         this.log_debug('after actual', element);
     }
 
     static Context = class {
         context = [[0,0]];
+        add_box(style) {
+            let [width, height] = style.get_used_or_default();
+            //width += style.margin.get_width() + style.padding.get_width();
+            //height += style.margin.get_height() + style.padding.get_height();
+            return [width, height];
+        }
+
         inline_block(style) {
-            const [width, height] = style.get_used_or_default();
+            //const [width, height] = style.get_used_or_default();
+            const [width, height] = this.add_box(style);
             const end = this.context.length-1;
             const [w, h] = this.context[end];
             this.context[end] = [width + w, (height > h) ? height : h];
         }
 
         block(style) {
-            const used = style.get_used_or_default();
-            this.context.push(used);
+            this.context.push(this.add_box(style));
         }
 
         get_sum(i) {
@@ -945,7 +980,10 @@ class UIStyle {
             child.get_style().get_used_values(child, context);
         }
 
-        const [context_width, context_height] = context.get_size();
+        let [context_width, context_height] = context.get_size();
+        context_width += this.margin.get_width() + this.padding.get_width();
+        context_height += this.margin.get_height() + this.padding.get_height();
+
         const [computed_width, computed_height] = this.get_computed();
 
         let [used_width, used_height] = [context_width,context_height];
@@ -959,6 +997,12 @@ class UIStyle {
 
         if (this.overflow_x == 'auto' || !this.overflow_x) used_width = context_width ?? computed_width;
         if (this.overflow_y == 'auto' || !this.overflow_y) used_height = context_height ?? computed_height;
+
+        //used_width += this.margin.get_width() + this.padding.get_width();
+        //used_height += this.margin.get_width() + this.padding.get_width();
+        //used_width += this.margin.get_right();
+        //used_height += this.margin.get_bottom();
+        
 
         this.set_used(used_width, used_height);
 
@@ -1137,7 +1181,13 @@ class UIRoot extends UIElement {
         this.buffer.flush();
     }
 
-    layout = () => this.style.compute_layout_2(this);
+    layout = (skip_clear=false,skip_draw=false) => { 
+        this.style.compute_layout_2(this);
+        if (!skip_clear)
+            this.dispatch('clear', 'capture');
+        if (!skip_draw)
+            this.dispatch('draw', 'capture_selffirst');
+    };
 
     has_valid_interval = () => this.interval_id > 0;
 
@@ -1521,8 +1571,21 @@ const UIBorderBoxMixin = (Super) => class extends Super {
     border_top = 0;
     border_bottom = 0;
 
-    set_border(border) {
-        this.border_top = this.border_right = this.border_bottom = this.border_left = border;
+    set_border({border,top,right,bottom,left}) {
+        if (border != undefined) {
+            this.border_top = this.border_right = this.border_bottom = this.border_left = border;
+        }
+        if (top != undefined) this.border_top = top;
+        if (right != undefined) this.border_right = right;
+        if (bottom != undefined) this.border_bottom = bottom;
+        if (left != undefined) this.border_left = left;
+
+        this.style.padding.top = this.border_top;
+        this.style.padding.left = this.border_left;
+        this.style.padding.right = this.border_right;
+        this.style.padding.bottom = this.border_bottom;
+
+        this.dispatch('layout', 'bubble', true);
     }
 
     draw() {
@@ -1866,9 +1929,8 @@ async function page_load() {
     let batl = uidummy.appendChild(new UIText('', FontAtlas.fonts[7]));
     uiclock = uidiv.appendChild(new UIClock());
     //let border = ui.appendChild(new UIStyleMixin(new UIBorderBox(), {width:10,height:10}));
-    let border = ui.appendChild(make_styled(UIBorderBox, {width:10,height:10}));
-    border.set_border(1);
-    border.appendChild(make_styled(UISprite, {width:8,height:8}, textures.get_sprite('heart')));
+    let border = ui.appendChild(new UIBorderBox());
+    border.appendChild(new UISprite(textures.get_sprite('heart')));
     uitext = ui.appendChild(new UITextInput());
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
@@ -1889,15 +1951,17 @@ async function page_load() {
     batl.style.display = 'inline-block';
     uiclock.style.display = 'inline-block';
     uidummy.style.display = 'inline-block';
+    UIEvents.debug = UIStyle.debug_mode;
     ui.dispatch('load', 'capture');
     ui.dispatch('reset', 'capture');
     ui.dispatch_value('set_buffer_event', ui.buffer, 'capture');
     //batl.text = '0%';
     ui.dispatch('content_size', 'capture');
-    ui.layout();
+    border.set_border({border:1});
+    ui.layout(true,true);
     if (UIStyle.debug_mode)
         await async_wait(2000);
-    ui.dispatch('draw', 'capture');
+    ui.dispatch('draw', 'capture_selffirst');
     ui.listener_of(document.querySelector('body'));
     ui.start_interval();
 
