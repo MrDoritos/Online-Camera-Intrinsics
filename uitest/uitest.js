@@ -327,6 +327,10 @@ class SpriteSheet extends Texture {
         }
     }
 
+    make_sprite(array) {
+        return new Atlas.Sprite(this, array[0], array[1], array[2]+array[0], array[3]+array[1]);
+    }
+
     sprites = {};
 
     static TEXTURES = {
@@ -335,7 +339,7 @@ class SpriteSheet extends Texture {
         'battery_13x6': [5, 11, 13, 6],
         'battery': 'battery_5x10',
 
-        'heart_large': [20, 12, 10, 10],
+        'heart_large': [20, 12, 11, 11],
         'heart_small': [32, 13, 9, 8],
         'heart': 'heart_small',
     };
@@ -378,6 +382,28 @@ class SpriteSheet extends Texture {
         'Z': [171,0,3,5],
         
     };
+
+    static TEXT_5x5 = {
+        'M': [71, 17, 5, 5],
+    };
+
+    static TEXT_4x5 = {
+        'N': [77, 17, 4, 5],
+    };
+
+    small_text(character, fallback_font=FontAtlas.DEFAULT) {
+        const sheets = [
+            SpriteSheet.TEXT_3x5,
+            SpriteSheet.TEXT_4x5,
+            SpriteSheet.TEXT_5x5,
+        ];
+
+        for (const sheet of sheets)
+            if (sheet[character])
+                return this.make_sprite(sheet[character]);
+        
+        return fallback_font.get_character(character);
+    }
 
     get_sprite = (sprite_id) => this.sprites[sprite_id] ?? new Atlas.Sprite(this,0,0,0,0);
 };
@@ -521,6 +547,7 @@ class UIEvents {
         is_stop_any = () => this.stop_propagation || this.stop_immediate_propagation;
         is_stop_propagation = () => this.stop_propagation;
         is_stop_immediate = () => this.stop_immediate_propagation;
+        is_stop_default = () => this.prevent_default;
         handle = (element) => { if (element[this.type]) { element[this.type].bind(element, this)(); if (UIEvents.debug) this.handle_log(element); } };
 
         handle_log(element) {
@@ -797,7 +824,7 @@ class UIStyle {
     }
 
     canvas_debug_r(element) {
-        element.clear(Color.get_random());
+        element.clear(undefined, Color.get_random());
 
         for (const child of element.get_children())
             this.canvas_debug_r(child);
@@ -841,6 +868,11 @@ class UIStyle {
         let [soffset_x, soffset_y] = [offset_x, offset_y];
         let [inline_w, inline_h] = [0,0];
         let [width, height] = this.get_used();
+
+        if (this.display == 'block' && this.computed_width == undefined) {
+            width = container_w - soffset_x;
+        }
+
         //width -= this.margin.get_width();
         //height -= this.margin.get_height();
         //width -= this.padding.get_width();
@@ -849,7 +881,7 @@ class UIStyle {
         if (this.horizontal_align || this.vertical_align) {
             if (UIStyle.debug_mode) console.log(soffset_x, soffset_y, container_w, container_h, width, height, container_x, container_y);
             if (this.horizontal_align == 'center') {
-                soffset_x += (container_w * .5) - (width * .5);
+                soffset_x = container_x + (container_w * .5) - (width * .5);
             }
             if (this.horizontal_align == 'right') {
                 soffset_x = container_x + container_w - width;
@@ -898,7 +930,6 @@ class UIStyle {
             [poffsetx, poffsety] = [offset_x, offset_y];
         }
 
-
         let ctxp = 'block';
         
         for (const child of element.get_children()) {
@@ -946,6 +977,10 @@ class UIStyle {
 
         [offset_x, offset_y] = [soffset_x, soffset_y];
         let [final_width, final_height] = [s_width, s_height];
+
+        //if (this.display == 'block') {
+        //    final_width = container_w;
+        //}
         //final_width -= this.margin.get_right();// + this.padding.get_width();
         //final_height -= this.margin.get_bottom();// + this.padding.get_height();
 
@@ -1038,7 +1073,11 @@ class UIStyle {
         //used_height += this.margin.get_width() + this.padding.get_width();
         //used_width += this.margin.get_right();
         //used_height += this.margin.get_bottom();
-        
+
+        /*if (element.parent && this.display == 'block') {
+            if (element.parent.style.computed_width != undefined)
+                [used_width, ] = element.parent.style.get_computed();
+        }*/
 
         this.set_used(used_width, used_height);
 
@@ -1140,7 +1179,9 @@ const UIElementMixin = (Super) => class extends UISize(Super) {
 
     log = (...params) => this.dispatch_value('log_event', params, 'broadcast');
 
-    get_tree_str = () => (this.parent ? this.parent.get_tree_str() : '') + `::${this.constructor.name}`;
+    get_name = () => this.constructor.name;
+
+    get_tree_str = () => (this.parent ? this.parent.get_tree_str() : '') + `::${this.get_name()}`;
     
     dispatch_event(event, event_action='bubble', skip_source=false) {
         if (!this || event.is_stop_any()) return;
@@ -1218,6 +1259,8 @@ class UIRoot extends UIElement {
 
     interval_id=0;
     interval_period=50;
+    screens=[];
+    active_screen=undefined;
 
     listener_of(element) {
         element.addEventListener('keydown', event => 
@@ -1236,6 +1279,45 @@ class UIRoot extends UIElement {
         if (!skip_draw)
             this.dispatch('draw', 'capture_selffirst');
     };
+
+    remove_screen(screen) {
+        this.children = this.children.filter(x => x != screen && x != undefined);
+    }
+
+    set_screen(screen) {
+        this.remove_screen(this.active_screen);
+        this.active_screen = screen;
+        this.children.splice(1, 1, screen);
+    }
+
+    screen_index(screen) {
+        if (this.screens.includes(screen))
+            return this.screens.indexOf(screen);
+        return 0;
+    }
+
+    screen_next() {
+        let index = this.screen_index(this.active_screen) + 1;
+        index %= this.screens.length;
+        this.set_screen(this.screens[index]);
+    }
+
+    screen_prev() {
+        let index = this.screen_index(this.active_screen) - 1;
+        index = (index + this.screens.length) % this.screens.length;
+        this.set_screen(this.screens[index]);
+    }
+
+    keyboard(event) {
+        if (event.is_stop_default())
+            return;
+
+        if (event.is_arrow_right_key())
+            this.screen_next();
+
+        if (event.is_arrow_left_key())
+            this.screen_prev();
+    }
 
     has_valid_interval = () => this.interval_id > 0;
 
@@ -1269,6 +1351,8 @@ class UIText extends UIElement {
     draw_end_y;
     cursor_x;
     cursor_y;
+
+    get_name = () => this.text;
 
     get_font_width = () => this.font_atlas.sprite_width;
     get_font_height = () => this.font_atlas.sprite_height;
@@ -1325,15 +1409,19 @@ class UIText extends UIElement {
 
     is_char_bound = (x, y) => (x >= this.get_left() && x + this.get_font_width() <= this.get_right() && y >= this.get_top() && y + this.get_font_height() <= this.get_bottom());
 
-    draw_character(x, y, character) {
-        const font_sprite = this.get_font_sprite(character);
-
+    draw_sprite(x, y, sprite) {
         if (this.alpha_blend) {
-            this.buffer.draw_sprite_alpha_blend(x, y, font_sprite, this.alpha_fast);
+            this.buffer.draw_sprite_alpha_blend(x, y, sprite, this.alpha_fast);
         } else {
-            this.buffer.draw_sprite(x, y, font_sprite);
+            this.buffer.draw_sprite(x, y, sprite);
         }
     }
+
+    draw_character(x, y, character) {
+        this.draw_sprite(x,y,this.get_font_sprite(character));
+    }
+
+    draw_sprite_at_cursor = (sprite) => this.draw_sprite(this.cursor_x, this.cursor_y, sprite);
 
     draw_at_cursor = (character) => this.draw_character(this.cursor_x, this.cursor_y, character);
     draw_at_cursor_bound = (character) => { if (this.is_char_bound(this.cursor_x, this.cursor_y)) this.draw_at_cursor(character); };
@@ -1391,6 +1479,11 @@ class UIText extends UIElement {
         for (let i = 0; i < text.length; i++) {
             const character = text[i];
 
+            if (this.cursor_x + font_width > this.get_right()) {
+                this.cursor_x = this.get_left();
+                this.cursor_y += font_height;
+            }
+
             if (character == '\n') {
                 this.cursor_x = this.get_left();
                 this.cursor_y += font_height;
@@ -1404,10 +1497,6 @@ class UIText extends UIElement {
             }
 
             this.cursor_x += font_width;
-            if (this.cursor_x + font_width > this.get_right()) {
-                this.cursor_x = this.get_left();
-                this.cursor_y += font_height;
-            }
             if (this.cursor_y + font_height > this.get_bottom())
                 break;
         }
@@ -1827,10 +1916,10 @@ class DPad {
         }
     
         if (element.id == 4) {
-            this.debug_mode = !this.debug_mode;
+            //this.debug_mode = !this.debug_mode;
             //this.handler.dispatch('reset', 'broadcast');
-            uitext.reset_uitext();
-            this.handler.dispatch('draw', 'broadcast');
+            //uitext.reset_uitext();
+            //this.handler.dispatch('draw', 'broadcast');
             return;
         }
 
@@ -1939,7 +2028,125 @@ class DPad {
     }
 };
 
-let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures, bottom_label, uidiv;
+class UIScreen extends UIElement {
+};
+
+class UISubText extends UIText {
+    constructor(text, subtext, textures, fallback, y_baseline=0) {
+        super(text, fallback);
+        this.subtext = subtext;
+        this.texture = textures;
+        this.font = fallback;
+        this.y_baseline = y_baseline;
+    }
+
+    content_size() {
+        super.content_size();
+
+        let [width, height] = [this.style.content_width,this.style.content_height];
+
+        for (const char of this.subtext) {
+            const sprite = this.texture.small_text(char, this.font);
+            if (!sprite)
+                continue;
+            width += sprite.get_width();
+            if (sprite.get_height() > height)
+                height = sprite.get_height();
+        }
+
+        //this.style.content_width = width;
+        //this.style.content_height = height;
+        [this.style.content_width, this.style.content_height] = [width, height];
+    }
+
+    draw() {
+        super.draw();
+        this.cursor_x+=1;
+        console.log(this.cursor_y, this.cursor_x);
+        for (const char of this.subtext) {
+            const sprite = this.texture.small_text(char, this.font);
+            if (!sprite)
+                continue;
+            const y =  this.cursor_y + this.get_font_height() - sprite.get_height() + this.y_baseline;
+            this.draw_sprite(this.cursor_x, y, sprite);
+            this.cursor_x += sprite.get_width()+1;
+        }
+    }
+};
+
+class UIScreenMain extends UIScreen {
+    constructor(props) {
+        super();
+        Object.assign(this, props);
+
+        let row1 = new UIElement();
+        let heart = row1.appendChild(new UISprite(this.textures.get_sprite(this.heart_sprite)));
+        //let heart_text = row1.appendChild(new UIText('65BPM', this.font));
+        let heart_text = row1.appendChild(new UISubText('65', 'BPM', this.textures, this.font));
+        heart_text.style.margin.left = 3;
+        let spdiv = row1.appendChild(new UIElement());
+        let spo2 = spdiv.appendChild(new UISubText('SpO', '2', this.textures, this.font));
+        spo2.style.display='inline-block';
+        //spo2.style.padding.right = 3;
+        let spo2_text = spdiv.appendChild(new UIText(' 98.1%', this.font));
+        //spo2_text.style.padding.left = 3;
+        spo2_text.style.display='inline-block';
+        spdiv.style.horizontal_align = 'right';
+        let row2 = new UIElement();
+        let temp = row2.appendChild(new UIText('103°F', this.font));
+        let humd = row2.appendChild(new UIText('23%', this.font));
+        let baro = row2.appendChild(new UIText('0.91atm', this.font));
+        humd.style.horizontal_align='center';
+        baro.style.horizontal_align='right';
+        let row3 = new UIElement();
+        let br = row3.appendChild(new UIText('30br/m', this.font));
+        let row4 = new UIElement();
+        let body_temp = row3.appendChild(new UIText('Body 98*F', this.font));
+        body_temp.style.horizontal_align = 'right';
+        let hydrat = row4.appendChild(new UIText('Suggested H2O', this.font));
+        let h2o = row4.appendChild(new UIText('3L', this.font));
+        h2o.style.horizontal_align = 'right';
+        //hydrat.style.horizontal_align = 'right';
+        let row5 = new UIElement();
+        let uv = row5.appendChild(new UIText('UV 80%', this.font));
+        let uv_exp = row5.appendChild(new UIText('24Hr Sum 20%', this.font));
+        uv_exp.style.horizontal_align = 'right';
+        let row6 = new UIElement();
+        let cos = row6.appendChild(new UISubText('CO', '2', this.textures, this.font));
+        let co2 = row6.appendChild(new UIText(' 1200ppm', this.font));
+        let aqi = row6.appendChild(new UIText('AQI 30%', this.font));
+        aqi.style.horizontal_align = 'right';
+        let row7 = new UIElement();
+        let wea = row7.appendChild(new UIText('Weather HOT', this.font));
+        let tim = row7.appendChild(new UIText('3 Hrs', this.font));
+        //tim.style.margin.left=3;
+        tim.style.horizontal_align='right';
+
+
+        this.children = [
+            row1,
+            row2,
+            row3,
+            row4,
+            row5,
+            row6,
+            row7,
+        ];
+
+        for (const child of this.children) {
+            for (const sub of child.children)
+                sub.style.display = 'inline-block';
+            child.style.min_height=14;
+            child.style.max_height=16;
+        }
+    }
+
+    heart_sprite='heart_large';
+    textures;
+    font;
+};
+
+let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures, bottom_label, uidiv, mainscreen;
 
 async function load_additional_fonts() {
     const font_list = [
@@ -1961,7 +2168,7 @@ async function load_additional_fonts() {
 
     const promises = font_list.map(x => new Promise(resolve => FontAtlas.make(x[0], x[1], x[2]).then(resolve)));
     
-    Promise.allSettled(promises)
+    await Promise.allSettled(promises)
         .then(fulfilled => {
             for (const promise of fulfilled)
                 if (promise?.value)
@@ -1985,7 +2192,12 @@ async function page_load() {
     //let border = ui.appendChild(new UIStyleMixin(new UIBorderBox(), {width:10,height:10}));
     let border = new UIBorderBox();//ui.appendChild(new UIBorderBox());
     border.appendChild(new UISprite(textures.get_sprite('heart'))).style.horizontal_align='center';
-    uitext = ui.appendChild(new UITextInput());
+    uitext = new UITextInput();//ui.appendChild(new UITextInput());
+    mainscreen = new UIScreenMain({textures, font:FontAtlas.fonts[7]});
+    mainscreen.style.margin.top=1;
+    //ui.appendChild(mainscreen);
+    ui.screens.push(mainscreen);
+    ui.set_screen(mainscreen);
     let bottom_div = ui.appendChild(new UIBorderBox());
     bottom_label = bottom_div.appendChild(new UIText('UI Test Demo', FontAtlas.fonts[7]));
     //uitext.set_size(8, 16, 112-1, 94);
@@ -2066,8 +2278,8 @@ async function page_load() {
         //await uitext.reset();
         uitext.reset_uitext();
     };
-    if (!UIStyle.debug_mode)
-        welcome();
+    //if (!UIStyle.debug_mode)
+    //    welcome();
 }
 
 page_load();
