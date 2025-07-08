@@ -182,6 +182,94 @@ const TextureWriter = (Super) => class extends Super {
         }
     };
 
+    line_callback(x1, y1, x2, y2, callback) {
+        let x,y,dx,dy,dx1,dy1,px,py,xe,ye,i;
+		
+		dx=x2-x1;
+		dy=y2-y1;
+		
+		dx1=Math.abs(dx);
+		dy1=Math.abs(dy);
+		
+		px=2*dy1-dx1;
+		py=2*dx1-dy1;
+
+		if(dy1<=dx1) {
+			if(dx>=0) {
+				x=x1;
+				y=y1;
+				xe=x2;
+			} else {
+				x=x2;
+				y=y2;
+				xe=x1;
+			}
+            
+            callback(x,y);
+			
+			for(i=0;x<xe;i++) {
+				x=x+1;
+				if(px<0) {
+					px=px+2*dy1;
+				} else {
+					if((dx<0 && dy<0) || (dx>0 && dy>0)) {
+						y=y+1;
+					} else {
+						y=y-1;
+					}
+					px=px+2*(dy1-dx1);
+				}
+
+				callback(x,y);
+			}
+		} else {
+			if(dy>=0) {				
+				x=x1;
+				y=y1;
+				ye=y2;
+			} else {
+				x=x2;
+				y=y2;
+				ye=y1;
+			}  
+			
+            callback(x,y);
+  
+			for(i=0;y<ye;i++) {
+				y=y+1;
+				if(py<=0) {
+					py=py+2*dx1;
+				} else {
+					if((dx<0 && dy<0) || (dx>0 && dy>0)) {
+						x=x+1;
+					} else {
+						x=x-1;
+					}
+					
+					py=py+2*(dx1-dy1);
+				}	
+				
+                callback(x,y);
+			}
+		}
+    }
+
+    line = (x1, y1, x2, y2, pixel) => this.line_callback(x1, y1, x2, y2, (x,y) => this.put_pixel(x, y, pixel));
+
+    circle = (cx, cy, r, pixel, fill=true) => {
+        const r2 = r ** 2;
+
+        for (let x = cx-r; x < cx+r+1; x++) {
+            for (let y = cy-r; y < cy+r+1; y++) {
+                const xy2 = (x-cx) ** 2 + (y-cy) ** 2;
+                if (!fill && Math.abs(xy2 - r2) > 2)
+                    continue;
+                if (xy2 < r2)
+                    this.put_pixel(x, y, pixel);
+            }
+        }
+    };
+
     sample_texture(dx0, dy0, dx1, dy1, sx0, sy0, sx1, sy1, texture) {
         const ix = 1/this.width;
         const iy = 1/this.height;
@@ -447,6 +535,10 @@ const UISize = (Super) => class extends (Super) {
     get_top = () => this.get_offsety();
     get_bottom = () => this.get_offsety() + this.get_height();
 
+    get_centerx = () => (this.get_width() * .5) + this.get_offsetx();
+    get_centery = () => (this.get_height() * .5) + this.get_offsety();
+    get_center = () => [this.get_centerx(), this.get_centery()];
+
     is_bound = (x, y) => x >= this.get_left() && x < this.get_right() && y >= this.get_top() && y < this.get_bottom();
 
     get_absolute() {
@@ -626,7 +718,7 @@ class UIStyle {
     min_height;
     height;
     max_height;
-    text_wrap = "wrap";
+    text_wrap = "nowrap";
     text_align = "left";
     overflow_x = "hidden"; // 'auto'/undefined
     overflow_y = "hidden";
@@ -1272,8 +1364,12 @@ class UIRoot extends UIElement {
         this.buffer.flush();
     }
 
-    layout = (skip_clear=false,skip_draw=false) => { 
+    layout = (skip_clear=false,skip_draw=false,skip_buffer=false,skip_content_size=false) => { 
+        if (!skip_content_size)
+            this.dispatch('content_size', 'capture');
         this.style.compute_layout_2(this);
+        if (!skip_buffer)
+            this.dispatch_value('set_buffer_event', this.buffer, 'capture', true);
         if (!skip_clear)
             this.dispatch('clear', 'capture');
         if (!skip_draw)
@@ -1287,7 +1383,9 @@ class UIRoot extends UIElement {
     set_screen(screen) {
         this.remove_screen(this.active_screen);
         this.active_screen = screen;
-        this.children.splice(1, 1, screen);
+        this.children.splice(1, 0, screen);
+        this.children.at(-1).children[0].text = this.active_screen.get_name();
+        this.layout();
     }
 
     screen_index(screen) {
@@ -2029,6 +2127,7 @@ class DPad {
 };
 
 class UIScreen extends UIElement {
+    get_name = () => "Screen";
 };
 
 class UISubText extends UIText {
@@ -2101,9 +2200,10 @@ class UIScreenMain extends UIScreen {
         let row3 = new UIElement();
         let br = row3.appendChild(new UIText('30br/m', this.font));
         let row4 = new UIElement();
-        let body_temp = row3.appendChild(new UIText('Body 98*F', this.font));
+        let body_temp = row3.appendChild(new UIText('Body 98°F', this.font));
         body_temp.style.horizontal_align = 'right';
-        let hydrat = row4.appendChild(new UIText('Suggested H2O', this.font));
+        let hydrat = row4.appendChild(new UISubText('Suggested H', '2', this.textures, this.font));
+        row4.appendChild(new UIText('O', this.font)).style.margin.left=1;
         let h2o = row4.appendChild(new UIText('3L', this.font));
         h2o.style.horizontal_align = 'right';
         //hydrat.style.horizontal_align = 'right';
@@ -2117,7 +2217,7 @@ class UIScreenMain extends UIScreen {
         let aqi = row6.appendChild(new UIText('AQI 30%', this.font));
         aqi.style.horizontal_align = 'right';
         let row7 = new UIElement();
-        let wea = row7.appendChild(new UIText('Weather HOT', this.font));
+        let wea = row7.appendChild(new UIText('Weather UV+HOT', this.font));
         let tim = row7.appendChild(new UIText('3 Hrs', this.font));
         //tim.style.margin.left=3;
         tim.style.horizontal_align='right';
@@ -2144,9 +2244,70 @@ class UIScreenMain extends UIScreen {
     heart_sprite='heart_large';
     textures;
     font;
+
+    get_name = () => "Live Data";
 };
 
-let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures, bottom_label, uidiv, mainscreen;
+class UIScreenClock extends UIScreen {
+    draw() {
+        this.clear();
+        const min = Math.min(this.get_height(), this.get_width());
+        const rd = min * .5;
+        const [cx, cy] = this.get_center();
+        this.buffer.circle(cx, cy, rd, Color.WHITE, true);
+
+        const time = new Date();
+
+        const fill = (x,y,width,pixel) => {
+            this.buffer.circle(x,y,width,pixel,true);
+        };
+
+        const to_rect = (rad, radius, x, y) => {
+            return [radius * Math.cos(rad) + x, radius * Math.sin(rad) + y];
+        };
+
+        const linefill = (sx, sy, ex, ey, width, pixel=Color.BLACK) => {
+            this.buffer.line_callback(sx, sy, ex, ey, (x, y) =>
+                fill(x, y, width, pixel));
+        };
+        
+        const polar_line = (rad, radius, width, pixel=Color.BLACK, _cx=cx, _cy=cy) => {
+            const ex = radius * Math.cos(rad) + _cx;
+            const ey = radius * Math.sin(rad) + _cy;
+            linefill(_cx, _cy, ex, ey, width, pixel);
+        };
+
+        let hours = time.getHours();
+        let minutes = time.getMinutes();
+        let seconds = time.getSeconds();
+        minutes += seconds * (1/60);
+        hours += minutes * (1/60);
+
+        polar_line(hours * (1/12) * Math.PI * 2 - (Math.PI * .5), rd * .9, 2);
+        //polar_line(hours * (1/12) * Math.PI * 2 - (Math.PI * .5), rd * .8, .75, Color.WHITE);
+        polar_line(seconds * (1/60) * Math.PI * 2 - (Math.PI * .5), rd * .75, 1);
+        polar_line(minutes * (1/60) * Math.PI * 2 - (Math.PI * .5), rd * 0.8, 1.5);
+
+        for (let i = 0; i < Math.PI * 2; i+=(Math.PI * 2 * (1/60))){
+            const [[sx, sy],[ex,ey]] = [to_rect(i,rd*.91,cx,cy),to_rect(i,rd,cx,cy)];
+            linefill(sx, sy, ex, ey, 1, Color.BLACK);
+        }
+
+        for (let i = 0; i < Math.PI * 2; i+=(Math.PI * 2 * (1/12))){
+            const [[sx, sy],[ex,ey]] = [to_rect(i,rd*.87,cx,cy), to_rect(i,rd,cx,cy)];
+            linefill(sx, sy, ex, ey, 1.5, Color.BLACK);
+        }
+
+        this.buffer.circle(cx,cy,2,Color.BLACK,true);
+        this.buffer.circle(cx,cy,1,Color.WHITE,true);
+    }
+
+    tick = () => this.draw();
+
+    get_name = () => "Clock";
+};
+
+let ui = undefined, uitext = undefined, uiclock = undefined, dpad, container, uidummy, textures, bottom_label, uidiv, mainscreen, screenclock;
 
 async function load_additional_fonts() {
     const font_list = [
@@ -2197,9 +2358,14 @@ async function page_load() {
     mainscreen.style.margin.top=1;
     //ui.appendChild(mainscreen);
     ui.screens.push(mainscreen);
-    ui.set_screen(mainscreen);
+    screenclock = new UIScreenClock();
+    screenclock.style.height=96;
+    screenclock.style.vertical_align = 'center';
+    screenclock.style.position = 'absolute';
     let bottom_div = ui.appendChild(new UIBorderBox());
     bottom_label = bottom_div.appendChild(new UIText('UI Test Demo', FontAtlas.fonts[7]));
+    ui.screens.push(screenclock);
+    ui.set_screen(mainscreen);
     //uitext.set_size(8, 16, 112-1, 94);
     //uiclock.set_size(0, 1, 128, 12);
     ui.style.width = 128;
@@ -2233,6 +2399,7 @@ async function page_load() {
     bottom_div.set_border({top:1});
     bottom_label.style.horizontal_align = 'center';
     bottom_div.style.vertical_align = 'bottom';
+    bottom_div.style.min_height=14;
     
     uidiv.style.padding.right = 1;
     //batl.style.vertical_align = 'center';
