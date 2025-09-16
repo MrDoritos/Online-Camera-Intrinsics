@@ -1,0 +1,12 @@
+* {
+    margin:0;
+    padding:0;
+}
+
+body {
+    background-color: gray;
+    width: 100dvw;
+    height: 100dvh;
+    overflow: hidden;
+    align-content: center;
+}
