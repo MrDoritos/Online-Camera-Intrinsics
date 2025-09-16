@@ -10,3 +10,13 @@ body {
     overflow: hidden;
     align-content: center;
 }
+
+#main {
+    height: 80%;
+    width: 80%;
+    align-content: center;
+    margin: auto;
+}
+
+#canvas {
+}
