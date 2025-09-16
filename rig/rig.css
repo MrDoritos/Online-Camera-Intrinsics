@@ -8,15 +8,12 @@ body {
     width: 100dvw;
     height: 100dvh;
     overflow: hidden;
-    align-content: center;
+    overscroll-behavior: none;
+    touch-action: none;
 }
 
 #main {
-    height: 80%;
-    width: 80%;
-    align-content: center;
-    margin: auto;
-}
-
-#canvas {
+    height: 70%;
+    width: 90%;
+    margin: 15% 5%;
 }
