@@ -96,13 +96,14 @@ const camera = new THREE.PerspectiveCamera(72, size.width / size.height, 0.1, 10
 const renderer = new THREE.WebGLRenderer({canvas:canvas, alpha:true});
 renderer.setSize(size.width, size.height);
 
-const geometry = new THREE.BoxGeometry(1, 1, 1);
+const geometry = new THREE.SphereGeometry(0.5);
 const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 const cube = new THREE.Mesh(geometry, material);
 
 scene.add(cube);
 
-let magnitude = new OptionNumber(control, 'magnitude', 'Magnitude', 0, 11, 0.1, 2);
+let magnitude = new OptionNumber(control, 'magnitude', 'Magnitude (ML)', 0, 11, 0.1, 2);
+let depth = new OptionNumber(control, 'depth', 'Depth below MSL (km)', -100, 600, 1, 10)
 
 magnitude.onupdate = (con) => {
     con.set_info(con.get_value());
