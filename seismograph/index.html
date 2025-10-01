@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="canonical" href="https://iansweb.org/seismograph" />
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="keywords" content="rig">
+        <meta name="author" content="iansweb">
+        <meta name="description" content="Seismograph">
+        <title>Rig</title>
+        <link rel="stylesheet" href="seismograph.css">
+    </head>
+    <body id="body">
+        <div id="control">
+        </div>
+        <div id="main">
+            <canvas id="canvas"></canvas>
+        </div>
+    </body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.180.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module" src="seismograph.js"></script>
+</html>
