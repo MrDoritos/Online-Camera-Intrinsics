@@ -265,6 +265,56 @@ class SensorDB {
 	}
 };
 
+class CalcField {
+	text = undefined;
+	value = undefined;
+	step = undefined;
+	calc = undefined;
+};
+
+class CalcState {
+	fields={};
+
+	format_html(readonly) {
+		let innerHTML = "";
+		let extra = readonly ? "readonly" : "";
+
+		for (const [key, value] of Object.entries(this.fields)) {
+			let type = readonly || value.calc < 1 ? "text" : "number";
+			let html = 
+			`<div id="${value.calc_id ? value.calc_id : ''}"><p>${value.text}</p><input type="${type}" name="${key}" step="${value.step}" value="${value.value}" ${extra} oninput="" /></div>\n`;
+			innerHTML += html;
+		}
+
+		return innerHTML;
+	}
+
+	from_html(id) {
+		this.fields = db.from_sparse(
+			document.querySelectorAll(id),
+			'name', 'value'	
+		);
+	}
+};
+
+class CalcForm {
+	constructor(parent, id, readonly) {
+		this.id = id;
+		this.element = document.getElementById(id);
+		this.readonly = readonly;
+	}
+
+	set_state(state) {
+		this.element.innerHTML = state.format_html(this.readonly);
+	}
+
+	get_state() {
+		let state = new CalcState();
+		state.from_html(`#${this.id} input`);
+		return state;
+	}
+};
+
 // #endregion
 
 // #region Data generation
