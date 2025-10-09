@@ -2475,6 +2475,10 @@ class VCDS {
     events = [
         ['log_load', 'input', this.log_load_input],
         ['log_load_sensagram', 'input', this.log_load_input_sensagram],
+        ['log_combine', 'click', this.log_combine_input],
+        ['log_combine_select', 'input', this.log_combine_select_input],
+        ['log_combine_execute', 'click', this.log_combine_execute_input],
+        ['log_combine_cancel', 'click', this.log_combine_cancel_input],
         ['define_engine', 'click', this.define_engine_input],
         ['clear_engine', 'click', this.clear_engine_input],
         ['save_engine', 'click', this.save_engine_input],
@@ -2873,6 +2877,87 @@ class VCDS {
         }.bind(this);
 
         reader.readAsText(form);
+    }
+
+    log_combine_get_entries() {
+        let elems = document.querySelectorAll('#log_combine_selected div');
+        let entries = [];
+        for (const e of elems) {
+            entries.push(e.className);
+        }
+        return entries;
+    }
+
+    log_combine_clear_entries() {
+        let e = this.get_element('log_combine_selected');
+
+        e.innerHTML = '';
+    }
+
+    log_combine_add_entries() {
+        let target = this.get_element('log_combine_select');
+
+        target.innerHTML = '';
+
+        const current = this.log_combine_get_entries();
+
+        for (const log of this.logs) {
+            if (current.includes(log.log.name))
+                continue;
+            let entry = document.createElement('option');
+            entry.className = log.log.name;
+            entry.innerText = log.log.filename;
+            target.appendChild(entry);
+        }
+
+        let def = document.createElement('option');
+        def.disabled = true;
+        def.selected = true;
+        def.innerText = 'Select Log';
+        target.appendChild(def);
+    }
+
+    log_combine_select_input(event) {
+        let entries = event.target.selectedOptions;
+
+        let current = this.log_combine_get_entries();
+        let selected = this.get_element('log_combine_selected');
+
+        for (const [key, value] of Object.entries(entries)) {
+            console.log(key, value, current);
+
+            if (current.includes(value.className))
+                continue;
+
+            let entry = document.createElement('div');
+            entry.className = value.className;
+            entry.innerText = value.innerText;
+            selected.appendChild(entry);
+        }
+
+        this.log_combine_add_entries();
+    }
+
+    log_combine_input(event) {
+        let e = this.get_element('log_combine_dialog');
+
+        this.log_combine_add_entries();
+
+        e.show();
+    }
+
+    log_combine_cancel_input(event) {
+        this.log_combine_clear_entries();
+
+        let e = this.get_element('log_combine_dialog');
+
+        e.close();
+    }
+
+    log_combine_execute_input(event) {
+        let e = this.get_element('log_combine_dialog');
+
+        e.close();
     }
 
     async log_load_input_sensagram(event) {

@@ -443,3 +443,29 @@ table {
     padding: 0.2em;
     gap:0.2em;
 }
+
+#log_combine_dialog {
+    height: 100%;
+    background: none;
+    border: none;
+    align-content: center;
+}
+
+#log_combine_div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border: 1px solid black;
+    background-color: silver;
+    padding: 10px;
+}
+
+#log_combine_buttons {
+    display: flex;
+    justify-content: right;
+    gap: 5px;
+}
+
+#log_combine_div > h3, #log_combine_div > h5 {
+    margin: 2px;
+}

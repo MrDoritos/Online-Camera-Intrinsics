@@ -11,11 +11,24 @@
         <link rel="stylesheet" href="vcds.css">
     </head>
     <body id="log_body">
+        <dialog id="log_combine_dialog">
+            <div id="log_combine_div">
+                <h3>Combine Logs</h3>
+                <h5>Select Logs</h5>
+                <div id="log_combine_selected"></div>
+                <select id="log_combine_select"></select>
+                <div id="log_combine_buttons">
+                    <button id="log_combine_execute">Combine</button>
+                    <button id="log_combine_cancel">Cancel</button>
+                </div>
+            </div>
+        </dialog>
         <div id="log_load_div">
             <input class="input_bypass" id="log_load" type="file" accept="text/csv, *" />
             <button onclick="log_load.click()">Load VCDS Log</button>
             <input class="input_bypass" id="log_load_sensagram" type="file" accept="*" />
             <button onclick="log_load_sensagram.click()">Load SensaGram Log</button>
+            <button id="log_combine">Combine Logs</button>
         </div>
         <div id="engine_opts">
             <p>Engine Configuration</p>
