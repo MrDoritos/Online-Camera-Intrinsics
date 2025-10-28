@@ -28,7 +28,7 @@ Sony,IMX462,,,,1920,1080,2.9,,,6.46,,1/2.8”,,,,,,,,,,,,,,,,,,,
 Sony,IMX415,,,,3840,2160,1.45,,,6.4,,1/2.8”,,,,,,,,,,,,,,,,,https://github.com/raspberrypi/linux/tree/rpi-6.6.y/drivers/media/i2c,rpi firmware,linux firmware
 Sony,IMX355,,,,2592,1944,2,,,6.52,,1/2.8”,,,,,,,,,,,,,,,,,,,linux firmware
 Sony,IMX334,,,,3840,2160,2,,,8.86,,1/1.8”,,,,,,,,,,,,,,,,,,,linux firmware
-Sony,IMX335,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,linux firmware
+Sony,IMX335,,,,2616,1964,2,,,6.52,,1/2.8”,5.14,,,,,,,,,,,,,,,,https://www.sony-semicon.com/files/62/flyer_security/IMX335LQN_Flyer.pdf,,linux firmware
 Sony,IMX327,,,,1920,1080,2.9,,,,,1/2.8”,,,,,,,,,,,,,,,,,,,
 Sony,IMX319,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,linux firmware
 Sony,IMX519,,4.28,,4656,3496,1.22,,,7.103,,1/2.534”,16,,,,,,,,,,,,,,,,,rpi firmware,
