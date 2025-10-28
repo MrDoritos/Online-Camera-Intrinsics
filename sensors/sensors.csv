@@ -16,7 +16,9 @@ Samsung,S5KHM1,ISOCELL HM1,,,12032,9024,0.8,7.3,9.7,,,1/1.33”,108,,,,,,,,,,,,,
 Samsung,S5KHP9,ISOCELL HP9,,,16320,12288,0.56,,,,,1/1.4”,200,,,,,,,,,,,,,,,,,,
 Sony,Exmor_RS_CMOS_50MP,Alpha 1,,,,,4.16,35.9,24,,,,50.1,,,,,,,,,,,,,,,,https://www.fullcompass.com/prod/599822-sony-alpha-1-50mp-mirrorless-digital-camera-body-only,,
 Omnivision,OV5647,,3.6,,2592,,1.4,,,,,1/4”,5,,,,,,,,,,,,,,,,https://www.raspberrypi.com/documentation/accessories/camera.html,,
-Sony,IMX208,,,,,,,,,,,,,,,,,,,,,,,,,,,,https://github.com/torvalds/linux/tree/master/drivers/media/i2c,,linux firmware
+Omnivision,OV9281,,,,1280,800,3,3.84,2.4,,,,,,,,,,,,,,,,,,,,https://cdn.robotshop.com/media/a/adu/rb-adu-115/pdf/arducam-ov9281-1mp-global-shutter-mipi-camera-raspberry-pi-datasheet.pdf,,
+Omnivision,OV7251,,,,640,480,3,,,,,,,,,,,,,,,,,,,,,,https://dlscorp.com/wp-content/uploads/2019/02/OV7251_MIPI_Camera_Module_DS_v1.pdf,,
+Sony,IMX208,,,,1936,1096,1.4,4.245,2.783,,,,,,,,,,,,,,,,,,,,https://github.com/torvalds/linux/tree/master/drivers/media/i2c,https://e-nexty.dxp.nexty-ele.com/product_files/download?lc_code=ja&maker_code=SONY&product_file_id=5242901&product_id=5601227&product_part_number=IMX208&search_log_id=7597977,linux firmware
 Sony,IMX214,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,linux firmware
 Sony,IMX219,,3.04,,3280,,1.12,,,4.6,,1/4”,8,,,,,,,,,,,,,,,,,rpi firmware,linux firmware
 Sony,IMX708,,4.74,,4608,,1.4,,,7.4,,1/2.43”,11.9,,,,,,,,,,,,,,,,,rpi firmware,

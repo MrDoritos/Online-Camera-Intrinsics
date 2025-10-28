@@ -528,6 +528,18 @@
 		<priority>0.5</priority>
 	</url>
 	<url>
+		<loc>https://iansweb.org/sensors/OV7251/</loc>
+		<lastmod>2025-10-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
+	</url>
+	<url>
+		<loc>https://iansweb.org/sensors/OV9281/</loc>
+		<lastmod>2025-10-28</lastmod>
+		<changefreq>monthly</changefreq>
+		<priority>0.5</priority>
+	</url>
+	<url>
 		<loc>https://iansweb.org/sensors/QV2710/</loc>
 		<lastmod>2025-07-02</lastmod>
 		<changefreq>monthly</changefreq>
