@@ -802,20 +802,25 @@ class Arrows {
         // Transform 2D Origin into 3D space along Camera
         this.inverse_matrix = inverse_m4(this.view_transform_matrix);
         this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        //this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
 
         // Draw axis using new 3D origin, project using MVP?
 
         let axis_scale = 1;
+        let axis_w = 1;
         let axis_vectors = [
-            vec4(axis_scale,0,0,1),
-            vec4(0,axis_scale,0,1),
-            vec4(0,0,axis_scale,1)
+            vec4(axis_scale,0,0,axis_w),
+            vec4(0,axis_scale,0,axis_w),
+            vec4(0,0,axis_scale,axis_w)
         ];
-        let origin_4d = vec4_v3(this.origin_3d, 0);
 
         let project = function get_projection(vec) {
             return mul_m4_v4(this.matrix, vec);
         }.bind(this);
+
+        let origin_4d = vec4_v3(this.origin_3d, 1);
+        //let origin_4d = project(vec4(0,0,0,0));
+        let c = screen_v(project(origin_4d), size);
 
         for (let i = 0; i < 3; i++) {
             let vec = axis_vectors[i];
@@ -823,7 +828,7 @@ class Arrows {
             vec = project(vec);
 
             let s = screen_v(vec, size);
-            let c = screen_v(origin_4d, size);
+            //let c = screen_v(origin_4d, size);
 
             ctx.strokeStyle = ["red", "lime", "dodgerblue"][i];
 
@@ -1348,22 +1353,25 @@ class Arrows {
         return point;
     }
 
-    get_3d_origin(origin_2d, principal_point, focal_length_relative, z=-1) {
+    get_3d_origin(origin_2d, principal_point, focal_length_relative, z=-10) {
         let k = 2 / focal_length_relative;
-        return vec4(
+        //console.log("origin_2d", origin_2d, "principal_point", principal_point, "k", k);
+        let origin_3d = vec4(
             k * (origin_2d.x - principal_point.x),
             k * (origin_2d.y - principal_point.y),
             z,
             1
         );
+        //console.log("origin_3d", origin_3d);
+        return origin_3d;
     }
 
     get_view_transform_matrix(rotation_matrix, unit_vector_matrix, origin_3d) {
         let view_transform_matrix = mul_m4(unit_vector_matrix, rotation_matrix);
         //view_transform_matrix = translate_m4(view_transform_matrix, origin_3d);
-        //view_transform_matrix[0].w = origin_3d.x;
-        //view_transform_matrix[1].w = origin_3d.y;
-        //view_transform_matrix[2].w = origin_3d.z;
+        view_transform_matrix[0].w = origin_3d.x;
+        view_transform_matrix[1].w = origin_3d.y;
+        view_transform_matrix[2].w = origin_3d.z;
         this.camera_transform_matrix = inverse_m4(view_transform_matrix);
         this.rotation_matrix = inverse_m3(rotation_matrix);
         return view_transform_matrix;
