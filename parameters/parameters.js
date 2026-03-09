@@ -787,6 +787,56 @@ class Arrows {
         return vec2(canvas.width, canvas.height);
     }
 
+    draw_axis(ctx, size, draw_point, draw_line) {
+        /*
+            this.camera_transform_matrix
+            this.view_transform_matrix
+            this.projection_matrix
+
+
+            this.origin_3d is 3d origin relative to camera transform
+            this.axis_view_origin is 2d origin relative to 2d screen
+        */
+
+
+        // Transform 2D Origin into 3D space along Camera
+        this.inverse_matrix = inverse_m4(this.view_transform_matrix);
+        this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+
+        // Draw axis using new 3D origin, project using MVP?
+
+        let axis_scale = 1;
+        let axis_vectors = [
+            vec4(axis_scale,0,0,1),
+            vec4(0,axis_scale,0,1),
+            vec4(0,0,axis_scale,1)
+        ];
+        let origin_4d = vec4_v3(this.origin_3d, 0);
+
+        let project = function get_projection(vec) {
+            return mul_m4_v4(this.matrix, vec);
+        }.bind(this);
+
+        for (let i = 0; i < 3; i++) {
+            let vec = axis_vectors[i];
+            vec = add_v4(vec, origin_4d);
+            vec = project(vec);
+
+            let s = screen_v(vec, size);
+            let c = screen_v(origin_4d, size);
+
+            ctx.strokeStyle = ["red", "lime", "dodgerblue"][i];
+
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y);
+            ctx.lineTo(s.x, s.y);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle = "black";
+        draw_point(this.axis_view_origin, 1);
+    }
+
     draw(canvas) {
         this.solve();
 
@@ -957,76 +1007,39 @@ class Arrows {
         let mat = this.camera_transform_matrix;
 
         if (cam && inv && cam.length && inv.length) {
+            this.draw_axis(ctx, size, draw_point, draw_line);
 
-        //let unproj_matrix = inverse
-        //let o = this.get_3d_origin(this.axis_view_origin, this.principal_point, this.focal_length, -1);
+            /*
         let o = vec4_v2(this.axis_view_origin, -1, 1);
         let ss = -1;
         let off = vec4(ss * -o.x, ss * -o.y, 1 * ss, 1.0);
-        //this.inverse_matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        
         this.inverse_matrix = inverse_m4(this.projection_matrix);
-        //this.inverse_matrix = set_translate_m4(this.inverse_matrix, this.get_3d_origin(o, this.principal_point, this.focal_length));
-        //let mat = this.inverse_matrix = mul_m4(this.inverse_matrix, this.camera_transform_matrix);
-        //o = mul_v4_f(o, 4);
-        //o = mul_m4_v4(this.camera_transform_matrix, o);
-        //this.view_transform_matrix = translate_m4(this.view_transform_matrix, o);
-        //this.camera_transform_matrix = set_translate_m4(this.camera_transform_matrix, o);
-        //this.view_transform_matrix = inverse_m4(this.camera_transform_matrix);
-        this.view_transform_matrix = set_translate_m4(this.view_transform_matrix, o);
-        //this.view_transform_matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
-        //this.view_transform_matrix = set_translate_m4(this.view_transform_matrix, o);
-        //this.view_transform_matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
+        o = this.origin_3d = mul_m4_v4(this.view_transform_matrix, mul_m4_v4(this.inverse_matrix, o));
+        
         this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
-        //this.matrix = mul_m4(this.projection_matrix, this.camera_transform_matrix);
-        //this.matrix = this.view_transform_matrix;
-        //this.matrix = inverse_m4(this.view_transform_matrix);
-        //this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
-        //this.matrix = set_translate_m4(this.matrix, o);
-        //this.matrix = mul_m4(this.matrix, translation_m4(o));
-        //this.view_transform_matrix = translate_m4(matrix4_m3(cam), vec4(0,0,0,0));
-        //let inverse_projection = inverse_m4(this.projection_matrix);
-        //this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
-        //this.inverse_matrix = inverse_m4(this.matrix);
-        //let off_world = translate_v3_m4(this.view_transform_matrix, off);
-        //let off_world_proj = translate_v3_m4(this.projection_matrix, off_world);
-        //let off_world = mul_m4_v4(this.view_transform_matrix, off);
-        //let off_world_proj = mul_m4_v4(this.inverse_matrix, off);
+        
         let project = function get_projection(point) {
-            //let t = mul_m4_v4(this.view_transform_matrix, off);
-            //return add_v4(t, point);
             let b = mul_m4_v4(this.matrix, point);
             return b;
         }.bind(this);
 
-        //let off_world_proj = mul_m4_v4(mat, vec4(0, 0, 0, 1));
-        //off_world_proj = project(vec4(0,0,0,1));
-
-        //console.log('off:', off);
-        //console.log('off_world:', off_world);
-        //console.log('off_world_proj:', off_world_proj);
-
         let points = [];
         for (let i = 0; i < 3; i++) {
             let ax = av[i];
-            //ax = add_v4(off_world, ax);
-            //let v = translate_v3_m4(this.matrix, av[i]);
-            //v = mul_m4_v4(this.projection_matrix, v);
-            //let v = translate_v3_m4(this.view_transform_matrix, ax);
-            //let v = mul_m4_v4(this.view_transform_matrix, ax);
+            
             let v = ax;
-            //v = add_v4(v, off_world_proj);
-            //v = translate_v3_m4(this.projection_matrix, v);
-            //v = mul_m4_v4(mat, v);
+            
+            v = add_v4(v, o);
+            
             v = project(v);
-            //v = add_v4(v, off_world);
-            //let v = translate_v3_m4(this.pro)
-            //let p = this.project_v3(v);
+            
             let p = vec2(v.x, v.y);
             console.log('v:',str_v3(v),'p:',str_v2(p));
 
             let s = screen_v(p, size);
             let c = screen_v(o, size);
-            //c = screen_v(project(o), size);
+            
             c = screen_v(project(vec4(0,0,0,1)), size);
 
             points.push(s);
@@ -1038,15 +1051,17 @@ class Arrows {
             ctx.lineTo(s.x, s.y);
             ctx.stroke();
         }
-        ctx.strokeStyle = "black";
+            */
+
+        /*
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         ctx.lineTo(points[1].x, points[1].y);
         ctx.lineTo(points[2].x, points[2].y);
         ctx.lineTo(points[0].x, points[0].y);
         ctx.stroke();
+        */
 
-        draw_point(this.axis_view_origin, 1);
         }
 
         {
