@@ -836,16 +836,16 @@ class Arrows {
         ];
 
         let project = function get_projection(vec) {
-            return mul_m4_v4(this.matrix, vec);
+            return mul_m4_v4(this.view_transform_matrix, vec);
         }.bind(this);
 
         let origin_4d = vec4_v3(this.origin_3d, 1);
         origin_4d = vec4(0,0,0,1);
         origin_4d = mul_m4_v4(this.inverse_matrix, origin_4d);
-        let offset_4d = vec4_v2(this.axis_view_origin, 0, 0);
-        offset_4d = mul_m3_v3(this.camera_rotation_matrix, offset_4d);
-        offset_4d = vec4_v3(offset_4d, 0);
-        origin_4d = add_v4(origin_4d, offset_4d);
+        //let offset_4d = vec4_v2(this.axis_view_origin, 0, 0);
+        //offset_4d = mul_m3_v3(this.camera_rotation_matrix, offset_4d);
+        //offset_4d = vec4_v3(offset_4d, 0);
+        //origin_4d = add_v4(origin_4d, offset_4d);
 
         let origin_projected = project(origin_4d);
         console.log(`project origin: ${str_vs(origin_projected, 4)}`);
