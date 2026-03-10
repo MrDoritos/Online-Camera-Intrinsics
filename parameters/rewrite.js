@@ -8,6 +8,10 @@ function get_offset(x, y, w) {
     return Math.round(Math.round(y) * w + x) * 4;
 }
 
+// #region Linear Algebra
+
+// #region Strings
+
 function str_v(v, digits=3) {
     if (v != null && v != undefined)
         return v.toFixed(digits);
@@ -51,6 +55,10 @@ function str_m4(m, digits=3) {
     return str_m(m, 4, 4, digits);
 }
 
+// #endregion
+
+// #region Constructors
+
 function vec(w) {
     let v = {};
     for (let i = 0; i < w; i++)
@@ -80,6 +88,10 @@ function vec4(x,y,z,w) {
 function get_arrow(v1, v2, axis) {
     return {start:v1, end:v2, axis:axis, primary_axis:axis.replace('-','')};
 }
+
+// #endregion
+
+// #region Operations
 
 function op_v2(v1, v2, op) {
     return vec2(
@@ -139,6 +151,10 @@ function op_mul(a, b) {
 function op_div(a, b) {
     return a / b;
 }
+
+// #endregion
+
+// #region Math
 
 function sub_v2(v1, v2) {
     return op_v2(v1, v2, op_sub);
@@ -591,6 +607,10 @@ function pick_closer(v1, v2, point) {
     return v2;
 }
 
+// #endregion
+
+// #endregion
+
 function emplace_pixel(data, pixel, x, y, width, height) {
     let offset = get_offset(x, y, width);
     for (let i = 0; i < 4; i++)
@@ -633,8 +653,6 @@ class Arrows {
 
     get_tolerance(size) {
         return this.arrow_tolerance / Math.sqrt((size.x * size.y * 3));
-        //return normalize_v3(vec3(size.x, size.y, this.arrow_tolerance)).z;
-        //return this.arrow_tolerance;
     }
 
     find_alt_moveable(mpos, tolerance) {
@@ -715,7 +733,8 @@ class Arrows {
     }
 
     get_arrow_magnitude(arrow) {
-        return normalize_v2(sub_v2(arrow.end, arrow.start));
+        //return normalize_v2(sub_v2(arrow.end, arrow.start));
+        return arrow.magnitude();
     }
 
     iden_v2(v) {
@@ -801,13 +820,15 @@ class Arrows {
 
         // Transform 2D Origin into 3D space along Camera
         this.inverse_matrix = inverse_m4(this.view_transform_matrix);
-        this.matrix = mul_m4(this.projection_matrix, this.view_transform_matrix);
+        //this.matrix = mul_m4(this.projection_matrix, this.inverse_matrix);
+        //this.matrix = mul_m4(this.inverse_matrix, this.projection_matrix);
         //this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
+        this.matrix = mul_m4(this.view_transform_matrix, this.projection_matrix);
 
         // Draw axis using new 3D origin, project using MVP?
 
         let axis_scale = 1;
-        let axis_w = 1;
+        let axis_w = 0;
         let axis_vectors = [
             vec4(axis_scale,0,0,axis_w),
             vec4(0,axis_scale,0,axis_w),
@@ -819,18 +840,46 @@ class Arrows {
         }.bind(this);
 
         let origin_4d = vec4_v3(this.origin_3d, 1);
+        origin_4d = vec4(0,0,0,1);
+        origin_4d = mul_m4_v4(this.inverse_matrix, origin_4d);
+        let offset_4d = vec4_v2(this.axis_view_origin, 0, 0);
+        offset_4d = mul_m3_v3(this.camera_rotation_matrix, offset_4d);
+        offset_4d = vec4_v3(offset_4d, 0);
+        origin_4d = add_v4(origin_4d, offset_4d);
+
+        let origin_projected = project(origin_4d);
+        console.log(`project origin: ${str_vs(origin_projected, 4)}`);
         //let origin_4d = project(vec4(0,0,0,0));
         let c = screen_v(project(origin_4d), size);
 
         for (let i = 0; i < 3; i++) {
             let vec = axis_vectors[i];
+
+            if (i == 0) {
+                console.log(`base vec: ${str_vs(vec, 4)}`);
+            }
+
             vec = add_v4(vec, origin_4d);
+
+            if (i == 0) {
+                console.log(`add vec: ${str_vs(vec, 4)}`);
+            }
+
             vec = project(vec);
+
+            if (i == 0) {
+                console.log(`project vec: ${str_vs(vec, 4)}`);
+            }
 
             let s = screen_v(vec, size);
             //let c = screen_v(origin_4d, size);
 
             ctx.strokeStyle = ["red", "lime", "dodgerblue"][i];
+
+            if (i == 0) {
+                console.log(`origin: ${c.x}, ${c.y}, end: ${s.x}, ${s.y}`);
+                console.log(`world origin: ${str_vs(origin_4d, 4)}, end: ${str_vs(vec, 4)}`);
+            }
 
             ctx.beginPath();
             ctx.moveTo(c.x, c.y);
@@ -1314,9 +1363,11 @@ class Arrows {
     solve_3vp_supplemental() {
         let vns = this.vanishing_points;
         let vn1 = vns[0].point, vn2 = vns[1].point, vn3 = vns[2].point;
+
         this.horizontal_fov = this.get_field_of_view(this.focal_length, 35, 1, 1);
         this.calculated_principal_point = this.ortho_center(vn1, vn2, vn3);
         this.focal_length = this.get_focal_length(vn1, vn2, this.calculated_principal_point);
+
         return [vn1, vn2, vn3, this.calculated_principal_point, this.focal_length];
     }
 
@@ -1367,13 +1418,17 @@ class Arrows {
     }
 
     get_view_transform_matrix(rotation_matrix, unit_vector_matrix, origin_3d) {
-        let view_transform_matrix = mul_m4(unit_vector_matrix, rotation_matrix);
+        //this.rotation_matrix = inverse_m3(rotation_matrix);
+        this.rotation_matrix = rotation_matrix;
+
+        //let view_transform_matrix = mul_m4(unit_vector_matrix, rotation_matrix);
+        let view_transform_matrix = mul_m4(rotation_matrix, unit_vector_matrix);
         //view_transform_matrix = translate_m4(view_transform_matrix, origin_3d);
         view_transform_matrix[0].w = origin_3d.x;
         view_transform_matrix[1].w = origin_3d.y;
         view_transform_matrix[2].w = origin_3d.z;
         this.camera_transform_matrix = inverse_m4(view_transform_matrix);
-        this.rotation_matrix = inverse_m3(rotation_matrix);
+
         return view_transform_matrix;
     }
     
@@ -1479,6 +1534,7 @@ class Parameters {
     final_move_rel = undefined;
     diff_move_scale = 1;
     last_save = 0;
+    local_save_name = "rewrite";
 
     elements = {
         'focal_length': 'range_focal_length',
@@ -1897,11 +1953,11 @@ class Parameters {
 
     async parameter_save_local() {
         let str = JSON.stringify(this.arrows);
-        localStorage.setItem('parameters', str);
+        localStorage.setItem(this.local_save_name, str);
     }
 
     parameter_load_local() {
-        const params = localStorage.getItem('parameters');
+        const params = localStorage.getItem(this.local_save_name);
 
         if (!params)
             return false;

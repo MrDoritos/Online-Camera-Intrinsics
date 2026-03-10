@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="canonical" href="https://iansweb.org/parameters/rewrite" />
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="keywords" content="rewrite">
+        <meta name="author" content="iansweb">
+        <meta name="description" content="Rewrite">
+        <title>Rewrite</title>
+        <link rel="stylesheet" href="parameters.css">
+    </head>
+    <body id="parameter_body">
+        <div id="parameter_images">
+            <div id="image_holder">
+                <img id="image_canvas"></img>
+            </div>
+            <div id="image_opacity"></div>
+            <canvas id="arrows_canvas"></canvas>
+        </div>
+        <div id="parameter_opts_container">
+        <div id="parameter_opts">
+            <p>Load Image</p>
+            <input name="image_load" id="image_load" type="file" accept="image/*, *" />
+            <p>Dim Image</p>
+            <input name="range_opacity" id="range_opacity" type="range" min="0" max="100" />
+            <p>Number of Vanishing Points</p>
+            <select id="axis_count"></select>
+            <div id="axis_types"></div>
+            <p>Focal Length</p>
+            <input name="range_focal_length" id="range_focal_length" type="range" min="0" max="100" />
+            <div id="parameter_info"></div>
+            <button name="parameter_save" id="parameter_save" type="button">Save Parameters</button>
+            <p>Load Parameters</p>
+            <input name="parameter_load" id="parameter_load" type="file" accept="text/*, *" />
+            <p>Magnifier Size</p>
+            <input name="range_magnifier_scale" id="range_magnifier_scale" type="range" min="0" max="100" />
+            <p>UI Scale</p>
+            <input name="range_ui_scale" id="range_ui_scale" type="range" min="0" max="100" />
+            <input id="checkbox_debug" type="checkbox">Debug</input>
+        </div>
+        </div>
+    </body>
+    <script src="rewrite.js"></script>
+</html>
