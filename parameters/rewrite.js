@@ -842,10 +842,10 @@ class Arrows {
         let origin_4d = vec4_v3(this.origin_3d, 1);
         origin_4d = vec4(0,0,0,1);
         origin_4d = mul_m4_v4(this.inverse_matrix, origin_4d);
-        //let offset_4d = vec4_v2(this.axis_view_origin, 0, 0);
+        let offset_4d = vec4_v2(this.axis_view_origin, 0, 0);
         //offset_4d = mul_m3_v3(this.camera_rotation_matrix, offset_4d);
-        //offset_4d = vec4_v3(offset_4d, 0);
-        //origin_4d = add_v4(origin_4d, offset_4d);
+        offset_4d = vec4_v3(offset_4d, 0);
+        origin_4d = add_v4(origin_4d, offset_4d);
 
         let origin_projected = project(origin_4d);
         console.log(`project origin: ${str_vs(origin_projected, 4)}`);
@@ -859,7 +859,7 @@ class Arrows {
                 console.log(`base vec: ${str_vs(vec, 4)}`);
             }
 
-            vec = mul_m4_v4(this.inverse_matrix, vec);
+            //vec = mul_m4_v4(this.inverse_matrix, vec);
             vec = add_v4(vec, origin_4d);
 
             if (i == 0) {
