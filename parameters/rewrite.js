@@ -859,6 +859,7 @@ class Arrows {
                 console.log(`base vec: ${str_vs(vec, 4)}`);
             }
 
+            vec = mul_m4_v4(this.inverse_matrix, vec);
             vec = add_v4(vec, origin_4d);
 
             if (i == 0) {
